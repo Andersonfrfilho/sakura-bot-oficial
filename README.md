@@ -1,149 +1,182 @@
-# Sakura Bot — Automação de Atendimento via WhatsApp
+# sakura-bot-oficial
 
-Bot de atendimento para qualquer tipo de estabelecimento (restaurante, barbearia, clínica, loja, etc.) via WhatsApp. Fluxo completo de pedidos com entrega ou retirada, reservas de mesa, histórico de pedidos, notificações automáticas de status e handoff para atendente humano.
+Bot de atendimento WhatsApp usando a **API oficial da Meta (WhatsApp Cloud API)**. Versão sem risco de ban, com suporte nativo a botões interativos, menus, catálogos e WhatsApp Flows.
+
+> Projeto irmão de [sakura-bot](https://github.com/Andersonfrfilho/sakura-bot) (Evolution API). Use este para produção.
 
 ---
 
-## Setup em 3 comandos
+## Por que a API oficial?
 
-```bash
-make setup   # cria infra/.env a partir do exemplo
-# edite infra/.env com suas credenciais
-make all     # sobe tudo + configura automaticamente
+| | Evolution API (não-oficial) | Meta Cloud API (oficial) |
+|---|---|---|
+| Risco de ban | Alto | Zero |
+| Botões / Menus | Instável | Nativo |
+| WhatsApp Flows | Não | Sim |
+| Catálogo de produtos | Não | Sim |
+| Templates outbound | Não | Sim |
+| Reconexão QR | Periódica | Não precisa |
+| Webhook confiável | Depende do host | Garantido pela Meta |
+
+### Tipos de mensagens interativas disponíveis
+
+**Reply Buttons** — até 3 botões de resposta rápida
+```
+┌─────────────────────────┐
+│ Como posso te ajudar?   │
+├──────────┬──────────────┤
+│ Cardápio │ Fazer pedido │  Suporte
+└──────────┴──────────────┘
 ```
 
-Após `make all`, o único passo manual é escanear o QR code do WhatsApp em `http://localhost:8081/manager`.
+**List Message** — menu com até 10 opções em seções
+```
+┌─────────────────────────┐
+│ Escolha uma opção       │
+│        [Ver opções ▼]   │
+└─────────────────────────┘
+```
 
-> Para deploy em produção (nuvem, domínio, HTTPS), veja [DEPLOY.md](DEPLOY.md).
+**WhatsApp Flows** — formulários nativos (endereço, agendamento, pagamento) sem sair do WhatsApp.
 
 ---
 
-## O que está automatizado no `make all`
+## Pré-requisitos
 
-| O que | Como |
-|---|---|
-| Schema do banco | Montado via `database/schema.sql` no Docker init |
-| Cardápio, FAQ | `make db-seed` importa os CSVs de `dados/` |
-| n8n — owner + workflows | `make n8n-import` cria conta, credencial Postgres e ativa todos os workflows |
-| Directus — admin | Criado pelas env vars `DIRECTUS_ADMIN_EMAIL` / `ADMIN_PASSWORD` |
-| Chatwoot — admin + inbox | `make chatwoot-init` via Rails runner, salva tokens no banco |
+- Docker + Docker Compose
+- Conta Meta for Developers com app WhatsApp configurado
+- URL pública HTTPS para o webhook (Railway, Fly.io ou ngrok para dev)
+
+> Veja o [SETUP.md](SETUP.md) para o passo a passo completo.
+
+---
+
+## Setup rápido
+
+```bash
+# 1. Clone e configure
+git clone https://github.com/Andersonfrfilho/sakura-bot-oficial
+cd sakura-bot-oficial
+make setup           # cria infra/.env a partir do exemplo
+
+# 2. Preencha infra/.env com suas credenciais Meta
+# WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, etc.
+
+# 3. Suba os serviços
+make up
+
+# 4. Exponha o n8n publicamente (dev)
+ngrok http 5678
+# URL gerada: https://abc123.ngrok.io
+
+# 5. Registre o webhook na Meta
+# URL: https://abc123.ngrok.io/webhook/whatsapp
+# Verify token: (o que você definiu em WHATSAPP_WEBHOOK_VERIFY_TOKEN)
+```
 
 ---
 
 ## Arquitetura
 
 ```
-WhatsApp → Evolution API [:8081]
-                ↓ webhook
+WhatsApp → Meta Cloud API (hospedado pela Meta)
+                  ↓ POST webhook (HTTPS obrigatório)
              n8n [:5678]  ←→  Groq (IA Llama 3)
-                ↓
-          PostgreSQL [:5432]
-                ↓
-     ┌──────────┴───────────┐
-  Chatwoot [:3010]    Directus [:8055]
-  (atendente humano)  (painel admin)
+                  ↓
+            PostgreSQL [:5432]
+                  ↓
+     ┌────────────┴────────────┐
+  Chatwoot [:3010]       Directus [:8055]
+  (atendente humano)     (painel admin)
 ```
 
-**Roteamento de mensagens** (tudo em `n8n/workflows/01-receber-mensagem.json`):
-
-| Condição | Destino |
-|---|---|
-| Opções do menu (1–6) | Handler direto no workflow |
-| Conversa de pedido | Máquina de estados (carrinho → endereço → pagamento → confirmação) |
-| Pergunta livre | Groq (Llama 3) com contexto de `dados/processos.md` + FAQ do banco |
-| Opção 4 — "Falar com atendente" | Cria conversa no Chatwoot + notifica agente via WhatsApp |
-| Estado `human_handoff` | Pausa o bot até o cliente digitar "sair" |
+**n8n** recebe os webhooks da Meta, roteia mensagens e chama a Graph API para enviar respostas. Não há Evolution API neste projeto.
 
 ---
 
-## Workflows n8n
-
-| Arquivo | Função | Ativo |
-|---|---|---|
-| `01-receber-mensagem.json` | Recebe webhook, roteia, responde | Sempre |
-| `02-limpar-sessoes.json` | Limpa sessões expiradas (cron) | Sempre |
-| `03-promocoes.json` | Envio de promoções agendadas | Opcional |
-| `04-lembrete-pedido.json` | Lembra cliente de pedido em aberto | Opcional |
-| `05-lembrete-reserva.json` | Lembra cliente de reserva | Se `FEATURE_RESERVAS=true` |
-| `06-notificar-status.json` | Notifica cliente ao mudar status do pedido | Se `FEATURE_STATUS_NOTIFICATIONS=true` |
-
----
-
-## Estrutura do projeto
-
-```
-sakura-bot/
-├── dados/
-│   ├── categorias.csv     ← Categorias do cardápio
-│   ├── produtos.csv       ← Produtos/serviços
-│   ├── faq.csv            ← Perguntas e respostas
-│   └── processos.md       ← Regras de negócio (contexto da IA)
-├── database/
-│   ├── init.sql           ← Cria bancos auxiliares (n8n, chatwoot, etc.)
-│   └── schema.sql         ← Schema completo da aplicação
-├── infra/
-│   ├── docker-compose.yml ← Todos os serviços
-│   └── .env.example       ← Template de variáveis de ambiente
-├── n8n/workflows/         ← Workflows exportados
-├── scripts/
-│   ├── seed-db.sh         ← Importa CSVs para o banco
-│   └── import-workflows.sh← Importa e ativa workflows no n8n
-├── tests/                 ← Testes de parsing e validação de workflow
-├── DEPLOY.md              ← Guia de deploy em produção (custos, nuvem, passos)
-└── Makefile               ← Interface principal
-```
-
----
-
-## Comandos disponíveis
+## Variáveis de ambiente obrigatórias
 
 ```bash
-make help          # lista todos os comandos
-make all           # primeira execução completa
-make up            # sobe os containers
-make down          # para os containers
-make restart       # reinicia os containers
-make logs          # logs em tempo real
-make ps            # status dos containers
-make init          # reconfigura sem recriar containers
-make db-reset      # recria schema (apaga dados)
-make test-msg      # simula mensagem: MSG="oi" TEL=5511999999999
-make test-order    # insere pedido de teste no banco
-make test          # roda testes de parsing + validação de workflow
+# WhatsApp Cloud API (Meta)
+WHATSAPP_ACCESS_TOKEN=EAAxx...       # token do app
+WHATSAPP_PHONE_NUMBER_ID=112905...   # ID do número (não o número em si)
+WHATSAPP_BUSINESS_ACCOUNT_ID=133...  # WABA ID
+WHATSAPP_WEBHOOK_VERIFY_TOKEN=...    # string que você define
+WHATSAPP_API_VERSION=v21.0
+```
+
+---
+
+## Enviar mensagem via Graph API (referência n8n)
+
+```
+POST https://graph.facebook.com/v21.0/{{PHONE_NUMBER_ID}}/messages
+Authorization: Bearer {{ACCESS_TOKEN}}
+
+# Texto simples
+{ "messaging_product": "whatsapp", "to": "5511999999999",
+  "type": "text", "text": { "body": "Olá!" } }
+
+# Botões interativos
+{ "messaging_product": "whatsapp", "to": "5511999999999",
+  "type": "interactive",
+  "interactive": {
+    "type": "button",
+    "body": { "text": "Como posso te ajudar?" },
+    "action": {
+      "buttons": [
+        { "type": "reply", "reply": { "id": "cardapio", "title": "Cardápio" } },
+        { "type": "reply", "reply": { "id": "pedido",   "title": "Fazer pedido" } },
+        { "type": "reply", "reply": { "id": "suporte",  "title": "Suporte" } }
+      ]
+    }
+  }
+}
+
+# Menu lista
+{ "messaging_product": "whatsapp", "to": "5511999999999",
+  "type": "interactive",
+  "interactive": {
+    "type": "list",
+    "body": { "text": "Escolha uma opção" },
+    "action": {
+      "button": "Ver opções",
+      "sections": [{
+        "title": "Menu principal",
+        "rows": [
+          { "id": "opt1", "title": "Cardápio completo" },
+          { "id": "opt2", "title": "Fazer pedido" },
+          { "id": "opt3", "title": "Status do pedido" },
+          { "id": "opt4", "title": "Falar com atendente" }
+        ]
+      }]
+    }
+  }
+}
 ```
 
 ---
 
 ## URLs após `make up`
 
-| Serviço | URL | Uso |
-|---|---|---|
-| Evolution API | http://localhost:8081 | Gateway WhatsApp + QR code |
-| n8n | http://localhost:5678 | Workflows |
-| Directus | http://localhost:8055 | Painel admin (cardápio, config) |
-| Chatwoot | http://localhost:3010 | Atendimento humano |
-| Metabase | http://localhost:4100 | Dashboards e relatórios |
-| Adminer | http://localhost:8181 | Banco de dados |
+| Serviço | URL |
+|---|---|
+| n8n | http://localhost:5678 |
+| Directus | http://localhost:8055 |
+| Chatwoot | http://localhost:3010 |
+| Metabase | http://localhost:4100 |
+| Adminer | http://localhost:8181 |
 
 ---
 
-## Feature flags
+## Comandos
 
-| Variável | Padrão | Efeito |
-|---|---|---|
-| `FEATURE_DELIVERY` | `true` | Habilita fluxo de delivery |
-| `FEATURE_RETIRADA` | `true` | Habilita opção de retirada |
-| `FEATURE_RESERVAS` | `false` | Habilita reservas de mesa |
-| `FEATURE_PEDIDO_MESA` | `false` | Habilita pedido pelo WhatsApp para mesas |
-| `FEATURE_STATUS_NOTIFICATIONS` | `true` | Notifica cliente via WhatsApp ao mudar status do pedido |
-
----
-
-## Personalizar para um novo estabelecimento
-
-1. `make setup` — cria o `.env`
-2. Preencha `infra/.env` com nome, telefone, horários e chaves
-3. Edite `dados/produtos.csv` com os produtos/serviços reais
-4. Edite `dados/processos.md` com as regras do negócio
-5. `make all` — sobe e configura tudo
-6. Escaneie o QR code em `http://localhost:8081/manager`
+```bash
+make help       # lista todos os comandos
+make up         # sobe os containers
+make down       # para os containers
+make logs       # logs em tempo real
+make ps         # status dos containers
+make db-reset   # recria schema (apaga dados)
+make test-msg   # simula mensagem: MSG="oi" TEL=5511999999999
+```
