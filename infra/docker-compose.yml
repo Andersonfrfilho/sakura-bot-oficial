@@ -1,0 +1,265 @@
+services:
+
+  # Banco de dados principal (app + Typebot + Chatwoot)
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/02-schema.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - sakura_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (usado por Chatwoot e n8n)
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sakura_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Orquestração de fluxos — recebe webhooks da Meta Cloud API
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+      - TZ=America/Sao_Paulo
+      - N8N_LOG_LEVEL=info
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      # WhatsApp Cloud API (Meta oficial)
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID}
+      - WHATSAPP_BUSINESS_ACCOUNT_ID=${WHATSAPP_BUSINESS_ACCOUNT_ID}
+      - WHATSAPP_WEBHOOK_VERIFY_TOKEN=${WHATSAPP_WEBHOOK_VERIFY_TOKEN}
+      - WHATSAPP_API_VERSION=${WHATSAPP_API_VERSION:-v21.0}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - sakura_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Builder de chatbot
+  typebot-builder:
+    image: baptistearno/typebot-builder:latest
+    container_name: typebot_builder
+    restart: always
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXTAUTH_URL=${TYPEBOT_URL:-http://localhost:3001}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - ENCRYPTION_SECRET=${ENCRYPTION_SECRET}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/typebot
+    networks:
+      - sakura_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  typebot-viewer:
+    image: baptistearno/typebot-viewer:latest
+    container_name: typebot_viewer
+    restart: always
+    ports:
+      - "3002:3000"
+    environment:
+      - NEXTAUTH_URL=${TYPEBOT_VIEWER_URL:-http://localhost:3002}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - ENCRYPTION_SECRET=${ENCRYPTION_SECRET}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/typebot
+    networks:
+      - sakura_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Prepara banco do Chatwoot (roda apenas uma vez; reinicia até ter sucesso)
+  chatwoot-init:
+    image: chatwoot/chatwoot:latest
+    container_name: chatwoot_init
+    command: bundle exec rails db:chatwoot_prepare
+    environment:
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/chatwoot
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - sakura_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: on-failure
+
+  # Atendimento humano
+  chatwoot:
+    image: chatwoot/chatwoot:latest
+    container_name: chatwoot
+    restart: always
+    ports:
+      - "3010:3000"
+    environment:
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE}
+      - FRONTEND_URL=${CHATWOOT_URL:-http://localhost:3010}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/chatwoot
+      - REDIS_URL=redis://redis:6379
+    command: bundle exec rails s -p 3000 -b 0.0.0.0
+    volumes:
+      - chatwoot_data:/app/storage
+    networks:
+      - sakura_net
+    depends_on:
+      chatwoot-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  chatwoot-sidekiq:
+    image: chatwoot/chatwoot:latest
+    container_name: chatwoot_sidekiq
+    restart: always
+    command: bundle exec sidekiq -C config/sidekiq.yml
+    environment:
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/chatwoot
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - sakura_net
+    depends_on:
+      chatwoot-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  # Painel admin do estabelecimento (cardápio, horários, configurações)
+  directus:
+    image: directus/directus:latest
+    container_name: directus
+    restart: always
+    ports:
+      - "8055:8055"
+    environment:
+      SECRET: ${DIRECTUS_SECRET}
+      DB_CLIENT: pg
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      ADMIN_EMAIL: ${DIRECTUS_ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${DIRECTUS_ADMIN_PASSWORD}
+      PUBLIC_URL: ${DIRECTUS_URL:-http://localhost:8055}
+      WEBSOCKETS_ENABLED: "true"
+      AUTH_PROVIDERS: ${DIRECTUS_AUTH_PROVIDERS:-}
+      AUTH_KEYCLOAK_DRIVER: openid
+      AUTH_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-}
+      AUTH_KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-}
+      AUTH_KEYCLOAK_ISSUER_URL: ${KEYCLOAK_ISSUER_URL:-}
+      EXTENSIONS_AUTO_RELOAD: "true"
+    volumes:
+      - directus_uploads:/directus/uploads
+      - directus_extensions:/directus/extensions
+    networks:
+      - sakura_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Simulador de conversa com o bot (preview)
+  preview:
+    image: nginx:alpine
+    container_name: preview
+    restart: always
+    ports:
+      - "9001:80"
+    volumes:
+      - ../preview:/usr/share/nginx/html:ro
+    networks:
+      - sakura_net
+
+  # Gerenciamento de registros (cardápio, FAQ, pedidos, reservas)
+  adminer:
+    image: adminer:latest
+    container_name: adminer
+    restart: always
+    ports:
+      - "8181:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+      - ADMINER_DESIGN=pepa-linha
+    networks:
+      - sakura_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Painel administrativo (pedidos, reservas, cardápio, FAQ, relatórios)
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    restart: always
+    ports:
+      - "4100:3000"
+    environment:
+      - MB_DB_TYPE=postgres
+      - MB_DB_HOST=postgres
+      - MB_DB_PORT=5432
+      - MB_DB_DBNAME=metabase
+      - MB_DB_USER=${POSTGRES_USER}
+      - MB_DB_PASS=${POSTGRES_PASSWORD}
+      - MB_SITE_LOCALE=pt
+    networks:
+      - sakura_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  n8n_data:
+  chatwoot_data:
+  directus_uploads:
+  directus_extensions:
+
+networks:
+  sakura_net:
+    driver: bridge

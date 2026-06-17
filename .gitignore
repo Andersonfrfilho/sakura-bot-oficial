@@ -1,0 +1,10 @@
+infra/.env
+infra/.env.local
+*.log
+__pycache__/
+*.pyc
+.DS_Store
+node_modules/
+/tmp/
+evolution/
+infra/.env.bak
