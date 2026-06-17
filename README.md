@@ -1,182 +1,211 @@
 # sakura-bot-oficial
 
-Bot de atendimento WhatsApp usando a **API oficial da Meta (WhatsApp Cloud API)**. Versão sem risco de ban, com suporte nativo a botões interativos, menus, catálogos e WhatsApp Flows.
+Template de bot de atendimento WhatsApp usando a **Meta WhatsApp Cloud API** (oficial).
+Fork este repo, preencha o `.env` com as credenciais do seu estabelecimento e faça deploy em minutos.
 
-> Projeto irmão de [sakura-bot](https://github.com/Andersonfrfilho/sakura-bot) (Evolution API). Use este para produção.
+> Projeto irmão: [sakura-bot](https://github.com/Andersonfrfilho/sakura-bot) usa Evolution API — indicado apenas para testes locais.
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/new?template=https://github.com/Andersonfrfilho/sakura-bot-oficial)
 
 ---
 
-## Por que a API oficial?
+## Por que API oficial?
 
 | | Evolution API (não-oficial) | Meta Cloud API (oficial) |
 |---|---|---|
 | Risco de ban | Alto | Zero |
-| Botões / Menus | Instável | Nativo |
-| WhatsApp Flows | Não | Sim |
+| Botões / Menus nativos | Instável | Sim |
+| WhatsApp Flows (formulários) | Não | Sim |
 | Catálogo de produtos | Não | Sim |
-| Templates outbound | Não | Sim |
-| Reconexão QR | Periódica | Não precisa |
+| Templates para mensagens ativas | Não | Sim |
+| Reconexão QR periódica | Necessária | Não precisa |
 | Webhook confiável | Depende do host | Garantido pela Meta |
 
-### Tipos de mensagens interativas disponíveis
+### Mensagens interativas disponíveis
 
-**Reply Buttons** — até 3 botões de resposta rápida
+**Botões de resposta rápida** (até 3):
 ```
-┌─────────────────────────┐
-│ Como posso te ajudar?   │
-├──────────┬──────────────┤
-│ Cardápio │ Fazer pedido │  Suporte
-└──────────┴──────────────┘
-```
-
-**List Message** — menu com até 10 opções em seções
-```
-┌─────────────────────────┐
-│ Escolha uma opção       │
-│        [Ver opções ▼]   │
-└─────────────────────────┘
+┌─────────────────────────────┐
+│  Como posso te ajudar hoje? │
+├────────────┬────────────────┤
+│  Cardápio  │  Fazer pedido  │  Suporte
+└────────────┴────────────────┘
 ```
 
-**WhatsApp Flows** — formulários nativos (endereço, agendamento, pagamento) sem sair do WhatsApp.
+**Menu lista** (até 10 opções em categorias):
+```
+┌─────────────────────────────┐
+│  Escolha uma opção          │
+│              [Ver opções ▼] │
+└─────────────────────────────┘
+  Abre drawer nativo do WhatsApp
+```
+
+**WhatsApp Flows** — formulários completos (endereço, agendamento, pagamento) sem sair do app.
 
 ---
 
-## Pré-requisitos
-
-- Docker + Docker Compose
-- Conta Meta for Developers com app WhatsApp configurado
-- URL pública HTTPS para o webhook (Railway, Fly.io ou ngrok para dev)
-
-> Veja o [SETUP.md](SETUP.md) para o passo a passo completo.
-
----
-
-## Setup rápido
+## Como usar este template
 
 ```bash
-# 1. Clone e configure
-git clone https://github.com/Andersonfrfilho/sakura-bot-oficial
-cd sakura-bot-oficial
-make setup           # cria infra/.env a partir do exemplo
+# 1. Fork ou clone
+git clone https://github.com/Andersonfrfilho/sakura-bot-oficial meu-bot
+cd meu-bot
 
-# 2. Preencha infra/.env com suas credenciais Meta
-# WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, etc.
+# 2. Configure o ambiente
+make setup                # gera infra/.env a partir do .env.example
+nano infra/.env           # preencha com suas credenciais Meta
 
-# 3. Suba os serviços
-make up
+# 3. Suba localmente (stack completo)
+cd infra && docker compose up -d
 
-# 4. Exponha o n8n publicamente (dev)
-ngrok http 5678
-# URL gerada: https://abc123.ngrok.io
+# 4. Deploy em produção (Railway)
+railway login
+railway init              # cria projeto novo no Railway
+railway variables set WHATSAPP_ACCESS_TOKEN=EAAxx...
+railway variables set WHATSAPP_PHONE_NUMBER_ID=1129...
+railway variables set WHATSAPP_BUSINESS_ACCOUNT_ID=133...
+railway variables set WHATSAPP_WEBHOOK_VERIFY_TOKEN=minha_string
+railway variables set POSTGRES_USER=botuser POSTGRES_PASSWORD=senha POSTGRES_DB=botdb
+railway variables set N8N_USER=admin N8N_PASSWORD=senha
+railway up                # deploy — Railway gera URL pública automaticamente
 
 # 5. Registre o webhook na Meta
-# URL: https://abc123.ngrok.io/webhook/whatsapp
-# Verify token: (o que você definiu em WHATSAPP_WEBHOOK_VERIFY_TOKEN)
+# URL: https://SEU_APP.up.railway.app/webhook/whatsapp
+# Token: o valor de WHATSAPP_WEBHOOK_VERIFY_TOKEN
 ```
+
+> Veja o [SETUP.md](SETUP.md) para o guia completo com screenshots e troubleshooting.
 
 ---
 
 ## Arquitetura
 
 ```
-WhatsApp → Meta Cloud API (hospedado pela Meta)
-                  ↓ POST webhook (HTTPS obrigatório)
-             n8n [:5678]  ←→  Groq (IA Llama 3)
-                  ↓
-            PostgreSQL [:5432]
-                  ↓
-     ┌────────────┴────────────┐
-  Chatwoot [:3010]       Directus [:8055]
-  (atendente humano)     (painel admin)
+                 ┌─── Meta Cloud API (hospedado pela Meta) ───┐
+WhatsApp ───────►│  Webhook POST → n8n                        │
+                 └───────────────────────────────────────────-┘
+                               │
+                    ┌──────────┼──────────┐
+                    ▼          ▼          ▼
+                 Typebot    Groq IA    Chatwoot
+               (fluxos)   (dúvidas)  (humano)
+                    │
+                    ▼
+                PostgreSQL
 ```
 
-**n8n** recebe os webhooks da Meta, roteia mensagens e chama a Graph API para enviar respostas. Não há Evolution API neste projeto.
+**Stack mínimo para webhook funcionar:** n8n + postgres + redis (no `docker-compose.yml` da raiz).
+**Stack completo para produção:** + chatwoot + typebot + directus + metabase (em `infra/docker-compose.yml`).
 
 ---
 
-## Variáveis de ambiente obrigatórias
+## Pré-requisitos Meta
+
+1. Conta em [developers.facebook.com](https://developers.facebook.com) com app WhatsApp criado
+2. Número de WhatsApp Business verificado no app
+3. Credenciais da aba **"Primeiros passos"**:
+   - `WHATSAPP_ACCESS_TOKEN`
+   - `WHATSAPP_PHONE_NUMBER_ID`
+   - `WHATSAPP_BUSINESS_ACCOUNT_ID`
+
+---
+
+## Estrutura do projeto
+
+```
+sakura-bot-oficial/
+├── docker-compose.yml        ← Stack mínimo (Railway / produção)
+├── railway.toml              ← Configuração Railway
+├── infra/
+│   ├── docker-compose.yml    ← Stack completo (dev local)
+│   └── .env.example          ← Template de variáveis
+├── dados/
+│   ├── processos.md          ← Regras de negócio (contexto IA)
+│   ├── cardapio.csv          ← Seed do cardápio
+│   └── faq.csv               ← Seed do FAQ
+├── database/
+│   ├── init.sql              ← Cria databases auxiliares
+│   └── schema.sql            ← Schema completo da aplicação
+├── n8n/workflows/            ← Workflows exportados para importar no n8n
+├── SETUP.md                  ← Guia de setup passo a passo
+└── Makefile                  ← Comandos principais
+```
+
+---
+
+## Referência rápida — enviar mensagem via Graph API
 
 ```bash
-# WhatsApp Cloud API (Meta)
-WHATSAPP_ACCESS_TOKEN=EAAxx...       # token do app
-WHATSAPP_PHONE_NUMBER_ID=112905...   # ID do número (não o número em si)
-WHATSAPP_BUSINESS_ACCOUNT_ID=133...  # WABA ID
-WHATSAPP_WEBHOOK_VERIFY_TOKEN=...    # string que você define
-WHATSAPP_API_VERSION=v21.0
-```
-
----
-
-## Enviar mensagem via Graph API (referência n8n)
-
-```
-POST https://graph.facebook.com/v21.0/{{PHONE_NUMBER_ID}}/messages
-Authorization: Bearer {{ACCESS_TOKEN}}
-
 # Texto simples
-{ "messaging_product": "whatsapp", "to": "5511999999999",
-  "type": "text", "text": { "body": "Olá!" } }
+curl -X POST "https://graph.facebook.com/v21.0/$PHONE_NUMBER_ID/messages" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messaging_product": "whatsapp",
+    "to": "5511999999999",
+    "type": "text",
+    "text": { "body": "Olá! Como posso ajudar?" }
+  }'
 
 # Botões interativos
-{ "messaging_product": "whatsapp", "to": "5511999999999",
-  "type": "interactive",
-  "interactive": {
-    "type": "button",
-    "body": { "text": "Como posso te ajudar?" },
-    "action": {
-      "buttons": [
-        { "type": "reply", "reply": { "id": "cardapio", "title": "Cardápio" } },
-        { "type": "reply", "reply": { "id": "pedido",   "title": "Fazer pedido" } },
-        { "type": "reply", "reply": { "id": "suporte",  "title": "Suporte" } }
-      ]
-    }
-  }
-}
-
-# Menu lista
-{ "messaging_product": "whatsapp", "to": "5511999999999",
-  "type": "interactive",
-  "interactive": {
-    "type": "list",
-    "body": { "text": "Escolha uma opção" },
-    "action": {
-      "button": "Ver opções",
-      "sections": [{
-        "title": "Menu principal",
-        "rows": [
-          { "id": "opt1", "title": "Cardápio completo" },
-          { "id": "opt2", "title": "Fazer pedido" },
-          { "id": "opt3", "title": "Status do pedido" },
-          { "id": "opt4", "title": "Falar com atendente" }
+curl -X POST "https://graph.facebook.com/v21.0/$PHONE_NUMBER_ID/messages" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messaging_product": "whatsapp",
+    "to": "5511999999999",
+    "type": "interactive",
+    "interactive": {
+      "type": "button",
+      "body": { "text": "Como posso te ajudar hoje?" },
+      "action": {
+        "buttons": [
+          { "type": "reply", "reply": { "id": "cardapio", "title": "Cardápio" } },
+          { "type": "reply", "reply": { "id": "pedido",   "title": "Fazer pedido" } },
+          { "type": "reply", "reply": { "id": "suporte",  "title": "Suporte" } }
         ]
-      }]
+      }
     }
-  }
-}
+  }'
 ```
-
----
-
-## URLs após `make up`
-
-| Serviço | URL |
-|---|---|
-| n8n | http://localhost:5678 |
-| Directus | http://localhost:8055 |
-| Chatwoot | http://localhost:3010 |
-| Metabase | http://localhost:4100 |
-| Adminer | http://localhost:8181 |
 
 ---
 
 ## Comandos
 
 ```bash
-make help       # lista todos os comandos
-make up         # sobe os containers
-make down       # para os containers
+make setup      # gera infra/.env
+make up         # sobe stack completo local (infra/)
+make down       # para containers
 make logs       # logs em tempo real
 make ps         # status dos containers
 make db-reset   # recria schema (apaga dados)
 make test-msg   # simula mensagem: MSG="oi" TEL=5511999999999
 ```
+
+---
+
+## URLs após make up (stack completo local)
+
+| Serviço | URL |
+|---|---|
+| n8n (webhook + workflows) | http://localhost:5678 |
+| Directus (painel admin) | http://localhost:8055 |
+| Chatwoot (atendimento humano) | http://localhost:3010 |
+| Typebot Builder | http://localhost:3001 |
+| Metabase (dashboards) | http://localhost:4100 |
+| Adminer (banco de dados) | http://localhost:8181 |
+
+---
+
+## Personalizar para um novo estabelecimento
+
+1. Fork deste repositório
+2. `make setup` → preencha `infra/.env` com nome, telefone, horários, credenciais Meta
+3. Edite `dados/processos.md` com as regras do negócio
+4. Edite `dados/cardapio.csv` com os produtos/serviços
+5. `railway init && railway up` → deploy em produção
+6. Registre a URL do n8n como webhook na Meta
+
+Cada estabelecimento tem seu próprio fork com seu próprio `.env`.

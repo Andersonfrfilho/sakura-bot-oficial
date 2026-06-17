@@ -1,162 +1,146 @@
 # CLAUDE.md — sakura-bot-oficial
 
-This is the **official Meta WhatsApp Cloud API** variant of the sakura-bot.
-The sister project `sakura-bot/` uses Evolution API (unofficial). This project uses the Meta Graph API directly for greater reliability and compliance.
+Template de bot de atendimento WhatsApp usando a **Meta WhatsApp Cloud API** (oficial).
+Projeto irmão de `sakura-bot/` (Evolution API). Use este para produção — sem risco de ban.
 
-**Client**: AdA Technology
-**WhatsApp number**: +55 16 99170-7267
-**Meta App ID**: 1017474297938142
+## O que é este projeto
 
-## What This Project Is
+Infrastructure-as-configuration: sem código para compilar ou testar. Trabalho aqui significa editar
+CSVs de dados, schemas SQL, regras de negócio em markdown, workflows n8n e configuração Docker.
 
-A WhatsApp automation bot for any type of establishment. Infrastructure and configuration project — no application code to compile or test. Work here means editing CSV data, SQL schemas, markdown operational rules, n8n workflow JSONs, and Docker Compose configuration.
+Cada estabelecimento recebe sua própria cópia configurada via `infra/.env` e arquivos em `dados/`.
 
-## Key Difference from sakura-bot/
+## Diferença fundamental em relação ao sakura-bot (Evolution)
 
-| Aspect | sakura-bot (Evolution) | sakura-bot-oficial (Meta) |
+| Aspecto | sakura-bot (Evolution) | sakura-bot-oficial (Meta) |
 |---|---|---|
-| WhatsApp gateway | Evolution API (Docker, porta 8081) | Meta Cloud API (hosted by Meta) |
-| Webhook source | Evolution → n8n | Meta Graph API → n8n (HTTPS required) |
-| Local testing | Possible | Needs public URL (ngrok or Railway) |
-| Stability | Risk of ban | Official, no ban risk |
-| Message format | Evolution JSON | Meta Graph API JSON |
-| Send messages | POST to Evolution API | POST to graph.facebook.com |
+| Gateway WhatsApp | Evolution API (Docker, porta 8081) | Meta Cloud API (hospedado pela Meta) |
+| Webhook | Evolution → n8n | Meta → n8n (HTTPS obrigatório) |
+| Teste local | Possível | Requer URL pública (Railway ou ngrok) |
+| Risco de ban | Alto | Zero |
+| Botões interativos | Instável | Nativo e confiável |
+| Mensagem format | JSON Evolution | JSON Meta Graph API |
+| Envio de mensagem | POST → Evolution API | POST → graph.facebook.com |
 
-## Architecture
+## Arquitetura
 
 ```
-WhatsApp → Meta Cloud API (hosted by Meta)
-                ↓ POST webhook (HTTPS obrigatório)
-           n8n [DOCKER:5678 or Railway]
-                ↓
-           PostgreSQL [DOCKER:5432]
-                ↓
-     ┌──────────┴──────────┐
-  Typebot              Chatwoot
-(bot flows)        (human agents)
+WhatsApp → Meta Cloud API (hospedado pela Meta)
+                  ↓ POST webhook (HTTPS obrigatório)
+             n8n [:5678]  ←→  Groq (IA)
+                  ↓
+            PostgreSQL [:5432]
+                  ↓
+     ┌────────────┴────────────┐
+  Chatwoot [:3010]       Directus [:8055]
+  (atendente humano)     (painel admin)
 ```
 
-### Meta Cloud API credentials (in infra/.env)
-- `WHATSAPP_ACCESS_TOKEN` — token do app (Meta Business Suite)
-- `WHATSAPP_PHONE_NUMBER_ID` — ID do número: 1129051206965973
-- `WHATSAPP_BUSINESS_ACCOUNT_ID` — WABA ID: 1331187315501590
-- `WHATSAPP_WEBHOOK_VERIFY_TOKEN` — token de verificação do webhook (definido por nós)
-- `WHATSAPP_API_VERSION` — versão da Graph API (padrão: v21.0)
+Não há Evolution API neste projeto. O n8n recebe webhooks diretamente da Meta.
 
-### Sending messages (n8n HTTP Request node)
+## Variáveis de ambiente Meta (em infra/.env)
+
+```bash
+WHATSAPP_ACCESS_TOKEN          # token do app Meta
+WHATSAPP_PHONE_NUMBER_ID       # ID do número (não o número em si)
+WHATSAPP_BUSINESS_ACCOUNT_ID   # WABA ID
+WHATSAPP_WEBHOOK_VERIFY_TOKEN  # string que você define para verificação
+WHATSAPP_API_VERSION           # padrão: v21.0
 ```
-POST https://graph.facebook.com/v21.0/{{WHATSAPP_PHONE_NUMBER_ID}}/messages
+
+Obter em: developers.facebook.com/apps → WhatsApp → Primeiros passos
+
+## Enviar mensagem (referência para workflows n8n)
+
+```
+POST https://graph.facebook.com/{{WHATSAPP_API_VERSION}}/{{WHATSAPP_PHONE_NUMBER_ID}}/messages
 Authorization: Bearer {{WHATSAPP_ACCESS_TOKEN}}
-Content-Type: application/json
 
-{
-  "messaging_product": "whatsapp",
-  "to": "5511999999999",
-  "type": "text",
-  "text": { "body": "Sua mensagem aqui" }
-}
+# Texto
+{ "messaging_product":"whatsapp", "to":"5511999999999",
+  "type":"text", "text":{"body":"Olá!"} }
+
+# Botões (até 3)
+{ "messaging_product":"whatsapp", "to":"5511999999999",
+  "type":"interactive",
+  "interactive":{ "type":"button", "body":{"text":"Como posso ajudar?"},
+    "action":{ "buttons":[
+      {"type":"reply","reply":{"id":"cardapio","title":"Cardápio"}},
+      {"type":"reply","reply":{"id":"pedido","title":"Fazer pedido"}},
+      {"type":"reply","reply":{"id":"suporte","title":"Suporte"}}
+    ]}}}
 ```
 
-### Receiving messages (n8n Webhook node)
-Meta sends two types of requests to the webhook URL:
+## Receber mensagem (POST da Meta no n8n)
 
-**GET** (verification, one-time): respond with `hub.challenge`
-```
-GET /webhook/whatsapp?hub.mode=subscribe&hub.verify_token=TOKEN&hub.challenge=XYZ
-→ Response: XYZ (just the challenge value)
-```
-
-**POST** (incoming message):
 ```json
 {
-  "entry": [{
-    "changes": [{
-      "value": {
-        "messages": [{
-          "from": "5516991707267",
-          "text": { "body": "Olá" },
-          "type": "text",
-          "timestamp": "1234567890"
-        }]
-      }
+  "entry": [{ "changes": [{ "value": {
+    "messages": [{
+      "from": "5511999999999",
+      "type": "text",
+      "text": { "body": "Olá" }
     }]
-  }]
+  }}]}]
 }
 ```
+
+Expressões n8n:
+```
+Telefone : {{ $json.body.entry[0].changes[0].value.messages[0].from }}
+Texto    : {{ $json.body.entry[0].changes[0].value.messages[0].text.body }}
+```
+
+O webhook também recebe GET para verificação (hub.challenge) — tratar no workflow.
 
 ## Setup
 
-1. `make setup` — cria `infra/.env` a partir do exemplo
-2. `make up` — sobe todos os serviços
-3. Exponha o n8n publicamente:
-   - **Desenvolvimento**: `ngrok http 5678` → use a URL gerada
-   - **Produção**: Railway/Fly.io com deploy via GitHub
-4. No Meta Developer Console → Webhooks → configure URL: `https://SEU_HOST/webhook/whatsapp`
-5. Importe os workflows n8n de `n8n/workflows/`
+1. `make setup` → cria `infra/.env` a partir do `.env.example`
+2. Preencher credenciais Meta em `infra/.env`
+3. `make up` → sobe todos os serviços localmente
+4. Expor n8n publicamente:
+   - Dev: `ngrok http 5678`
+   - Produção: `railway up` (ver `railway.toml`)
+5. Registrar webhook na Meta com a URL pública
 
-## Common Commands
+Ver [SETUP.md](SETUP.md) para passo a passo detalhado.
+
+## Comandos
 
 ```bash
-make setup      # cria infra/.env a partir do exemplo
+make setup      # cria infra/.env
 make up         # sobe todos os serviços
 make down       # para containers
-make logs       # acompanha logs em tempo real
+make logs       # logs em tempo real
 make ps         # status dos containers
-make db-reset   # recria o schema do app no banco (destrói dados)
-make test-msg   # simula mensagem WhatsApp no n8n (MSG="texto" TEL=número)
+make db-reset   # recria schema (destrói dados)
+make test-msg   # simula mensagem: MSG="oi" TEL=5511999999999
 ```
 
-### Service URLs after startup:
-- **n8n** (workflow orchestrator): http://localhost:5678
-- **Directus** (admin panel): http://localhost:8055
-- **Chatwoot** (human agents): http://localhost:3010
-- **Typebot Builder** (chatbot flows): http://localhost:3001
-- **Metabase** (dashboards): http://localhost:4100
-- **Adminer** (DB browser): http://localhost:8181
+## URLs após make up
 
-## n8n Webhook — Critical Setup
+- n8n: http://localhost:5678
+- Directus: http://localhost:8055
+- Chatwoot: http://localhost:3010
+- Typebot Builder: http://localhost:3001
+- Metabase: http://localhost:4100
+- Adminer: http://localhost:8181
 
-The webhook node in n8n must handle **both** GET and POST from Meta:
+## Arquivos de dados
 
-```
-Webhook URL registrado na Meta:
-  https://SEU_HOST/webhook/whatsapp
-
-GET  → verifica hub.verify_token e responde com hub.challenge
-POST → processa mensagem recebida
-```
-
-No modo desenvolvimento, use ngrok:
-```bash
-ngrok http 5678
-# URL gerada ex: https://abc123.ngrok.io
-# Registrar na Meta: https://abc123.ngrok.io/webhook/whatsapp
-```
-
-## Key Data Files
-
-| File | Purpose | When to edit |
+| Arquivo | Função | Quando editar |
 |---|---|---|
-| `dados/processos.md` | AI system context — business rules | Change operating rules |
-| `dados/cardapio.csv` | Menu seed data for `cardapio` table | Add/remove/reprice items |
-| `dados/faq.csv` | FAQ seed data for `faq` table | Add new questions |
-| `database/schema.sql` | Full schema — run once | Schema changes |
-| `infra/.env.example` | Env var template — never commit real `.env` | Add new credentials |
+| `dados/processos.md` | Contexto da IA — regras de negócio | Mudar regras, horários, preços |
+| `dados/cardapio.csv` | Seed do cardápio | Adicionar/remover/reprear itens |
+| `dados/faq.csv` | Seed do FAQ | Adicionar perguntas frequentes |
+| `database/schema.sql` | Schema completo | Mudanças de estrutura |
+| `infra/.env.example` | Template de variáveis | Adicionar novas credenciais |
 
-## Feature Flags (in `.env`)
+## Feature flags (em .env)
 
-| Variable | Default | Effect |
+| Variável | Padrão | Efeito |
 |---|---|---|
-| `FEATURE_DELIVERY` | `false` | Enables delivery order flow |
-| `FEATURE_RETIRADA` | `false` | Enables takeout option |
-| `FEATURE_RESERVAS` | `false` | Enables table reservation flow |
-| `FEATURE_PEDIDO_MESA` | `false` | Enables dine-in WhatsApp ordering |
-
-## Handoff Rules (in `dados/processos.md`)
-
-The AI must transfer to a human agent when:
-- Quality complaint, wrong or lost order
-- Customer explicitly asks for human
-- Severe allergy concern
-- Corporate order above R$300
-- Confidence is low
+| `FEATURE_DELIVERY` | `true` | Habilita fluxo de delivery |
+| `FEATURE_RETIRADA` | `true` | Habilita retirada |
+| `FEATURE_RESERVAS` | `false` | Habilita reservas |
+| `FEATURE_PEDIDO_MESA` | `false` | Habilita pedido na mesa |

@@ -1,0 +1,30 @@
+# railway.toml
+# Configuração de deploy para Railway.app
+# Docs: https://docs.railway.app/reference/config-as-code
+
+[build]
+# Railway usa o docker-compose.yml da raiz automaticamente
+# Nenhum Dockerfile necessário — imagens oficiais do Docker Hub
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
+
+# Variáveis obrigatórias — preencher no dashboard Railway ou via CLI:
+#   railway variables set WHATSAPP_ACCESS_TOKEN=EAAxx...
+#   railway variables set WHATSAPP_PHONE_NUMBER_ID=112905...
+#   railway variables set WHATSAPP_BUSINESS_ACCOUNT_ID=133...
+#   railway variables set WHATSAPP_WEBHOOK_VERIFY_TOKEN=minha_string_secreta
+#   railway variables set POSTGRES_USER=botuser
+#   railway variables set POSTGRES_PASSWORD=senha_forte
+#   railway variables set POSTGRES_DB=botdb
+#   railway variables set N8N_USER=admin
+#   railway variables set N8N_PASSWORD=senha_forte
+#   railway variables set GROQ_API_KEY=gsk_xxx
+
+# Após o deploy, o Railway gera uma URL pública para o n8n:
+#   https://sakura-bot-oficial-production.up.railway.app
+#
+# Registre essa URL como webhook na Meta:
+#   URL: https://SEU_APP.up.railway.app/webhook/whatsapp
+#   Verify token: o valor de WHATSAPP_WEBHOOK_VERIFY_TOKEN
