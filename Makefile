@@ -7,7 +7,7 @@ PROJECT := $(if $(PROJECT),$(PROJECT),whatsapp-bot)
 
 COMPOSE = docker compose -f infra/docker-compose.yml -p $(PROJECT)
 
-.PHONY: help all setup init up down restart logs ps db-reset db-seed n8n-import directus-init chatwoot-init test test-order test-msg evolution-start evolution-stop evolution-logs validate
+.PHONY: help all setup init up down restart logs ps db-reset db-seed n8n-import directus-init chatwoot-init test test-order test-msg evolution-start evolution-stop evolution-logs validate build
 
 help:
 	@echo ""
@@ -177,7 +177,10 @@ test:
 	@node tests/workflow.validate.js
 	@echo ""
 
-validate:
+build:
+	@node scripts/build-workflow.js
+
+validate: build
 	@bash scripts/validate-workflows.sh
 
 n8n-import: validate

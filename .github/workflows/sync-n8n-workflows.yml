@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'n8n/workflows/**'
+      - 'src/**'
       - 'database/migrations/**'
   workflow_dispatch:
 
@@ -13,6 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Build workflow from src/ modules
+        run: node scripts/build-workflow.js
 
       - name: Validate workflows (JSON + JS syntax + anti-patterns)
         run: bash scripts/validate-workflows.sh

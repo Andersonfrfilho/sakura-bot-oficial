@@ -105,9 +105,37 @@ O webhook também recebe GET para verificação (hub.challenge) — tratar no wo
 
 Ver [SETUP.md](SETUP.md) para passo a passo detalhado.
 
+## Lógica do bot (src/)
+
+O nó `Rotear e Responder` do workflow é gerado a partir de módulos em `src/`:
+
+```
+src/
+  setup.js              — extração de contexto, helpers, message builders
+  handlers/
+    global.js           — sair / cancelar (qualquer estado)
+    greeting.js         — saudações → boas-vindas ou awaiting_name
+    cart.js             — repeat_order, carrinho, finalizar, confirmar
+    delivery.js         — awaiting_type/address/complement/offer_pickup
+    payment.js          — awaiting_payment/change/split/mixed
+    menu-shortcuts.js   — atalhos 1/2/3/4/5/6/0 (!expectingRawInput)
+    reservation.js      — reserving, confirming_reservation
+    misc.js             — human_handoff, order_detail, notifications, name
+    ordering.js         — browsing_cat, ordering_items, awaiting_qty, more
+    fallback.js         — parsing livre de número/texto
+  teardown.js           — return statement final
+scripts/
+  build-workflow.js     — concatena src/ → injeta em n8n/workflows/
+```
+
+**Nunca edite `n8n/workflows/01-receber-mensagem.json` diretamente.**
+Edite os arquivos em `src/` e execute `make build` (ou `node scripts/build-workflow.js`).
+
 ## Comandos
 
 ```bash
+make build      # compila src/ → injeta no workflow JSON
+make validate   # build + testes + JSON + JS syntax (roda antes do push)
 make setup      # cria infra/.env
 make up         # sobe todos os serviços
 make down       # para containers

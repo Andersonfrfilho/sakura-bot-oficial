@@ -1,0 +1,10 @@
+{
+  "name": "sakura-bot-oficial",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-workflow.js",
+    "test": "node tests/flow.test.js",
+    "validate": "bash scripts/validate-workflows.sh"
+  }
+}
