@@ -6,10 +6,18 @@
       "name": "Cron — A cada 2 min",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [240, 300],
+      "position": [
+        240,
+        300
+      ],
       "parameters": {
         "rule": {
-          "interval": [{ "field": "minutes", "minutesInterval": 2 }]
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
         }
       }
     },
@@ -18,7 +26,10 @@
       "name": "Checar FEATURE_STATUS_NOTIFICATIONS",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [460, 300],
+      "position": [
+        460,
+        300
+      ],
       "parameters": {
         "jsCode": "const enabled = ($env['FEATURE_STATUS_NOTIFICATIONS'] || 'true').toLowerCase();\nif (enabled !== 'true' && enabled !== '1') {\n  console.log('[status-notif] FEATURE_STATUS_NOTIFICATIONS desabilitado — pulando');\n  return [];\n}\nreturn [{ json: { feature_enabled: true } }];"
       }
@@ -28,8 +39,16 @@
       "name": "Buscar Pedidos com Status Alterado",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
-      "position": [680, 300],
-      "credentials": { "postgres": { "id": "3ixmAWpr1TaaiwJE", "name": "Postgres account" } },
+      "position": [
+        680,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "k6K55CNkeEYnijTG",
+          "name": "Postgres account"
+        }
+      },
       "parameters": {
         "operation": "executeQuery",
         "query": "SELECT\n  o.id,\n  o.code,\n  o.customer_phone,\n  o.status,\n  o.order_type,\n  o.notified_status,\n  COALESCE(c.name, 'cliente') AS customer_name,\n  osn.message_template,\n  (SELECT value FROM settings WHERE key = 'evolution_api_key') AS evolution_api_key\nFROM orders o\nLEFT JOIN customers c ON c.phone = o.customer_phone\nJOIN order_status_notifications osn\n  ON osn.status = o.status AND osn.enabled = true\nWHERE o.deleted_at IS NULL\n  AND (o.notified_status IS NULL OR o.notified_status <> o.status)\nORDER BY o.updated_at DESC\nLIMIT 50"
@@ -40,7 +59,10 @@
       "name": "Verificar se há notificações",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [900, 300],
+      "position": [
+        900,
+        300
+      ],
       "parameters": {
         "jsCode": "const rows = $input.all();\nconsole.log(`[status-notif] ${rows.length} pedido(s) para notificar`);\nif (!rows || rows.length === 0) return [];\nreturn rows;"
       }
@@ -50,15 +72,24 @@
       "name": "Loop por Pedido",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [1120, 300],
-      "parameters": { "batchSize": 1, "options": {} }
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
     },
     {
       "id": "montar_msg_status",
       "name": "Montar Mensagem de Status",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1340, 300],
+      "position": [
+        1340,
+        300
+      ],
       "parameters": {
         "jsCode": "const o = $json;\nconst nome = o.customer_name || 'cliente';\nconst nomeCapit = nome.charAt(0).toUpperCase() + nome.slice(1);\nconst tipoLabel = o.order_type === 'delivery' ? 'Delivery' : o.order_type === 'retirada' ? 'Retirada' : 'Mesa';\n\nif (!o.message_template) {\n  console.log(`[status-notif] Sem template para status '${o.status}' — pulando`);\n  return [];\n}\n\nconst msg = o.message_template\n  .replace(/\\{name\\}/g, nomeCapit)\n  .replace(/\\{code\\}/g, o.code)\n  .replace(/\\{order_type\\}/g, tipoLabel)\n  .replace(/\\\\n/g, '\\n');\n\nreturn [{ json: { ...o, msg } }];"
       }
@@ -68,7 +99,10 @@
       "name": "Enviar WhatsApp",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1560, 300],
+      "position": [
+        1560,
+        300
+      ],
       "parameters": {
         "jsCode": "const { customer_phone, msg, evolution_api_key, status } = $json;\nconst instancia = $env['EVOLUTION_INSTANCE'] || 'default';\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: `http://evolution_api:8080/message/sendText/${instancia}`,\n    headers: { 'Content-Type': 'application/json', 'apikey': evolution_api_key || '' },\n    body: JSON.stringify({ number: customer_phone, text: msg })\n  });\n  console.log(`[status-notif] Enviado para ${customer_phone} — status: ${status}`);\n} catch(e) {\n  console.log(`[status-notif] Erro ao enviar para ${customer_phone}:`, e.message);\n}\nreturn [{ json: $json }];"
       }
@@ -78,8 +112,16 @@
       "name": "Marcar como Notificado",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
-      "position": [1780, 300],
-      "credentials": { "postgres": { "id": "3ixmAWpr1TaaiwJE", "name": "Postgres account" } },
+      "position": [
+        1780,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "k6K55CNkeEYnijTG",
+          "name": "Postgres account"
+        }
+      },
       "parameters": {
         "operation": "executeQuery",
         "query": "UPDATE orders SET notified_status = '{{ $json.status }}', updated_at = now() WHERE id = '{{ $json.id }}'"
@@ -88,30 +130,96 @@
   ],
   "connections": {
     "Cron — A cada 2 min": {
-      "main": [[{ "node": "Checar FEATURE_STATUS_NOTIFICATIONS", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Checar FEATURE_STATUS_NOTIFICATIONS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Checar FEATURE_STATUS_NOTIFICATIONS": {
-      "main": [[{ "node": "Buscar Pedidos com Status Alterado", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Buscar Pedidos com Status Alterado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Buscar Pedidos com Status Alterado": {
-      "main": [[{ "node": "Verificar se há notificações", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Verificar se há notificações",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Verificar se há notificações": {
-      "main": [[{ "node": "Loop por Pedido", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop por Pedido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Loop por Pedido": {
-      "main": [[{ "node": "Montar Mensagem de Status", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Montar Mensagem de Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Montar Mensagem de Status": {
-      "main": [[{ "node": "Enviar WhatsApp", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Enviar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Enviar WhatsApp": {
-      "main": [[{ "node": "Marcar como Notificado", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Marcar como Notificado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Marcar como Notificado": {
-      "main": [[{ "node": "Loop por Pedido", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop por Pedido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "staticData": null
 }
