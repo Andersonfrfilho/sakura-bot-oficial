@@ -63,7 +63,14 @@ import json, sys
 with open(sys.argv[1]) as f:
     wf = json.load(f)
 wf.pop('id', None)
-wf['active'] = False
+wf.pop('active', None)        # read-only na API v1
+wf.pop('versionId', None)
+wf.pop('activeVersionId', None)
+wf.pop('activeVersion', None)
+wf.pop('tags', None)
+wf.pop('shared', None)
+if 'settings' not in wf:
+    wf['settings'] = {"executionOrder": "v1"}
 print(json.dumps(wf))
 PYEOF
 )
