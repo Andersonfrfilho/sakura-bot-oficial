@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Importa e ativa todos os workflows de n8n/workflows/ via API Key (n8n v1+)
+# Importa e ATUALIZA todos os workflows de n8n/workflows/ via API Key (n8n v1+)
+# Se o workflow já existe: PUT (atualiza). Se não: POST (cria).
 # Uso: N8N_API_KEY=xxx bash scripts/import-workflows.sh [n8n_url]
 
 set -euo pipefail
@@ -14,7 +15,7 @@ if [ -z "$N8N_API_KEY" ]; then
   exit 1
 fi
 
-echo "Importando workflows para $N8N_URL..."
+echo "Sincronizando workflows para $N8N_URL..."
 
 # Aguarda n8n ficar disponível
 for i in $(seq 1 30); do
@@ -34,63 +35,88 @@ api() {
     -X "$method" "$N8N_URL/api/v1$path" "$@"
 }
 
-# Workflows já existentes (evita duplicatas)
-EXISTING=$(api GET "/workflows?limit=100" | python3 -c "
-import json, sys
-d = json.load(sys.stdin)
-for w in d.get('data', []):
-    print(w.get('name', ''))
-" 2>/dev/null || true)
+# Busca todos os workflows existentes (id + name)
+EXISTING_JSON=$(api GET "/workflows?limit=100")
 
-IMPORTED=0
-SKIPPED=0
+get_existing_id() {
+  local name="$1"
+  echo "$EXISTING_JSON" | python3 -c "
+import json, sys
+name = sys.argv[1]
+data = json.load(sys.stdin)
+for w in data.get('data', []):
+    if w.get('name') == name:
+        print(w.get('id', ''))
+        break
+" "$name" 2>/dev/null || true
+}
+
+strip_readonly() {
+  local wf_file="$1"
+  python3 - "$wf_file" <<'PYEOF'
+import json, sys
+with open(sys.argv[1]) as f:
+    wf = json.load(f)
+for key in ('id', 'active', 'versionId', 'activeVersionId', 'activeVersion', 'tags', 'shared'):
+    wf.pop(key, None)
+if 'settings' not in wf:
+    wf['settings'] = {"executionOrder": "v1"}
+print(json.dumps(wf))
+PYEOF
+}
+
+CREATED=0
+UPDATED=0
+FAILED=0
 
 for wf_file in "$WORKFLOWS_DIR"/*.json; do
   [ -f "$wf_file" ] || continue
 
   WF_NAME=$(python3 -c "import json; print(json.load(open('$wf_file')).get('name',''))" 2>/dev/null)
+  [ -z "$WF_NAME" ] && continue
 
-  if echo "$EXISTING" | grep -qF "$WF_NAME"; then
-    echo "  ↷ '$WF_NAME' já existe — pulando"
-    SKIPPED=$((SKIPPED + 1))
-    continue
+  EXISTING_ID=$(get_existing_id "$WF_NAME")
+  WF_DATA=$(strip_readonly "$wf_file")
+
+  if [ -n "$EXISTING_ID" ]; then
+    echo "  ↺ Atualizando '$WF_NAME' (id=$EXISTING_ID)..."
+
+    # Desativa antes de atualizar (evita conflito de webhook)
+    api PUT "/workflows/$EXISTING_ID/deactivate" -d '{}' >/dev/null 2>&1 || true
+
+    RESULT=$(echo "$WF_DATA" | api PUT "/workflows/$EXISTING_ID" -d @-)
+    WF_ID=$(echo "$RESULT" | python3 -c \
+      "import json,sys; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || true)
+
+    if [ -z "$WF_ID" ]; then
+      echo "  ✗ Falha ao atualizar '$WF_NAME'"
+      echo "    Resposta: $RESULT"
+      FAILED=$((FAILED + 1))
+      continue
+    fi
+
+    api PUT "/workflows/$WF_ID/activate" -d '{}' >/dev/null 2>&1 || true
+    echo "  ✓ '$WF_NAME' atualizado e ativado"
+    UPDATED=$((UPDATED + 1))
+  else
+    echo "  → Criando '$WF_NAME'..."
+
+    RESULT=$(echo "$WF_DATA" | api POST "/workflows" -d @-)
+    WF_ID=$(echo "$RESULT" | python3 -c \
+      "import json,sys; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || true)
+
+    if [ -z "$WF_ID" ]; then
+      echo "  ✗ Falha ao criar '$WF_NAME'"
+      echo "    Resposta: $RESULT"
+      FAILED=$((FAILED + 1))
+      continue
+    fi
+
+    api PUT "/workflows/$WF_ID/activate" -d '{}' >/dev/null 2>&1 || true
+    echo "  ✓ '$WF_NAME' criado e ativado (id=$WF_ID)"
+    CREATED=$((CREATED + 1))
   fi
-
-  echo "  → Importando '$WF_NAME'..."
-
-  WF_DATA=$(python3 - "$wf_file" <<'PYEOF'
-import json, sys
-with open(sys.argv[1]) as f:
-    wf = json.load(f)
-wf.pop('id', None)
-wf.pop('active', None)        # read-only na API v1
-wf.pop('versionId', None)
-wf.pop('activeVersionId', None)
-wf.pop('activeVersion', None)
-wf.pop('tags', None)
-wf.pop('shared', None)
-if 'settings' not in wf:
-    wf['settings'] = {"executionOrder": "v1"}
-print(json.dumps(wf))
-PYEOF
-)
-
-  RESULT=$(echo "$WF_DATA" | api POST "/workflows" -d @-)
-  WF_ID=$(echo "$RESULT" | python3 -c \
-    "import json,sys; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || true)
-
-  if [ -z "$WF_ID" ]; then
-    echo "  ✗ Falha ao criar '$WF_NAME'"
-    echo "    Resposta: $RESULT"
-    continue
-  fi
-
-  # Ativa o workflow
-  api PUT "/workflows/$WF_ID/activate" -d '{}' >/dev/null 2>&1 || true
-
-  echo "  ✓ '$WF_NAME' importado e ativado (id=$WF_ID)"
-  IMPORTED=$((IMPORTED + 1))
 done
 
 echo ""
-echo "Concluído: $IMPORTED importado(s), $SKIPPED ignorado(s)."
+echo "Concluído: $CREATED criado(s), $UPDATED atualizado(s), $FAILED falha(s)."
