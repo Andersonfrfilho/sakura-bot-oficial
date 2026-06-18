@@ -67,20 +67,19 @@
       "parameters": {
         "method": "POST",
         "url": "={{ 'https://graph.facebook.com/' + $env.WHATSAPP_API_VERSION + '/' + $env.WHATSAPP_PHONE_NUMBER_ID + '/messages' }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "genericCredentialType": "httpHeaderAuth",
-        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.WHATSAPP_ACCESS_TOKEN }}"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $json.from }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"Olá! Recebi sua mensagem. Em breve um atendente responderá.\"\n  }\n}",
         "options": {}
-      },
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "tPwRFUVP70AEnIyI",
-          "name": "WhatsApp Cloud API"
-        }
       },
       "id": "send-reply",
       "name": "Enviar resposta",
