@@ -12,7 +12,10 @@
       "name": "Webhook GET (verificação Meta)",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 200],
+      "position": [
+        240,
+        200
+      ],
       "webhookId": "whatsapp-get"
     },
     {
@@ -25,7 +28,10 @@
       "name": "Responder hub.challenge",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [480, 200]
+      "position": [
+        480,
+        200
+      ]
     },
     {
       "parameters": {
@@ -38,7 +44,10 @@
       "name": "Webhook POST (mensagens)",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 400],
+      "position": [
+        240,
+        400
+      ],
       "webhookId": "whatsapp-post"
     },
     {
@@ -51,62 +60,88 @@
       "name": "Responder OK",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [480, 400]
+      "position": [
+        480,
+        400
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const entry = $json.body?.entry?.[0];\nconst change = entry?.changes?.[0];\nconst value = change?.value;\nconst message = value?.messages?.[0];\n\nif (!message) {\n  return [];\n}\n\nreturn [{\n  json: {\n    from: message.from,\n    type: message.type,\n    text: message.text?.body || '',\n    messageId: message.id,\n    timestamp: message.timestamp,\n    phoneNumberId: value?.metadata?.phone_number_id\n  }\n}];"
+        "jsCode": "\nconst entry = $json.body?.entry?.[0];\nconst change = entry?.changes?.[0];\nconst value = change?.value;\nconst message = value?.messages?.[0];\n\nif (!message) return [];\n\nconst tel = message.from || '';\nconst push_name = value?.contacts?.[0]?.profile?.name || '';\nconst phoneNumberId = value?.metadata?.phone_number_id || '';\n\nlet texto = '';\nlet location_lat = null;\nlet location_lng = null;\n\nif (message.type === 'text') {\n  texto = (message.text?.body || '').trim();\n} else if (message.type === 'interactive') {\n  const ia = message.interactive;\n  if (ia?.type === 'button_reply') {\n    texto = ia.button_reply?.id || ia.button_reply?.title || '';\n  } else if (ia?.type === 'list_reply') {\n    texto = ia.list_reply?.id || ia.list_reply?.title || '';\n  }\n} else if (message.type === 'location') {\n  location_lat = message.location?.latitude;\n  location_lng = message.location?.longitude;\n  texto = '__location__';\n} else if (message.type === 'image' || message.type === 'document') {\n  texto = message.caption || '';\n}\n\nif (!texto && message.type !== 'location') return [];\nif (!tel) return [];\n\nreturn [{ json: { tel, texto, push_name, phoneNumberId, location_lat, location_lng, messageId: message.id } }];\n"
       },
       "id": "extract-message",
       "name": "Extrair dados da mensagem",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [720, 400]
+      "position": [
+        720,
+        400
+      ]
     },
     {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ 'https://graph.facebook.com/' + $env.WHATSAPP_API_VERSION + '/' + $env.WHATSAPP_PHONE_NUMBER_ID + '/messages' }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.WHATSAPP_ACCESS_TOKEN }}"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $json.from }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"Olá! Recebi sua mensagem. Em breve um atendente responderá.\"\n  }\n}",
-        "options": {}
-      },
-      "id": "send-reply",
-      "name": "Enviar resposta",
+      "id": "call-routing",
+      "name": "Chamar Roteamento",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [960, 400]
+      "position": [
+        960,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/routing",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 30000
+        }
+      }
     }
   ],
   "connections": {
     "Webhook GET (verificação Meta)": {
       "main": [
-        [{ "node": "Responder hub.challenge", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Responder hub.challenge",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Webhook POST (mensagens)": {
       "main": [
-        [{ "node": "Responder OK", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Responder OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Responder OK": {
       "main": [
-        [{ "node": "Extrair dados da mensagem", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Extrair dados da mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Extrair dados da mensagem": {
       "main": [
-        [{ "node": "Enviar resposta", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Chamar Roteamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
