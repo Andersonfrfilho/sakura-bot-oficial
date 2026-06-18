@@ -81,8 +81,9 @@ for wf_file in "$WORKFLOWS_DIR"/*.json; do
   if [ -n "$EXISTING_ID" ]; then
     echo "  ↺ Atualizando '$WF_NAME' (id=$EXISTING_ID)..."
 
-    # Desativa antes de atualizar (evita conflito de webhook)
+    # Desativa e desarquiva antes de atualizar
     api PUT "/workflows/$EXISTING_ID/deactivate" -d '{}' >/dev/null 2>&1 || true
+    api POST "/workflows/$EXISTING_ID/unarchive" -d '{}' >/dev/null 2>&1 || true
 
     RESULT=$(echo "$WF_DATA" | api PUT "/workflows/$EXISTING_ID" -d @-)
     WF_ID=$(echo "$RESULT" | python3 -c \
