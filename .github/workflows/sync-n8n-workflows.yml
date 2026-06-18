@@ -16,8 +16,5 @@ jobs:
       - name: Import workflows to n8n
         env:
           N8N_URL: ${{ secrets.N8N_URL }}
-          N8N_EMAIL: ${{ secrets.N8N_EMAIL }}
-          N8N_PASSWORD: ${{ secrets.N8N_PASSWORD }}
-          N8N_BASIC_USER: ${{ secrets.N8N_BASIC_USER }}
-          N8N_BASIC_PASS: ${{ secrets.N8N_BASIC_PASS }}
-        run: bash scripts/import-workflows.sh "$N8N_URL" "$N8N_EMAIL" "$N8N_PASSWORD"
+          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+        run: bash scripts/import-workflows.sh
