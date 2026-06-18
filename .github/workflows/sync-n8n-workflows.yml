@@ -1,0 +1,20 @@
+name: Sync n8n Workflows
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'n8n/workflows/**'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Import workflows to n8n
+        env:
+          N8N_URL: ${{ secrets.N8N_URL }}
+          N8N_EMAIL: ${{ secrets.N8N_EMAIL }}
+          N8N_PASSWORD: ${{ secrets.N8N_PASSWORD }}
+        run: bash scripts/import-workflows.sh "$N8N_URL" "$N8N_EMAIL" "$N8N_PASSWORD"
