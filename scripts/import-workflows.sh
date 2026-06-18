@@ -7,6 +7,9 @@ set -euo pipefail
 N8N_URL="${1:-http://localhost:5678}"
 N8N_EMAIL="${2:-admin@sakura.local}"
 N8N_PASSWORD="${3:-SakuraBot123}"
+# Basic auth (usuário HTTP, separado do owner — necessário quando N8N_BASIC_AUTH_ACTIVE=true)
+N8N_BASIC_USER="${N8N_BASIC_USER:-admin}"
+N8N_BASIC_PASS="${N8N_BASIC_PASS:-$N8N_PASSWORD}"
 WORKFLOWS_DIR="$(dirname "$0")/../n8n/workflows"
 
 # Load DB credentials from .env
@@ -29,7 +32,9 @@ for i in $(seq 1 30); do
 done
 
 # Setup owner (idempotent — 400 if already configured is fine)
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$N8N_URL/rest/owner/setup" \
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+  -u "$N8N_BASIC_USER:$N8N_BASIC_PASS" \
+  -X POST "$N8N_URL/rest/owner/setup" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$N8N_EMAIL\",\"firstName\":\"Admin\",\"lastName\":\"Bot\",\"password\":\"$N8N_PASSWORD\"}" \
   2>/dev/null || echo "000")
@@ -41,14 +46,16 @@ else
   echo "  AVISO: owner/setup retornou HTTP $HTTP_CODE"
 fi
 
-# Login
-TOKEN=$(curl -si -X POST "$N8N_URL/rest/login" \
+# Login (passa basic auth pois N8N_BASIC_AUTH_ACTIVE pode estar ativo)
+TOKEN=$(curl -si \
+  -u "$N8N_BASIC_USER:$N8N_BASIC_PASS" \
+  -X POST "$N8N_URL/rest/login" \
   -H "Content-Type: application/json" \
   -d "{\"emailOrLdapLoginId\":\"$N8N_EMAIL\",\"password\":\"$N8N_PASSWORD\"}" | \
   grep "Set-Cookie: n8n-auth=" | sed 's/.*n8n-auth=//;s/;.*//' | tr -d '\r')
 
 if [ -z "$TOKEN" ]; then
-  echo "ERRO: Login falhou. Verifique as credenciais do n8n."
+  echo "ERRO: Login falhou. Verifique N8N_EMAIL, N8N_PASSWORD e N8N_BASIC_USER/PASS."
   exit 1
 fi
 
@@ -57,7 +64,8 @@ echo "  Login OK"
 api() {
   local method="$1" path="$2"
   shift 2
-  curl -s -H "Cookie: n8n-auth=$TOKEN" \
+  curl -s -u "$N8N_BASIC_USER:$N8N_BASIC_PASS" \
+    -H "Cookie: n8n-auth=$TOKEN" \
     -H "Content-Type: application/json" \
     -X "$method" "$N8N_URL$path" "$@"
 }
