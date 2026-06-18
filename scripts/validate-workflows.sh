@@ -60,6 +60,20 @@ for node in wf.get('nodes', []):
             print(f'{level}:[{name}] {msg}')
 PYEOF
 
+bold "=== Testes de Fluxo ==="
+FLOW_TEST="$(dirname "$0")/../tests/flow.test.js"
+if [ -f "$FLOW_TEST" ]; then
+  if node "$FLOW_TEST"; then
+    echo ""
+  else
+    echo ""
+    red "✗ Testes de fluxo falharam — corrija antes de subir"
+    exit 1
+  fi
+else
+  yellow "⚠ tests/flow.test.js não encontrado — pulando testes de fluxo"
+fi
+
 bold "=== Validando workflows n8n ==="
 echo ""
 
