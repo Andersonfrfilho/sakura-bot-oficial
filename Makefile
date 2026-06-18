@@ -7,7 +7,7 @@ PROJECT := $(if $(PROJECT),$(PROJECT),whatsapp-bot)
 
 COMPOSE = docker compose -f infra/docker-compose.yml -p $(PROJECT)
 
-.PHONY: help all setup init up down restart logs ps db-reset db-seed n8n-import directus-init chatwoot-init test test-order test-msg evolution-start evolution-stop evolution-logs
+.PHONY: help all setup init up down restart logs ps db-reset db-seed n8n-import directus-init chatwoot-init test test-order test-msg evolution-start evolution-stop evolution-logs validate
 
 help:
 	@echo ""
@@ -21,7 +21,8 @@ help:
 	@echo "  make restart     Para e sobe novamente"
 	@echo "  make logs        Acompanha logs em tempo real"
 	@echo "  make ps          Status dos containers"
-	@echo "  make test        Roda testes de parsing + validação do workflow"
+	@echo "  make validate    Valida JSON + JS syntax + anti-padrões (roda antes do push)
+  make test        Roda testes de parsing + validação do workflow"
 	@echo "  make db-reset    Recria o schema do app no banco (destrói dados)"
 	@echo "  make db-seed     Importa cardapio.csv e faq.csv para o banco"
 	@echo "  make test-order  Insere pedido de teste completo no banco"
@@ -176,7 +177,10 @@ test:
 	@node tests/workflow.validate.js
 	@echo ""
 
-n8n-import: test
+validate:
+	@bash scripts/validate-workflows.sh
+
+n8n-import: validate
 	@bash scripts/import-workflows.sh "$(N8N_URL)" "$(N8N_EMAIL)" "$(N8N_PASSWORD)"
 
 # Importa workflows direto no Railway (produção)
