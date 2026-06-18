@@ -151,6 +151,13 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at  TIMESTAMPTZ DEFAULT now(),
   deleted_at  TIMESTAMPTZ
 );
+-- n8n reuses this table internally without some columns — add them if missing
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS group_name  TEXT DEFAULT 'general';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS created_at  TIMESTAMPTZ DEFAULT now();
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS updated_at  TIMESTAMPTZ DEFAULT now();
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS deleted_at  TIMESTAMPTZ;
+
 INSERT INTO settings (key, value, description, group_name) VALUES
   ('establishment_name',        'Sakura Restaurante',                        'Name shown in messages',                                 'general'),
   ('opening_time',              '18:00',                                     'Opening time (HH:MM)',                                   'schedule'),
