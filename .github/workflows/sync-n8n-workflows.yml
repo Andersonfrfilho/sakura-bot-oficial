@@ -5,15 +5,30 @@ on:
     branches: [main]
     paths:
       - 'n8n/workflows/**'
+      - 'database/migrations/**'
   workflow_dispatch:
 
 jobs:
-  sync:
+  migrate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Import workflows to n8n
+      - name: Install psql
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Run database migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: bash scripts/run-migrations.sh
+
+  sync:
+    runs-on: ubuntu-latest
+    needs: migrate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync workflows to n8n
         env:
           N8N_URL: ${{ secrets.N8N_URL }}
           N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
