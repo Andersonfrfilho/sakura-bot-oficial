@@ -82,7 +82,7 @@ for wf_file in "$WORKFLOWS_DIR"/*.json; do
     echo "  ↺ Atualizando '$WF_NAME' (id=$EXISTING_ID)..."
 
     # Desativa e desarquiva antes de atualizar
-    api PUT "/workflows/$EXISTING_ID/deactivate" -d '{}' >/dev/null 2>&1 || true
+    api POST "/workflows/$EXISTING_ID/deactivate" -d '{}' >/dev/null 2>&1 || true
     api POST "/workflows/$EXISTING_ID/unarchive" -d '{}' >/dev/null 2>&1 || true
 
     RESULT=$(echo "$WF_DATA" | api PUT "/workflows/$EXISTING_ID" -d @-)
@@ -96,7 +96,7 @@ for wf_file in "$WORKFLOWS_DIR"/*.json; do
       continue
     fi
 
-    api PUT "/workflows/$WF_ID/activate" -d '{}' >/dev/null 2>&1 || true
+    api POST "/workflows/$WF_ID/activate" -d '{}' >/dev/null 2>&1 || true
     echo "  ✓ '$WF_NAME' atualizado e ativado"
     UPDATED=$((UPDATED + 1))
   else
@@ -113,7 +113,7 @@ for wf_file in "$WORKFLOWS_DIR"/*.json; do
       continue
     fi
 
-    api PUT "/workflows/$WF_ID/activate" -d '{}' >/dev/null 2>&1 || true
+    api POST "/workflows/$WF_ID/activate" -d '{}' >/dev/null 2>&1 || true
     echo "  ✓ '$WF_NAME' criado e ativado (id=$WF_ID)"
     CREATED=$((CREATED + 1))
   fi
