@@ -179,6 +179,14 @@ test:
 n8n-import: test
 	@bash scripts/import-workflows.sh "$(N8N_URL)" "$(N8N_EMAIL)" "$(N8N_PASSWORD)"
 
+# Importa workflows direto no Railway (produção)
+# Uso: make n8n-import-railway N8N_RAILWAY_URL=https://n8n-xxx.up.railway.app
+n8n-import-railway:
+	@bash scripts/import-workflows.sh \
+		"$(N8N_RAILWAY_URL)" \
+		"$(N8N_EMAIL)" \
+		"$(N8N_PASSWORD)"
+
 # Insere um pedido de teste completo no banco (cliente + 2 pedidos + logs + IA)
 # Idempotente — limpa dados anteriores antes de inserir
 test-order:

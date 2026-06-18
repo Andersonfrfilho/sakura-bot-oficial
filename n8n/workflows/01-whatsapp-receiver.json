@@ -1,0 +1,123 @@
+{
+  "name": "01-whatsapp-receiver",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-get",
+      "name": "Webhook GET (verificação Meta)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 200],
+      "webhookId": "whatsapp-get"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": {}
+      },
+      "id": "respond-verification",
+      "name": "Responder hub.challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [480, 200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-post",
+      "name": "Webhook POST (mensagens)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400],
+      "webhookId": "whatsapp-post"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK",
+        "options": {}
+      },
+      "id": "respond-ok",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [480, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const entry = $json.body?.entry?.[0];\nconst change = entry?.changes?.[0];\nconst value = change?.value;\nconst message = value?.messages?.[0];\n\nif (!message) {\n  return [];\n}\n\nreturn [{\n  json: {\n    from: message.from,\n    type: message.type,\n    text: message.text?.body || '',\n    messageId: message.id,\n    timestamp: message.timestamp,\n    phoneNumberId: value?.metadata?.phone_number_id\n  }\n}];"
+      },
+      "id": "extract-message",
+      "name": "Extrair dados da mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/{{ $env.WHATSAPP_API_VERSION }}/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WHATSAPP_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $json.from }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"Olá! Recebi sua mensagem. Em breve um atendente responderá.\"\n  }\n}",
+        "options": {}
+      },
+      "id": "send-reply",
+      "name": "Enviar resposta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 400]
+    }
+  ],
+  "connections": {
+    "Webhook GET (verificação Meta)": {
+      "main": [
+        [{ "node": "Responder hub.challenge", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook POST (mensagens)": {
+      "main": [
+        [{ "node": "Responder OK", "type": "main", "index": 0 }]
+      ]
+    },
+    "Responder OK": {
+      "main": [
+        [{ "node": "Extrair dados da mensagem", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extrair dados da mensagem": {
+      "main": [
+        [{ "node": "Enviar resposta", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "whatsapp" }]
+}
