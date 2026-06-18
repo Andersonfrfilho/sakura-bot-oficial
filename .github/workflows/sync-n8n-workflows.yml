@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'n8n/workflows/**'
+  workflow_dispatch:
 
 jobs:
   sync:
