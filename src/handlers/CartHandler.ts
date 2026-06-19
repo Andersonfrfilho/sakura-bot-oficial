@@ -50,7 +50,7 @@ class CartHandler extends BaseHandler {
         respostas.push(MessagesConstants.CARRINHO_VAZIO);
       } else {
         const { lines, total } = cartSummary(newCart.items);
-        const minOrder = parseFloat(config['min_order_value'] || '0');
+        const minOrder = minOrderValue;
         if (minOrder > 0 && total < minOrder) {
           respostas.push(MessagesConstants.VALOR_MINIMO(fmtBRL(minOrder), fmtBRL(total)));
         } else {

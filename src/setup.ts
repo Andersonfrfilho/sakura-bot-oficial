@@ -3,16 +3,17 @@ const msgData = ($("Calcular Hora") as { first(): { json: MsgData } }).first().j
 const { tel, instancia, texto, horaAtual, diaSemana, location_lat, location_lng } = msgData;
 
 const inputData = $json as N8nInputData;
-const config: Record<string, string>   = inputData.config || {};
-const products: Product[]              = inputData.products || [];
-const recentOrders: RecentOrder[]      = inputData.recent_orders || [];
-const sessionRaw: SessionRaw           = inputData.session || {};
-const lastOrder: LastOrder | null      = inputData.last_order || null;
-const paymentTypes: PaymentType[]      = inputData.payment_types || [];
-const orderTypes: OrderType[]          = inputData.order_types || [];
+const establishment: EstablishmentConfig = inputData.establishment || {} as EstablishmentConfig;
+const config: Record<string, string>     = inputData.config || {};
+const products: Product[]                = inputData.products || [];
+const recentOrders: RecentOrder[]        = inputData.recent_orders || [];
+const sessionRaw: SessionRaw             = inputData.session || {};
+const lastOrder: LastOrder | null        = inputData.last_order || null;
+const paymentTypes: PaymentType[]        = inputData.payment_types || [];
+const orderTypes: OrderType[]            = inputData.order_types || [];
 
 // ── TTL de sessão ────────────────────────────────────────────────────────────
-const sessionTtlMin = parseInt(config['session_ttl_min'] || '60', 10);
+const sessionTtlMin = establishment.session_ttl_min ?? parseInt(config['session_ttl_min'] || '60', 10);
 const lastActivity  = sessionRaw.last_activity_at ? new Date(sessionRaw.last_activity_at) : null;
 const sessionExpired = lastActivity
   ? (Date.now() - lastActivity.getTime()) > sessionTtlMin * 60 * 1000
@@ -63,12 +64,17 @@ if (Array.isArray(rawCart)) {
 }
 
 // ── Configurações de negócio ─────────────────────────────────────────────────
-const openingTime  = config['opening_time']  || '18:00';
-const closingTime  = config['closing_time']  || '23:00';
-const workingDays  = (config['working_days'] || 'ter,qua,qui,sex,sab,dom').split(',');
-const msgClosed    = (config['msg_closed']   || 'Estamos fechados agora!').replace(/\\n/g, '\n');
-const msgWelcome   = (config['msg_welcome']  || 'Ola! Bem-vindo!').replace(/\\n/g, '\n');
-const ignoreHours  = config['ignore_hours'] === 'true';
+const openingTime    = establishment.opening_time  || config['opening_time']  || '18:00';
+const closingTime    = establishment.closing_time  || config['closing_time']  || '23:00';
+const workingDays    = (establishment.working_days || config['working_days'] || 'ter,qua,qui,sex,sab,dom').split(',');
+const msgClosed      = (establishment.msg_closed   || config['msg_closed']   || 'Estamos fechados agora!').replace(/\\n/g, '\n');
+const msgWelcome     = (establishment.msg_welcome  || config['msg_welcome']  || 'Ola! Bem-vindo!').replace(/\\n/g, '\n');
+const ignoreHours    = establishment.ignore_hours  ?? config['ignore_hours'] === 'true';
+const estName        = establishment.name          || config['establishment_name']    || 'nosso estabelecimento';
+const estCity        = establishment.city          || config['establishment_city']    || '';
+const estAddress     = establishment.address       || config['establishment_address'] || '';
+const minOrderValue  = establishment.min_order_value != null ? establishment.min_order_value : parseFloat(config['min_order_value'] || '0');
+const kitchenPhone   = establishment.kitchen_phone  || config['kitchen_phone']           || '';
 
 // ── Tipos de pedido / entrega ────────────────────────────────────────────────
 const featureDelivery = orderTypes.some((orderType: OrderType) => orderType.name === 'delivery');
@@ -80,8 +86,8 @@ const feePerKm        = Number(feeRule.per_km_rate   ?? 0);
 const feePerMin       = Number(feeRule.per_min_rate  ?? 0);
 const freeDeliveryAbove = Number(feeRule.free_above  ?? 0);
 const maxRadiusKm     = Number(feeRule.max_radius_km ?? 10);
-const estLat          = Number(config['establishment_lat'] || 0);
-const estLng          = Number(config['establishment_lng'] || 0);
+const estLat          = establishment.lat ?? Number(config['establishment_lat'] || 0);
+const estLng          = establishment.lng ?? Number(config['establishment_lng'] || 0);
 
 // ── PIX ──────────────────────────────────────────────────────────────────────
 const pixType   = paymentTypes.find((paymentType: PaymentType) => paymentType.name === 'pix') || {} as PaymentType;
@@ -428,7 +434,7 @@ function buildPayload(): N8nResponsePayload {
     save_reservation, reservation: finalReservation,
     save_customer_name, customer_name_to_save: customerNameToSave,
     save_marketing_opt_in, marketing_opt_in_value,
-    kitchen_phone: config['kitchen_phone'] || '',
+    kitchen_phone: kitchenPhone,
     create_chatwoot_conversation,
     chatwoot_customer_name: chatwootCustomerName,
   };

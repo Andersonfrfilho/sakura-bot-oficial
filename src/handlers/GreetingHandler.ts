@@ -7,7 +7,6 @@ class GreetingHandler extends BaseHandler {
 
     if (!customerName) {
       newState = BotState.AWAITING_NAME;
-      const estName = config['establishment_name'] || 'nosso estabelecimento';
       respostas.push(MessagesConstants.BOAS_VINDAS_NOME(estName));
     } else {
       if (!customerNameFromDB && pushNameFormatted) {

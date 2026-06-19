@@ -41,7 +41,7 @@ class DeliveryHandler extends BaseHandler {
         respostas.push(paymentList(newCart.split_count));
       } else {
         newState = BotState.AWAITING_ADDRESS;
-        respostas.push(MessagesConstants.OUTRO_ENDERECO(config['establishment_city'] || ''));
+        respostas.push(MessagesConstants.OUTRO_ENDERECO(estCity || ''));
       }
       return true;
     }
@@ -87,7 +87,6 @@ class DeliveryHandler extends BaseHandler {
   }
 
   private async _handleAddress(): Promise<void> {
-    const estCity = config['establishment_city'] || '';
     const estCityName = estCity.split(',')[0].trim().toLowerCase();
 
     if (texto === '__location__' && location_lat != null && location_lng != null) {
@@ -194,7 +193,7 @@ class DeliveryHandler extends BaseHandler {
 
     if (!streetInfo['localidade']) {
       newState = BotState.AWAITING_ADDRESS;
-      respostas.push(MessagesConstants.ENDERECO_INVALIDO_RETRY(config['establishment_city'] || ''));
+      respostas.push(MessagesConstants.ENDERECO_INVALIDO_RETRY(estCity || ''));
       return;
     }
 

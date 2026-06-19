@@ -162,7 +162,7 @@ class OrderingHandler extends BaseHandler {
 
     if (texto === 'finalizar') {
       const { lines, total } = cartSummary(newCart.items);
-      const minOrder = parseFloat(config['min_order_value'] || '0');
+      const minOrder = minOrderValue;
       if (minOrder > 0 && total < minOrder) {
         respostas.push(MessagesConstants.ORDEM_MINIMO_ADDMORE(fmtBRL(minOrder), fmtBRL(total)));
         newState = BotState.AWAITING_MORE;

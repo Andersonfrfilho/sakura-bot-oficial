@@ -110,7 +110,45 @@ interface OsrmResponse {
   routes?: OsrmRoute[];
 }
 
+interface EstablishmentConfig {
+  id: string;
+  slug: string;
+  whatsapp_number: string;
+  name: string;
+  phone: string | null;
+  logo_url: string | null;
+  address: string | null;
+  lat: number;
+  lng: number;
+  city: string | null;
+  opening_time: string;
+  closing_time: string;
+  working_days: string;
+  msg_welcome: string;
+  msg_closed: string;
+  min_order_value: number;
+  prep_time_min: number;
+  session_ttl_min: number;
+  ignore_hours: boolean;
+  feature_delivery: boolean;
+  feature_retirada: boolean;
+  feature_reservas: boolean;
+  feature_pedido_mesa: boolean;
+  kitchen_phone: string | null;
+  agent_phone: string | null;
+  chatwoot_account_id: string | null;
+  chatwoot_api_token: string | null;
+  chatwoot_inbox_id: string | null;
+  reminder_interval_days: number;
+  reminder_min_gap_days: number;
+  reminder_send_hour: number;
+  reminder_message_template: string | null;
+  reservation_reminder_hour: number;
+  active: boolean;
+}
+
 interface N8nInputData {
+  establishment: EstablishmentConfig;
   config: Record<string, string>;
   products: Product[];
   recent_orders: RecentOrder[];

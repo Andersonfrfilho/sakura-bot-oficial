@@ -68,7 +68,7 @@ class ReservationHandler extends BaseHandler {
     newReservationTemp = {};
     newState = BotState.START;
 
-    const estabAddr = config['establishment_address'] || '';
+    const estabAddr = estAddress;
     const mapsLink = estabAddr ? MessagesConstants.RESERVA_MAPS_LINE(estabAddr) : '';
     const addrLine = estabAddr ? MessagesConstants.RESERVA_ADDR_LINE(estabAddr, mapsLink) : '';
 
