@@ -32,7 +32,7 @@ enum BotState {
   CONFIRMING_RESERVATION    = 'confirming_reservation',
 }
 
-// Estados onde o usuário digita INPUT (não atalhos de menu)
+// Estados onde o usuário digita INPUT livre (não atalhos de menu)
 const ExpectingRawInputStates: ReadonlyArray<string> = [
   BotState.ORDERING_CAT,
   BotState.BROWSING_CATEGORIES,
@@ -41,4 +41,14 @@ const ExpectingRawInputStates: ReadonlyArray<string> = [
   BotState.AWAITING_QTY,
   BotState.AWAITING_MORE,
   BotState.ORDERING,
+  BotState.AWAITING_ADDRESS,
+  BotState.AWAITING_ADDRESS_NUMBER,
+  BotState.AWAITING_COMPLEMENT,
+  BotState.AWAITING_CHANGE,
+  BotState.AWAITING_SPLIT_COUNT,
+  BotState.AWAITING_SPLIT_CHANGE,
+  BotState.AWAITING_MIXED_AMOUNT,
+  BotState.AWAITING_MIXED_CHANGE,
+  BotState.AWAITING_NAME,
+  BotState.RESERVING,
 ];

@@ -70,9 +70,12 @@ class DeliveryHandler extends BaseHandler {
       return;
     }
 
-    const route = await routingProvider.route(estLat, estLng, lat, lng);
-    const routeKm = route ? route.km : distance;
-    const routeMin = route ? route.min : Math.round(distance * 3);
+    let routeKm = 0;
+    let routeMin = 0;
+    if (this._coordsConfigured()) {
+      const route = await routingProvider.route(estLat, estLng, lat, lng);
+      if (route) { routeKm = route.km; routeMin = route.min; }
+    }
 
     const { total: cartSubtotal } = cartSummary(newCart.items);
     const calcFee = calcDeliveryFee(routeKm, routeMin, cartSubtotal);
@@ -99,9 +102,12 @@ class DeliveryHandler extends BaseHandler {
         return;
       }
 
-      const route = await routingProvider.route(estLat, estLng, lat, lng);
-      const routeKm = route ? route.km : distance;
-      const routeMin = route ? route.min : Math.round(distance * 3);
+      let routeKm = 0;
+      let routeMin = 0;
+      if (this._coordsConfigured()) {
+        const route = await routingProvider.route(estLat, estLng, lat, lng);
+        if (route) { routeKm = route.km; routeMin = route.min; }
+      }
 
       let addressLabel = 'Localização compartilhada';
       const reverseResult = await geocodingProvider.reverse(lat, lng);

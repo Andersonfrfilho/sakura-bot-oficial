@@ -134,6 +134,13 @@ function fmtBRL(value: number): string {
   return Number(value).toFixed(2).replace('.', ',');
 }
 
+function fmtDuration(minutes: number): string {
+  if (minutes < 60) return minutes + ' min';
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return hours + 'h' + (mins > 0 ? ' ' + mins + 'min' : '');
+}
+
 function fmtDate(iso: string): string {
   return iso ? iso.split('-').reverse().join('/') : '';
 }
