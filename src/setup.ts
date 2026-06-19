@@ -117,6 +117,7 @@ interface N8nRuntimeContext {
   helpers: { httpRequest: (options: Record<string, unknown>) => Promise<unknown> };
 }
 const _httpRequest = async (options: Record<string, unknown>): Promise<unknown> =>
+  // @ts-ignore — arrow captura o 'this' do n8n Code node; TS7041 é falso-positivo em module:none
   (this as unknown as N8nRuntimeContext).helpers.httpRequest(options);
 
 // ── Providers de integração externa ──────────────────────────────────────────
