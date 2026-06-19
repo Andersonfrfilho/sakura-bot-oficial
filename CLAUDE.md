@@ -105,6 +105,14 @@ O webhook também recebe GET para verificação (hub.challenge) — tratar no wo
 
 Ver [SETUP.md](SETUP.md) para passo a passo detalhado.
 
+## Regras de desenvolvimento TypeScript
+
+- **Sem `any`** — usar interfaces tipadas ou `unknown` + type guard
+- **Sem diminutivos** — nomes de variável descritivos (`product`, não `p`; `paymentType`, não `pt`)
+- **Strings em constants** — toda string de UI vai em `MessagesConstants`
+- **Providers sem prefixo `I`** — interface: `GeocodingProvider`; implementação: `NominatimProviderImplementation`
+- **Shared first** — types em `src/shared/types/`, constants em `src/shared/constants/`, providers em `src/shared/providers/`
+
 ## Lógica do bot (src/)
 
 O nó `Rotear e Responder` do workflow é gerado a partir de módulos em `src/`:

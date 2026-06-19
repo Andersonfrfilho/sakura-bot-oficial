@@ -119,6 +119,12 @@ interface N8nRuntimeContext {
 const _httpRequest = async (options: Record<string, unknown>): Promise<unknown> =>
   (this as unknown as N8nRuntimeContext).helpers.httpRequest(options);
 
+// ── Providers de integração externa ──────────────────────────────────────────
+const httpClient: HttpClientProvider       = new N8nHttpClientProviderImplementation();
+const cepProvider: CepProvider             = new ViaCepProviderImplementation(httpClient);
+const geocodingProvider: GeocodingProvider = new NominatimProviderImplementation(httpClient);
+const routingProvider: RoutingProvider     = new OsrmProviderImplementation(httpClient);
+
 // ── Guard de input raw ───────────────────────────────────────────────────────
 const expectingRawInput = ExpectingRawInputStates.includes(currentState);
 

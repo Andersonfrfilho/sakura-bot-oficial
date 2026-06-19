@@ -21,6 +21,16 @@ const MODULE_ORDER = [
   'shared/constants/StateConstants.ts',
   'shared/constants/CartConstants.ts',
   'shared/constants/MessagesConstants.ts',
+  // provider contracts (interfaces)
+  'shared/providers/contracts/HttpClientProvider.ts',
+  'shared/providers/contracts/CepProvider.ts',
+  'shared/providers/contracts/GeocodingProvider.ts',
+  'shared/providers/contracts/RoutingProvider.ts',
+  // provider implementations
+  'shared/providers/N8nHttpClientProviderImplementation.ts',
+  'shared/providers/ViaCepProviderImplementation.ts',
+  'shared/providers/NominatimProviderImplementation.ts',
+  'shared/providers/OsrmProviderImplementation.ts',
   'handlers/BaseHandler.ts',
   'setup.ts',
   'handlers/GlobalHandler.ts',
