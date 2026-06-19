@@ -6,5 +6,8 @@
     "build": "node scripts/build-workflow.js",
     "test": "node tests/flow.test.js",
     "validate": "bash scripts/validate-workflows.sh"
+  },
+  "devDependencies": {
+    "typescript": "~5.7.3"
   }
 }
