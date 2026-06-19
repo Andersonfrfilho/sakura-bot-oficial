@@ -31,46 +31,35 @@ class PaymentHandler extends BaseHandler {
     return paymentTypes.filter((paymentType: PaymentType) => paymentType.name !== 'dinheiro');
   }
 
-  private _buildOrderConfirmation(total: number): void {
-    const { lines, total: subtotal } = cartSummary(newCart.items);
+  private _resolveOrderTypeLabel(): string {
+    return (orderTypes.find((orderType: OrderType) => orderType.name === newCart.order_type) || { label: 'Retirada' }).label;
+  }
+
+  private _buildDeliveryLines(): { typeLabel: string; feeLine: string; addrFull: string } {
     const addrFull = newCart.address + (newCart.complement ? ', ' + newCart.complement : '');
     const mapsLine = newCart.order_type === 'delivery' ? MessagesConstants.MAPS_LINE(addrFull) : '';
     const typeLabel = newCart.order_type === 'delivery'
       ? MessagesConstants.ENTREGA_LABEL(addrFull, mapsLine)
-      : '🏃 *' + (orderTypes.find((orderType: OrderType) => orderType.name === newCart.order_type) || { label: 'Retirada' }).label + '*';
+      : '🏃 *' + this._resolveOrderTypeLabel() + '*';
     const feeLine = newCart.delivery_fee > 0
       ? MessagesConstants.ENTREGA_LINE(fmtBRL(newCart.delivery_fee))
       : MessagesConstants.FRETE_LINE;
-    return void respostas.push(
+    return { typeLabel, feeLine, addrFull };
+  }
+
+  private _finalizeOrder(total: number, paymentName: string, paymentMethodLabel: string, changeFor: number | null): void {
+    const orderCode = generateOrderCode(tel);
+    const { lines, total: subtotal } = cartSummary(newCart.items);
+    const { typeLabel, feeLine, addrFull } = this._buildDeliveryLines();
+
+    respostas.push(
       MessagesConstants.PEDIDO_CONFIRMADO_PREFIX
       + lines.join('\n')
       + '\n\n' + MessagesConstants.SUBTOTAL_LINE(fmtBRL(subtotal))
       + feeLine
       + '\n' + MessagesConstants.TOTAL_LINE(fmtBRL(total))
       + '\n\n' + typeLabel
-    );
-  }
-
-  private _finalizeOrder(total: number, paymentMethodLabel: string, changeFor: number | null): void {
-    const orderCode = generateOrderCode(tel);
-    const { total: subtotal } = cartSummary(newCart.items);
-    const addrFull = newCart.address + (newCart.complement ? ', ' + newCart.complement : '');
-    const mapsLine = newCart.order_type === 'delivery' ? MessagesConstants.MAPS_LINE(addrFull) : '';
-    const typeLabel = newCart.order_type === 'delivery'
-      ? MessagesConstants.ENTREGA_LABEL(addrFull, mapsLine)
-      : '🏃 *' + (orderTypes.find((orderType: OrderType) => orderType.name === newCart.order_type) || { label: 'Retirada' }).label + '*';
-    const feeLine = newCart.delivery_fee > 0
-      ? MessagesConstants.ENTREGA_LINE(fmtBRL(newCart.delivery_fee))
-      : MessagesConstants.FRETE_LINE;
-
-    respostas.push(
-      MessagesConstants.PEDIDO_CONFIRMADO_PREFIX
-      + cartSummary(newCart.items).lines.join('\n')
-      + '\n\n' + MessagesConstants.SUBTOTAL_LINE(fmtBRL(subtotal))
-      + feeLine
-      + '\n' + MessagesConstants.TOTAL_LINE(fmtBRL(total))
-      + '\n\n' + typeLabel
-      + MessagesConstants.PAGAMENTO_LINE(paymentMethodLabel)
+      + MessagesConstants.PAGAMENTO_LINE(paymentMethodLabel, paymentEmoji(paymentName))
       + (changeFor ? MessagesConstants.TROCO_LINE(fmtBRL(changeFor)) : '')
       + MessagesConstants.PEDIDO_CODIGO(orderCode)
     );
@@ -97,7 +86,9 @@ class PaymentHandler extends BaseHandler {
 
   private _handleMixedMethod(): boolean {
     const nonCashTypes = this._nonCashTypes();
-    const choiceIndex = parseInt(texto) - 1;
+    let choiceIndex = parseInt(texto) - 1;
+    if (isNaN(choiceIndex) || choiceIndex < 0)
+      choiceIndex = nonCashTypes.findIndex((paymentType: PaymentType) => paymentType.name === texto);
     if (choiceIndex >= 0 && choiceIndex < nonCashTypes.length) {
       newCart.mixed_method = nonCashTypes[choiceIndex].name;
       newCart.mixed_label  = nonCashTypes[choiceIndex].label;
@@ -139,26 +130,28 @@ class PaymentHandler extends BaseHandler {
       const { total: subtotal } = cartSummary(newCart.items);
       const total = subtotal + newCart.delivery_fee;
       const perPerson = fmtBRL(total / splitCount);
-      const paymentOptions = paymentTypes.map((paymentType: PaymentType, index: number) => (index + 1) + '. ' + paymentType.label).join('\n');
       newState = BotState.AWAITING_SPLIT_PAYMENT;
-      respostas.push(MessagesConstants.DIVIDIR_PESSOA(splitCount, perPerson, 1) + paymentOptions + MessagesConstants.DIGITAR_NUMERO);
+      respostas.push(splitPersonPaymentList(1, splitCount, perPerson));
     }
     return true;
   }
 
   private _handleSplitPayment(): boolean {
-    const choiceIndex = parseInt(texto) - 1;
-    const paymentOptions = paymentTypes.map((paymentType: PaymentType, index: number) => (index + 1) + '. ' + paymentType.label).join('\n');
-    if (choiceIndex < 0 || choiceIndex >= paymentTypes.length) {
-      respostas.push(MessagesConstants.OPCAO_INVALIDA + ' Como vai pagar?\n\n' + paymentOptions + MessagesConstants.DIGITAR_NUMERO);
-      return true;
-    }
+    let choiceIndex = parseInt(texto) - 1;
+    if (isNaN(choiceIndex) || choiceIndex < 0)
+      choiceIndex = paymentTypes.findIndex((paymentType: PaymentType) => paymentType.name === texto);
 
-    const selectedPayment = paymentTypes[choiceIndex];
     const { total: subtotal } = cartSummary(newCart.items);
     const total = subtotal + newCart.delivery_fee;
     const splitTotal = newCart.split_count;
     const perPerson = total / splitTotal;
+
+    if (choiceIndex < 0 || choiceIndex >= paymentTypes.length) {
+      respostas.push(splitPersonPaymentList(newCart.split_current, splitTotal, fmtBRL(perPerson)));
+      return true;
+    }
+
+    const selectedPayment = paymentTypes[choiceIndex];
 
     if (selectedPayment.name === 'dinheiro') {
       newCart.payment_method = 'dinheiro';
@@ -166,7 +159,7 @@ class PaymentHandler extends BaseHandler {
       respostas.push(MessagesConstants.DIVIDIR_TROCO(newCart.split_current, fmtBRL(perPerson)));
     } else {
       const payments = Array.isArray(newCart.split_payments) ? newCart.split_payments : [];
-      payments.push({ person: newCart.split_current, label: selectedPayment.label, change_for: null });
+      payments.push({ person: newCart.split_current, label: paymentEmoji(selectedPayment.name) + ' ' + selectedPayment.label, change_for: null });
       newCart.split_payments = payments;
 
       if (newCart.split_current >= splitTotal) {
@@ -174,7 +167,7 @@ class PaymentHandler extends BaseHandler {
       } else {
         newCart.split_current = newCart.split_current + 1;
         newState = BotState.AWAITING_SPLIT_PAYMENT;
-        respostas.push(MessagesConstants.DIVIDIR_PROXIMO(newCart.split_current, splitTotal) + paymentOptions + MessagesConstants.DIGITAR_NUMERO);
+        respostas.push(splitPersonPaymentList(newCart.split_current, splitTotal, fmtBRL(perPerson)));
       }
     }
     return true;
@@ -185,7 +178,6 @@ class PaymentHandler extends BaseHandler {
     const total = subtotal + newCart.delivery_fee;
     const splitTotal = newCart.split_count;
     const perPerson = total / splitTotal;
-    const paymentOptions = paymentTypes.map((paymentType: PaymentType, index: number) => (index + 1) + '. ' + paymentType.label).join('\n');
 
     let changeFor: number | null = null;
     if (texto !== 'não' && texto !== 'nao') {
@@ -207,21 +199,14 @@ class PaymentHandler extends BaseHandler {
     } else {
       newCart.split_current = newCart.split_current + 1;
       newState = BotState.AWAITING_SPLIT_PAYMENT;
-      respostas.push(MessagesConstants.DIVIDIR_PROXIMO(newCart.split_current, splitTotal) + paymentOptions + MessagesConstants.DIGITAR_NUMERO);
+      respostas.push(splitPersonPaymentList(newCart.split_current, splitTotal, fmtBRL(perPerson)));
     }
     return true;
   }
 
   private _finalizeSplitOrder(total: number, subtotal: number, splitTotal: number, perPerson: number, payments: SplitPayment[]): void {
     const orderCode = generateOrderCode(tel);
-    const addrFull = newCart.address + (newCart.complement ? ', ' + newCart.complement : '');
-    const mapsLine = newCart.order_type === 'delivery' ? MessagesConstants.MAPS_LINE(addrFull) : '';
-    const typeLabel = newCart.order_type === 'delivery'
-      ? MessagesConstants.ENTREGA_LABEL(addrFull, mapsLine)
-      : '📤 *' + (orderTypes.find((orderType: OrderType) => orderType.name === newCart.order_type) || { label: 'Retirada no local 📤' }).label + '*';
-    const feeLine = newCart.delivery_fee > 0
-      ? MessagesConstants.ENTREGA_LINE(fmtBRL(newCart.delivery_fee))
-      : MessagesConstants.FRETE_LINE;
+    const { typeLabel, feeLine, addrFull } = this._buildDeliveryLines();
     const splitLines = payments.map((splitPayment: SplitPayment) =>
       MessagesConstants.SPLIT_PERSON_LINE(splitPayment.person, splitPayment.label, splitPayment.change_for ? fmtBRL(splitPayment.change_for) : null)
     ).join('\n');
@@ -278,14 +263,7 @@ class PaymentHandler extends BaseHandler {
     }
 
     const orderCode = generateOrderCode(tel);
-    const addrFull = newCart.address + (newCart.complement ? ', ' + newCart.complement : '');
-    const mapsLine = newCart.order_type === 'delivery' ? MessagesConstants.MAPS_LINE(addrFull) : '';
-    const typeLabel = newCart.order_type === 'delivery'
-      ? MessagesConstants.ENTREGA_LABEL(addrFull, mapsLine)
-      : '🏃 *' + (orderTypes.find((orderType: OrderType) => orderType.name === newCart.order_type) || { label: 'Retirada' }).label + '*';
-    const feeLine = newCart.delivery_fee > 0
-      ? MessagesConstants.ENTREGA_LINE(fmtBRL(newCart.delivery_fee))
-      : MessagesConstants.FRETE_LINE;
+    const { typeLabel, feeLine, addrFull } = this._buildDeliveryLines();
     const changeInfo = changeFor ? ' _(troco p/ R$ ' + fmtBRL(changeFor) + ')_' : '';
 
     respostas.push(
@@ -295,8 +273,8 @@ class PaymentHandler extends BaseHandler {
       + feeLine
       + '\n' + MessagesConstants.TOTAL_LINE(fmtBRL(total))
       + '\n\n' + typeLabel
-      + '\n💳 ' + (newCart.mixed_label || 'Cartão') + ': R$ ' + fmtBRL(entered)
-      + '\n💵 Dinheiro: R$ ' + fmtBRL(cashPart) + changeInfo
+      + '\n' + paymentEmoji(newCart.mixed_method || '') + ' *' + (newCart.mixed_label || 'Cartão') + ':* R$ ' + fmtBRL(entered)
+      + '\n💵 *Dinheiro:* R$ ' + fmtBRL(cashPart) + changeInfo
       + MessagesConstants.PEDIDO_CODIGO(orderCode)
     );
 
@@ -337,14 +315,7 @@ class PaymentHandler extends BaseHandler {
           ? MessagesConstants.SPLIT_LINE(newCart.split_count, fmtBRL(total / newCart.split_count))
           : '';
         const orderCode = generateOrderCode(tel);
-        const addrFull = newCart.address + (newCart.complement ? ', ' + newCart.complement : '');
-        const mapsLine = newCart.order_type === 'delivery' ? MessagesConstants.MAPS_LINE(addrFull) : '';
-        const typeLabel = newCart.order_type === 'delivery'
-          ? MessagesConstants.ENTREGA_LABEL(addrFull, mapsLine)
-          : '🏃 *' + (orderTypes.find((orderType: OrderType) => orderType.name === newCart.order_type) || { label: 'Retirada' }).label + '*';
-        const feeLine = newCart.delivery_fee > 0
-          ? MessagesConstants.ENTREGA_LINE(fmtBRL(newCart.delivery_fee))
-          : MessagesConstants.FRETE_LINE;
+        const { typeLabel, feeLine, addrFull } = this._buildDeliveryLines();
 
         respostas.push(
           MessagesConstants.PEDIDO_CONFIRMADO_PREFIX
@@ -354,7 +325,7 @@ class PaymentHandler extends BaseHandler {
           + '\n' + MessagesConstants.TOTAL_LINE(fmtBRL(total))
           + splitLine
           + '\n\n' + typeLabel
-          + MessagesConstants.PAGAMENTO_LINE(selectedPayment.label)
+          + MessagesConstants.PAGAMENTO_LINE(selectedPayment.label, paymentEmoji(selectedPayment.name))
           + pixInfo
           + MessagesConstants.PEDIDO_CODIGO(orderCode)
         );
@@ -417,7 +388,7 @@ class PaymentHandler extends BaseHandler {
       }
     }
 
-    this._finalizeOrder(total, 'Dinheiro', changeValue);
+    this._finalizeOrder(total, 'dinheiro', 'Dinheiro', changeValue);
     return true;
   }
 }

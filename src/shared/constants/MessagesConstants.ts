@@ -76,7 +76,7 @@ const MessagesConstants = {
   DIVISAO_HEADER:               (quantidade: number, valorPessoa: string) => `\n\n👥 *Divisão — ${quantidade} pessoas (R$ ${valorPessoa}/pessoa):*\n`,
   SPLIT_PERSON_LINE:            (pessoa: number, label: string, troco: string | null) => `• Pessoa ${pessoa}: ${label}${troco ? ' _(troco p/ R$ ' + troco + ')_' : ''}`,
   SPLIT_LINE:                   (quantidade: number, valorPessoa: string) => `\n👥 ${quantidade} pessoas — *R$ ${valorPessoa} por pessoa*`,
-  PAGAMENTO_LINE:               (label: string) => `\n💳 Pagamento: ${label}`,
+  PAGAMENTO_LINE:               (label: string, emoji?: string) => `\n${emoji || '💳'} *Pagamento:* ${label}`,
   TROCO_LINE:                   (valor: string) => `\n💵 Troco para: R$ ${valor}`,
   PIX_INFO:                     (chave: string, nome: string) => `\n\n💳 *Chave PIX:* ${chave}${nome ? '\n👤 ' + nome : ''}`,
 

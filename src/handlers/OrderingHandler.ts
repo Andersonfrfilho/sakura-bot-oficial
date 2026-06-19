@@ -139,11 +139,14 @@ class OrderingHandler extends BaseHandler {
     newCart.pending_item_id = null;
     newCart.pending_item_name = '';
 
-    const { total } = cartSummary(newCart.items);
+    const { lines: cartLines, total } = cartSummary(newCart.items);
     newState = BotState.AWAITING_MORE;
     respostas.push({
       type: 'buttons',
-      body: MessagesConstants.ITEM_ADICIONADO(foundProduct.name, quantity) + MessagesConstants.TOTAL_PARCIAL(fmtBRL(total)) + '\n\nDeseja adicionar mais itens ou finalizar?',
+      body: MessagesConstants.ITEM_ADICIONADO(foundProduct.name, quantity)
+        + '\n\n🛒 *Carrinho:*\n' + cartLines.join('\n')
+        + '\n\n' + MessagesConstants.TOTAL_PARCIAL(fmtBRL(total))
+        + '\n\nDeseja adicionar mais itens ou finalizar?',
       buttons: [{ id: '__add_more__', title: '➕ Adicionar mais' }, { id: 'finalizar', title: '✅ Finalizar' }],
     });
     return true;

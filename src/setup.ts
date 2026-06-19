@@ -112,6 +112,13 @@ let chatwootCustomerName            = '';
 // Usado pelos handlers para retorno antecipado (evita top-level return)
 let _earlyResponse: N8nResponsePayload | null = null;
 
+// ── HTTP helper global — captura o contexto do n8n via arrow (herda 'this' externo) ──
+interface N8nRuntimeContext {
+  helpers: { httpRequest: (options: Record<string, unknown>) => Promise<unknown> };
+}
+const _httpRequest = async (options: Record<string, unknown>): Promise<unknown> =>
+  (this as unknown as N8nRuntimeContext).helpers.httpRequest(options);
+
 // ── Guard de input raw ───────────────────────────────────────────────────────
 const expectingRawInput = ExpectingRawInputStates.includes(currentState);
 
@@ -160,7 +167,7 @@ function cartSummary(items: CartItem[]): CartSummarioResult {
   for (const item of items) {
     const sub = item.price * item.qty;
     total += sub;
-    lines.push('• [' + (item.menuIdx || '') + '] ' + item.name + ' — R$ ' + fmtBRL(item.price) + ' × ' + item.qty + ' — R$ ' + fmtBRL(sub));
+    lines.push('• *' + item.name + '* × ' + item.qty + ' — R$ ' + fmtBRL(sub));
   }
   return { lines, total };
 }
@@ -269,11 +276,27 @@ function orderTypeBtn(): ButtonMessage {
   };
 }
 
+function paymentEmoji(name: string): string {
+  if (name === 'pix') return '🔷';
+  if (name === 'dinheiro') return '💵';
+  return '💳';
+}
+
 function paymentList(splitCount: number, hideMixed?: boolean): ListMessage {
-  const rows = paymentTypes.map((paymentType: PaymentType) => ({ id: paymentType.name, title: paymentType.label }));
+  const rows = paymentTypes.map((paymentType: PaymentType) => ({ id: paymentType.name, title: paymentEmoji(paymentType.name) + ' ' + paymentType.label }));
   if (!splitCount || splitCount < 2) rows.push({ id: 'dividir', title: '👥 Dividir entre pessoas' });
   if (!hideMixed && paymentTypes.length > 1) rows.push({ id: 'misto', title: '💰 Pagamento misto' });
   return { type: 'list', body: MessagesConstants.SOLICITAR_PAGAMENTO, button: 'Ver opções', sections: [{ title: 'Forma de Pagamento', rows }] };
+}
+
+function splitPersonPaymentList(personNum: number, totalPersons: number, perPersonStr: string): ListMessage {
+  const rows = paymentTypes.map((paymentType: PaymentType) => ({ id: paymentType.name, title: paymentEmoji(paymentType.name) + ' ' + paymentType.label }));
+  return {
+    type: 'list',
+    body: '👥 *' + totalPersons + ' pessoas — R$ ' + perPersonStr + '/pessoa*\n\n*Pessoa ' + personNum + ' de ' + totalPersons + ':* Como vai pagar?',
+    button: 'Ver opções',
+    sections: [{ title: 'Forma de Pagamento', rows }],
+  };
 }
 
 function notifBtn(currentOptIn: boolean | null): ButtonMessage {

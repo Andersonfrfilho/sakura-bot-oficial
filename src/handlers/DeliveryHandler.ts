@@ -1,6 +1,5 @@
 class DeliveryHandler extends BaseHandler {
   async handle(): Promise<boolean> {
-    // Seleção de tipo de entrega
     if (currentState === BotState.AWAITING_TYPE) {
       let choiceIndex = parseInt(texto) - 1;
       if (isNaN(choiceIndex) || choiceIndex < 0)
@@ -23,19 +22,16 @@ class DeliveryHandler extends BaseHandler {
       return true;
     }
 
-    // Endereço
     if (currentState === BotState.AWAITING_ADDRESS) {
       await this._handleAddress();
       return true;
     }
 
-    // Número do imóvel (após CEP puro)
     if (currentState === BotState.AWAITING_ADDRESS_NUMBER) {
       await this._handleAddressNumber();
       return true;
     }
 
-    // Oferta de retirada (fora da área)
     if (currentState === BotState.OFFER_PICKUP) {
       if (texto === 'sim') {
         newCart.order_type = 'retirada';
@@ -53,6 +49,11 @@ class DeliveryHandler extends BaseHandler {
     return false;
   }
 
+  // Coordenadas só são válidas se diferentes de 0,0 (padrão não configurado)
+  private _coordsConfigured(): boolean {
+    return estLat !== 0 || estLng !== 0;
+  }
+
   private async _handleAddress(): Promise<void> {
     const estCity = config['establishment_city'] || '';
     const estCityName = estCity.split(',')[0].trim().toLowerCase();
@@ -63,7 +64,7 @@ class DeliveryHandler extends BaseHandler {
       const lng = Number(location_lng);
       const distance = haversine(estLat, estLng, lat, lng);
 
-      if (distance > maxRadiusKm) {
+      if (this._coordsConfigured() && distance > maxRadiusKm) {
         newCart.address = 'Localização compartilhada';
         newState = BotState.OFFER_PICKUP;
         respostas.push(offerPickupBtn(MessagesConstants.ENDERECO_FORA_AREA(maxRadiusKm)));
@@ -73,7 +74,7 @@ class DeliveryHandler extends BaseHandler {
       let routeKm = distance;
       let routeMin = Math.round(distance * 3);
       try {
-        const osrmRaw = await ((this as unknown) as { helpers: { httpRequest: (opts: unknown) => Promise<unknown> } }).helpers.httpRequest({
+        const osrmRaw = await _httpRequest({
           method: 'GET',
           url: 'https://router.project-osrm.org/route/v1/driving/' + estLng + ',' + estLat + ';' + lng + ',' + lat + '?overview=false',
           headers: { 'User-Agent': 'SakuraBot/1.0' },
@@ -87,7 +88,7 @@ class DeliveryHandler extends BaseHandler {
 
       let addressLabel = 'Localização compartilhada';
       try {
-        const reverseRaw = await ((this as unknown) as { helpers: { httpRequest: (opts: unknown) => Promise<unknown> } }).helpers.httpRequest({
+        const reverseRaw = await _httpRequest({
           method: 'GET',
           url: 'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json&accept-language=pt-BR',
           headers: { 'User-Agent': 'SakuraBot/1.0' },
@@ -123,7 +124,7 @@ class DeliveryHandler extends BaseHandler {
 
     if (cepDigits.length === 8) {
       try {
-        const cepRaw = await ((this as unknown) as { helpers: { httpRequest: (opts: unknown) => Promise<unknown> } }).helpers.httpRequest({
+        const cepRaw = await _httpRequest({
           method: 'GET',
           url: 'https://viacep.com.br/ws/' + cepDigits.substring(0, 5) + '-' + cepDigits.substring(5) + '/json/',
           headers: { 'User-Agent': 'SakuraBot/1.0' },
@@ -132,7 +133,11 @@ class DeliveryHandler extends BaseHandler {
         if (!cepData.erro) cepInfo = cepData;
       } catch(error) {}
 
-      if (/^\d{5}-?\d{3}$/.test(input.trim()) && cepInfo) {
+      // Input é só CEP (sem endereço adicional) — todos os chars não-digit são apenas formatação
+      const nonFormattingChars = input.replace(/[\d\s.\-]/g, '');
+      const isCepOnly = nonFormattingChars.length === 0;
+
+      if (isCepOnly && cepInfo) {
         const streetLabel = [cepInfo.logradouro, cepInfo.bairro, cepInfo.localidade, cepInfo.uf].filter(Boolean).join(', ');
         newCart.address_street_temp = JSON.stringify({
           logradouro: cepInfo.logradouro || '',
@@ -158,7 +163,7 @@ class DeliveryHandler extends BaseHandler {
 
     let geoResult: NominatimResult | null = null;
     try {
-      const nominatimRaw1 = await ((this as unknown) as { helpers: { httpRequest: (opts: unknown) => Promise<unknown> } }).helpers.httpRequest({
+      const nominatimRaw1 = await _httpRequest({
         method: 'GET',
         url: 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(addressToGeocode + ', Brasil') + '&format=json&limit=1&countrycodes=br',
         headers: { 'User-Agent': 'SakuraBot/1.0' },
@@ -170,7 +175,7 @@ class DeliveryHandler extends BaseHandler {
     if (!geoResult && estCity && !addressToGeocode.toLowerCase().includes(estCityName)) {
       try {
         const withCity = addressToGeocode + ', ' + estCity;
-        const nominatimRaw2 = await ((this as unknown) as { helpers: { httpRequest: (opts: unknown) => Promise<unknown> } }).helpers.httpRequest({
+        const nominatimRaw2 = await _httpRequest({
           method: 'GET',
           url: 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(withCity + ', Brasil') + '&format=json&limit=1&countrycodes=br',
           headers: { 'User-Agent': 'SakuraBot/1.0' },
@@ -183,7 +188,7 @@ class DeliveryHandler extends BaseHandler {
     if (!geoResult && estCity && streetAndNum !== addressToGeocode) {
       try {
         const stripped = streetAndNum + ', ' + estCity;
-        const nominatimRaw3 = await ((this as unknown) as { helpers: { httpRequest: (opts: unknown) => Promise<unknown> } }).helpers.httpRequest({
+        const nominatimRaw3 = await _httpRequest({
           method: 'GET',
           url: 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(stripped + ', Brasil') + '&format=json&limit=1&countrycodes=br',
           headers: { 'User-Agent': 'SakuraBot/1.0' },
@@ -221,7 +226,7 @@ class DeliveryHandler extends BaseHandler {
 
     let geoResult: NominatimResult | null = null;
     try {
-      const nominatimRaw1 = await ((this as unknown) as { helpers: { httpRequest: (opts: unknown) => Promise<unknown> } }).helpers.httpRequest({
+      const nominatimRaw1 = await _httpRequest({
         method: 'GET',
         url: 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(fullAddress + ', Brasil') + '&format=json&limit=1&countrycodes=br',
         headers: { 'User-Agent': 'SakuraBot/1.0' },
@@ -231,6 +236,7 @@ class DeliveryHandler extends BaseHandler {
     } catch(error) {}
 
     if (!geoResult) {
+      // CEP foi validado pelo ViaCEP — aceita mesmo sem geocoding
       const { total: cartSubtotal } = cartSummary(newCart.items);
       const fee = calcDeliveryFee(0, 0, cartSubtotal);
       const mapsLink = 'https://maps.google.com/?q=' + encodeURIComponent(fullAddress);
@@ -250,7 +256,7 @@ class DeliveryHandler extends BaseHandler {
     const lng = parseFloat(geoResult.lon);
     const distance = haversine(estLat, estLng, lat, lng);
 
-    if (distance > maxRadiusKm) {
+    if (this._coordsConfigured() && distance > maxRadiusKm) {
       newCart.address = addressLabel;
       newState = BotState.OFFER_PICKUP;
       respostas.push(offerPickupBtn(MessagesConstants.ENDERECO_FORA_AREA(maxRadiusKm)));
@@ -260,7 +266,7 @@ class DeliveryHandler extends BaseHandler {
     let routeKm = distance;
     let routeMin = Math.round(distance * 3);
     try {
-      const osrmRaw = await ((this as unknown) as { helpers: { httpRequest: (opts: unknown) => Promise<unknown> } }).helpers.httpRequest({
+      const osrmRaw = await _httpRequest({
         method: 'GET',
         url: 'https://router.project-osrm.org/route/v1/driving/' + estLng + ',' + estLat + ';' + lng + ',' + lat + '?overview=false',
         headers: { 'User-Agent': 'SakuraBot/1.0' },
