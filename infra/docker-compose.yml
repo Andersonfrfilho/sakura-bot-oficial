@@ -215,6 +215,58 @@ services:
     networks:
       - sakura_net
 
+  # Order Hub — API de gestão de pedidos (Bun + uWebSockets.js + Drizzle)
+  order-hub-api:
+    image: node:22
+    container_name: order_hub_api
+    working_dir: /app
+    # instala deps, gera migrations, sobe com tsx watch (reinicia ao salvar qualquer .ts)
+    command: sh -c "npm install && npx drizzle-kit generate && npx tsx watch src/index.ts"
+    volumes:
+      - ../apps/api:/app
+      - api_node_modules:/app/node_modules
+    environment:
+      - PORT=3333
+      - NODE_ENV=development
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${ORDER_HUB_JWT_SECRET:-changeme_jwt_32chars_troque_em_producao}
+      - JWT_REFRESH_SECRET=${ORDER_HUB_JWT_REFRESH_SECRET:-changeme_refresh_32chars_troque}
+      - JWT_ACCESS_EXPIRES_IN=15m
+      - JWT_REFRESH_EXPIRES_IN=7d
+      - WEBHOOK_SECRET=${ORDER_HUB_WEBHOOK_SECRET:-changeme_hmac_secret_compartilhado}
+      - ALLOWED_ORIGINS=http://localhost:4000
+      - LOG_LEVEL=info
+    ports:
+      - "3333:3333"
+    networks:
+      - sakura_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Order Hub — Painel operacional (React + Vite em modo dev)
+  order-hub-web:
+    image: node:22-alpine
+    container_name: order_hub_web
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    volumes:
+      - ../apps/web:/app
+      - web_node_modules:/app/node_modules
+    environment:
+      # URLs como vistas pelo BROWSER (host), não pelo Docker network
+      - VITE_API_URL=http://localhost:3333
+      - VITE_API_WS_URL=ws://localhost:3333/ws
+    ports:
+      - "4000:4000"
+    networks:
+      - sakura_net
+    depends_on:
+      - order-hub-api
+
   # Gerenciamento de registros (cardápio, FAQ, pedidos, reservas)
   adminer:
     image: adminer:latest
@@ -259,6 +311,8 @@ volumes:
   chatwoot_data:
   directus_uploads:
   directus_extensions:
+  api_node_modules:
+  web_node_modules:
 
 networks:
   sakura_net:

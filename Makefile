@@ -7,29 +7,39 @@ PROJECT := $(if $(PROJECT),$(PROJECT),whatsapp-bot)
 
 COMPOSE = docker compose -f infra/docker-compose.yml -p $(PROJECT)
 
-.PHONY: help all setup init up down restart logs ps db-reset db-seed n8n-import directus-init chatwoot-init test test-order test-msg evolution-start evolution-stop evolution-logs validate build
+.PHONY: help all setup init up down restart logs ps db-reset db-seed n8n-import directus-init chatwoot-init test test-order test-msg evolution-start evolution-stop evolution-logs validate build hub-up hub-down hub-restart hub-logs hub-seed hub-generate hub-wait
 
 help:
 	@echo ""
-	@echo "  make all         Primeira execução completa: setup + up + init"
-	@echo "  make setup       Cria infra/.env a partir do exemplo"
-	@echo "  make up          Sobe todos os serviços (inclui Evolution API)"
+	@echo "  make all           Primeira execução completa: setup + up + init"
+	@echo "  make setup         Cria infra/.env a partir do exemplo"
+	@echo "  make up            Sobe todos os serviços (bot + Order Hub)"
 	@echo "  make init          Seed banco + workflows + Directus admin (roda após 'up')"
 	@echo "  make directus-init Cria admin do Directus a partir do .env"
 	@echo "  make n8n-import    Importa/atualiza workflows no n8n manualmente"
-	@echo "  make down        Para todos os serviços"
-	@echo "  make restart     Para e sobe novamente"
-	@echo "  make logs        Acompanha logs em tempo real"
-	@echo "  make ps          Status dos containers"
-	@echo "  make validate    Valida JSON + JS syntax + anti-padrões (roda antes do push)
-  make test        Roda testes de parsing + validação do workflow"
-	@echo "  make db-reset    Recria o schema do app no banco (destrói dados)"
-	@echo "  make db-seed     Importa cardapio.csv e faq.csv para o banco"
-	@echo "  make test-order  Insere pedido de teste completo no banco"
-	@echo "  make test-msg    Simula uma mensagem WhatsApp no n8n (webhook)"
+	@echo "  make down          Para todos os serviços"
+	@echo "  make restart       Para e sobe novamente"
+	@echo "  make logs          Acompanha logs em tempo real"
+	@echo "  make ps            Status dos containers"
+	@echo "  make validate      Valida JSON + JS syntax + anti-padrões"
+	@echo "  make test          Roda testes de parsing + validação do workflow"
+	@echo "  make db-reset      Recria o schema do app no banco (destrói dados)"
+	@echo "  make db-seed       Importa cardapio.csv e faq.csv para o banco"
+	@echo "  make test-order    Insere pedido de teste completo no banco"
+	@echo "  make test-msg      Simula uma mensagem WhatsApp no n8n (webhook)"
 	@echo "  make chatwoot-init Cria admin + inbox do Chatwoot e salva config no banco"
 	@echo ""
+	@echo "  Order Hub (painel de pedidos):"
+	@echo "  make hub-up        Sobe apenas order-hub-api e order-hub-web"
+	@echo "  make hub-down      Para order-hub-api e order-hub-web"
+	@echo "  make hub-restart   Reinicia order-hub-api e order-hub-web"
+	@echo "  make hub-logs      Segue logs do Order Hub em tempo real"
+	@echo "  make hub-seed      Cria roles, permissões e admin (admin@orderhub.io / Admin@123)"
+	@echo "  make hub-generate  Gera nova migration Drizzle (após mudar schema)"
+	@echo ""
 	@echo "  Serviços após 'make up':"
+	@echo "    http://localhost:3333  Order Hub API  (REST + WebSocket)"
+	@echo "    http://localhost:4000  Order Hub Web  (painel operacional)"
 	@echo "    http://localhost:3001  Typebot        (fluxos do bot)"
 	@echo "    http://localhost:3010  Chatwoot       (atendimento humano)"
 	@echo "    http://localhost:4100  Metabase       (dashboards e relatórios)"
@@ -39,26 +49,37 @@ help:
 	@echo "    http://localhost:8181  Adminer        (banco de dados)"
 	@echo ""
 
-# Primeira execução completa
+# Primeira execução completa — sobe tudo e faz seed de todos os serviços
 all: setup up
 	@echo ""
-	@echo "Aguardando serviços iniciarem (60s)..."
-	@sleep 60
+	@echo "⏳ Aguardando postgres, n8n e Order Hub API iniciarem..."
+	@i=0; \
+	while [ $$i -lt 45 ]; do \
+	  case $$((i % 10)) in \
+	    0) s="⠋";; 1) s="⠙";; 2) s="⠹";; 3) s="⠸";; 4) s="⠼";; \
+	    5) s="⠴";; 6) s="⠦";; 7) s="⠧";; 8) s="⠇";; 9) s="⠏";; \
+	  esac; \
+	  printf "\r   %s  %ds/45s" "$$s" "$$i"; \
+	  sleep 1; \
+	  i=$$((i+1)); \
+	done; \
+	printf "\r   ✅  Pronto! (45s/45s)\n"
 	@$(MAKE) init
 	@echo ""
-	@echo "Ambiente pronto! Acesse os serviços com 'make help'."
+	@echo "🌸 Ambiente pronto! Acesse os serviços com 'make help'."
 	@echo ""
 
-# Seed banco + importa workflows + configura Directus + Chatwoot (roda após 'make up')
-init: db-seed n8n-import directus-init chatwoot-init
-	@echo "Inicialização concluída."
+# Seed banco + importa workflows + configura Directus + Chatwoot + Order Hub
+init: db-seed n8n-import directus-init chatwoot-init hub-wait hub-seed
+	@echo ""
+	@echo "🚀 Inicialização concluída."
 
 # Cria o admin do Directus a partir do DIRECTUS_ADMIN_EMAIL/.._PASSWORD do .env
 DIRECTUS_EMAIL    := $(shell grep -s ^DIRECTUS_ADMIN_EMAIL    $(ENV_FILE) | cut -d= -f2)
 DIRECTUS_PASSWORD := $(shell grep -s ^DIRECTUS_ADMIN_PASSWORD $(ENV_FILE) | cut -d= -f2)
 
 directus-init:
-	@echo "Configurando Directus..."
+	@echo "📁 Configurando Directus..."
 	@docker exec directus node /directus/cli.js bootstrap 2>/dev/null || true
 	@ROLE_ID=$$(docker exec postgres psql -U $(DB_USER) -d $(DB_NAME) -tAc \
 	  "SELECT id FROM directus_roles WHERE name='Administrator' LIMIT 1;" 2>/dev/null | tr -d ' '); \
@@ -83,7 +104,7 @@ CHATWOOT_ADMIN_PASSWORD := $(shell grep -s ^CHATWOOT_ADMIN_PASSWORD $(ENV_FILE) 
 CHATWOOT_ADMIN_PASSWORD := $(if $(CHATWOOT_ADMIN_PASSWORD),$(CHATWOOT_ADMIN_PASSWORD),SakuraBot123)
 
 chatwoot-init:
-	@echo "Configurando Chatwoot..."
+	@echo "💬 Configurando Chatwoot..."
 	@SCRIPT='email = "$(CHATWOOT_ADMIN_EMAIL)"; \
 	  user = User.find_by(email: email); \
 	  if user.nil?; \
@@ -121,16 +142,19 @@ chatwoot-init:
 	fi
 
 setup:
-	@test -f $(ENV_FILE) && echo "infra/.env já existe — edite manualmente se necessário" || \
-	  (cp infra/.env.example $(ENV_FILE) && echo "infra/.env criado — preencha as credenciais antes de rodar 'make up'")
+	@test -f $(ENV_FILE) && echo "✅ infra/.env já existe — edite manualmente se necessário" || \
+	  (cp infra/.env.example $(ENV_FILE) && echo "📝 infra/.env criado — preencha as credenciais antes de rodar 'make up'")
 
 up:
+	@echo "🚀 Subindo containers..."
 	$(COMPOSE) up -d
 
 down:
+	@echo "⏹️ Parando containers..."
 	$(COMPOSE) down
 
 restart:
+	@echo "🔄 Reiniciando containers..."
 	$(COMPOSE) down
 	$(COMPOSE) up -d
 
@@ -142,23 +166,31 @@ ps:
 
 # Recria apenas o schema da aplicação (tabelas do bot)
 # Não afeta os bancos do Typebot e Chatwoot
+# 1. Drop + recria schema público + drizzle (migração tracking)
+# 2. Roda migrations do Drizzle (Order Hub)
+# 3. Roda schema do bot (tabelas exclusivas)
 db-reset:
-	@echo "Recriando schema da aplicação..."
+	@echo "🔄 Recriando schema da aplicação..."
 	$(COMPOSE) exec -T postgres psql \
 	  -U $$(grep ^POSTGRES_USER $(ENV_FILE) | cut -d= -f2) \
 	  -d $$(grep ^POSTGRES_DB $(ENV_FILE) | cut -d= -f2) \
-	  -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+	  -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; DROP SCHEMA IF EXISTS drizzle CASCADE;"
+	@echo "  📦 Rodando migrations do Drizzle (Order Hub)..."
+	docker exec order_hub_api npx drizzle-kit migrate 2>/dev/null || \
+	  docker compose -f infra/docker-compose.yml -p ada-technology exec order-hub-api npx drizzle-kit migrate
+	@echo "  🤖 Aplicando schema do bot (tabelas exclusivas)..."
 	$(COMPOSE) exec -T postgres psql \
 	  -U $$(grep ^POSTGRES_USER $(ENV_FILE) | cut -d= -f2) \
 	  -d $$(grep ^POSTGRES_DB $(ENV_FILE) | cut -d= -f2) \
 	  < database/schema.sql
-	@echo "Schema recriado."
+	@echo "✅ Schema recriado."
 
 DB_USER := $(shell grep ^POSTGRES_USER $(ENV_FILE) | cut -d= -f2)
 DB_NAME := $(shell grep ^POSTGRES_DB $(ENV_FILE) | cut -d= -f2)
 
 # Importa os CSVs de dados iniciais para o banco
 db-seed:
+	@echo "🌱 Populando banco de dados..."
 	@bash scripts/seed-db.sh
 
 # Importa workflows do n8n via REST API (idempotente — pula se já existir)
@@ -170,20 +202,23 @@ N8N_PASSWORD := $(if $(N8N_PASSWORD),$(N8N_PASSWORD),SakuraBot123)
 
 test:
 	@echo ""
-	@echo "▶ Testes de parsing de pedidos"
+	@echo "🧪 Testes de parsing de pedidos"
 	@node tests/ordering.test.js
 	@echo ""
-	@echo "▶ Validação da estrutura do workflow"
+	@echo "📋 Validação da estrutura do workflow"
 	@node tests/workflow.validate.js
 	@echo ""
 
 build:
+	@echo "🔨 Compilando módulos TypeScript..."
 	@node scripts/build-workflow.js
 
 validate: build
+	@echo "🔍 Validando workflows..."
 	@bash scripts/validate-workflows.sh
 
 n8n-import: validate
+	@echo "📦 Importando workflows no n8n..."
 	@bash scripts/import-workflows.sh "$(N8N_URL)" "$(N8N_EMAIL)" "$(N8N_PASSWORD)"
 
 # Importa workflows direto no Railway (produção)
@@ -251,3 +286,37 @@ evolution-stop:
 
 evolution-logs:
 	@tail -f /tmp/evolution.log 2>/dev/null || echo "Log não encontrado — use 'make evolution-start' primeiro"
+
+# ─── Order Hub ───────────────────────────────────────────────────────────────
+
+# Aguarda a API do Order Hub responder /health (até 3 min)
+hub-wait:
+	@echo "⏳ Aguardando Order Hub API..."
+	@n=0; until curl -sf http://localhost:3333/health > /dev/null 2>&1; do \
+	  n=$$((n+1)); \
+	  if [ $$n -ge 36 ]; then echo "\n  ❌ Timeout — verifique: make hub-logs" && exit 1; fi; \
+	  printf '.'; sleep 5; \
+	done
+	@echo " ✅ pronta!"
+
+# Sobe apenas os serviços do Order Hub (postgres e redis devem já estar rodando)
+hub-up:
+	$(COMPOSE) up -d order-hub-api order-hub-web
+
+hub-down:
+	$(COMPOSE) stop order-hub-api order-hub-web
+
+hub-restart:
+	$(COMPOSE) restart order-hub-api order-hub-web
+
+hub-logs:
+	$(COMPOSE) logs -f order-hub-api order-hub-web
+
+# Seed: cria roles, permissões e usuário admin padrão (admin@orderhub.io / Admin@123)
+hub-seed:
+	@echo "🌱 Seed Order Hub..."
+	$(COMPOSE) exec order-hub-api bun run db:seed
+
+# Gera nova migration Drizzle após mudança de schema (persiste em apps/api/drizzle/migrations/)
+hub-generate:
+	$(COMPOSE) exec order-hub-api bun run db:generate
