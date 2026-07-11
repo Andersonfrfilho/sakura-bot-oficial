@@ -118,6 +118,8 @@ import { UpsertFiscalConfigUseCase } from '@/modules/fiscal/application/use-case
 import { TestFiscalConnectionUseCase } from '@/modules/fiscal/application/use-cases/TestFiscalConnectionUseCase'
 import { RetryFiscalDocumentUseCase } from '@/modules/fiscal/application/use-cases/RetryFiscalDocumentUseCase'
 import { FiscalController } from '@/modules/fiscal/infra/http/FiscalController'
+import { startFiscalWorker } from '@/modules/fiscal/application/workers/FiscalEmissionProcessor'
+import type { Worker } from 'bullmq'
 
 // WebSocket Hub (passed in from server bootstrap to avoid circular dep)
 import type { WebSocketHub } from '@/infra/websocket/WebSocketHub'
@@ -140,6 +142,7 @@ export interface AppContainer {
   staffController: StaffController
   conversationController: ConversationController
   fiscalController: FiscalController
+  fiscalWorker?: Worker | undefined
 }
 
 export function buildContainer(wsHub: WebSocketHub): AppContainer {
@@ -329,7 +332,14 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     retryFiscalDocumentUseCase
   )
 
+  // Fiscal emission worker — opt-in per environment (consumes the BullMQ fiscal queue)
+  const fiscalWorker = process.env.FISCAL_WORKER_ENABLED === 'true'
+    ? startFiscalWorker({ database: db, websocketHub: wsHub })
+    : undefined
+  if (fiscalWorker) console.log('[API] Fiscal worker started')
+
   return {
+    fiscalWorker,
     cache,
     menuController,
     catalogController,

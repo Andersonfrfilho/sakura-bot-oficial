@@ -50,17 +50,23 @@ Legenda: ✅ feito · ⬜ a fazer · 🔗 depende de.
 
 ## Sprint B — Worker + resiliência offline
 
-### FISCAL-B1 ⬜ EnqueueFiscalEmissionUseCase (refactor do Emit)
-- 🔗 FISCAL-A2
-- **Arquivos**: novo `EnqueueFiscalEmissionUseCase.ts`; ajustar `EmitFiscalDocumentUseCase` p/ só criar `pending` + `fiscalQueue.add('emit', {fiscalDocumentId})` (remover `processEmission` inline).
-- **Aceite**: `POST /orders/:id/fiscal-document` responde 202 em ≤500ms sem chamar SEFAZ no request; job enfileirado.
-- **Verificação**: curl mede latência; job aparece no Bull Board.
+### FISCAL-B1 ✅ Emit assíncrono (refactor + service)
+- 🔗 FISCAL-A2a
+- **Arquivos**: novo `FiscalEmissionService.ts` (lógica de emissão centralizada — resolve o DRY da A3); `EmitFiscalDocumentUseCase` agora só valida, cria `pending`, publica emitting e `fiscalQueue.add(EMIT)`.
+- **Aceite**: Emit não chama SEFAZ no request; job enfileirado. ✔ (typecheck)
+- **Verificação latência/Bull Board**: ⏳ pendente (precisa Redis via `make up`).
 
-### FISCAL-B2 ⬜ FiscalEmissionProcessor (worker)
+### FISCAL-B2 ✅ FiscalEmissionProcessor (worker) + Retry unificado
 - 🔗 FISCAL-B1, FISCAL-A3
-- **Arquivos**: `application/workers/FiscalEmissionProcessor.ts`; registrar Worker no boot sob `FISCAL_WORKER_ENABLED`.
-- **Aceite**: consome 'emit', idempotente (relê doc; pula se authorized/cancelled); sucesso→authorized+WS+enfileira 'deliver'; erro transitório→throw (backoff BullMQ); rejeição→rejected. Graceful shutdown no SIGTERM.
-- **Verificação**: emissão homologação autoriza via worker; matar rede → job retenta.
+- **Arquivos**: `application/workers/FiscalEmissionProcessor.ts`; worker instanciado no container sob `FISCAL_WORKER_ENABLED`; SIGTERM/SIGINT no `server.ts` fecha o worker; `RetryFiscalDocumentUseCase` reescrito p/ reenfileirar (−200 linhas de duplicação).
+- **Aceite (hardening pós-review de 2 agentes)**:
+  - **claim atômico** `UPDATE ... WHERE status='pending'` → exclusão mútua real (sem double-emit em jobs duplicados/concorrência 2).
+  - `attemptCount` incrementado com `sql` (atômico, sem lost-update).
+  - erro transitório → reset p/ `pending` + throw (re-claima no próximo attempt; nunca fica preso em `emitting`); **sem** WS REJECTED enganoso.
+  - esgotou tentativas → `failed`-listener marca `rejected` (RETRIES_EXHAUSTED) + WS.
+  - rejeição fatal SEFAZ → `rejected` sem throw (não auto-retenta).
+- **Verificação**: `tsc` limpo; lógica CAS revisada. ⏳ **teste ao vivo do worker pendente** (subir Redis: `make up`, então `FISCAL_WORKER_ENABLED=true`, emitir e observar pending→emitting→authorized).
+- **⚠️ Follow-ups anotados**: (a) graceful shutdown amplo (uWS listen socket + pool pg + Redis) — hoje só o worker é drenado (antes não havia shutdown algum); (b) checagem `config inativa` triplicada — extrair helper.
 
 ### FISCAL-B3 ⬜ FiscalSweeper (repeatable job offline)
 - 🔗 FISCAL-B2

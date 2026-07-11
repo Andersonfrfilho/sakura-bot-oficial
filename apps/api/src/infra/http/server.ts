@@ -47,6 +47,16 @@ export async function createServer() {
   const wsHub = new WebSocketHub(app, new RedisProvider())
   const container = buildContainer(wsHub)
 
+  // Graceful shutdown: drain the fiscal worker before exiting
+  if (container.fiscalWorker) {
+    const shutdownWorker = async (): Promise<void> => {
+      await container.fiscalWorker?.close()
+      process.exit(0)
+    }
+    process.on('SIGTERM', shutdownWorker)
+    process.on('SIGINT', shutdownWorker)
+  }
+
   // CORS pre-flight
   app.options('/*', (res, req) => {
     const origin = req.getHeader('origin')
