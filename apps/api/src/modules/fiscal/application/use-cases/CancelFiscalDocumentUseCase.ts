@@ -11,6 +11,7 @@ import {
   type FiscalProvider,
   type FiscalConfig,
 } from '@adatechnology/fiscal-provider'
+import { decryptSensitiveConfig } from '../FiscalConfigCrypto'
 
 type Database = NodePgDatabase<typeof schema>
 
@@ -123,7 +124,7 @@ export class CancelFiscalDocumentUseCase {
       crt: (config.crt ?? '1') as '1' | '2' | '3',
     }
 
-    const providerConfig = config.providerConfig as Record<string, unknown>
+    const providerConfig = decryptSensitiveConfig((config.providerConfig ?? {}) as Record<string, unknown>)
 
     if (config.model === 'nfce' || config.model === 'nfe') {
       return {

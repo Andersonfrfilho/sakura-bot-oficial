@@ -7,6 +7,7 @@ import {
   type TestConnectionResult,
 } from '@adatechnology/fiscal-provider'
 import { UnprocessableError } from '@/shared/errors/AppError'
+import { decryptSensitiveConfig } from '../FiscalConfigCrypto'
 
 export class TestFiscalConnectionUseCase {
   async execute(config: FiscalConfig): Promise<TestConnectionResult> {
@@ -64,27 +65,27 @@ export function buildFiscalConfigFromDb(
     crt: (config.crt ?? '1') as '1' | '2' | '3',
   }
 
-  const pc = config.providerConfig ?? {}
+  const providerConfigDecrypted = decryptSensitiveConfig(config.providerConfig ?? {})
 
   if (config.model === 'nfce' || config.model === 'nfe') {
     return {
       ...base,
-      certificadoBase64: String(pc['certificadoBase64'] ?? ''),
-      certificadoSenha: String(pc['certificadoSenha'] ?? ''),
-      serie: String(pc['serie'] ?? '1'),
-      numeroNf: Number(pc['numeroNf'] ?? 1),
-      codigoMunicipio: String(pc['codigoMunicipio'] ?? ''),
-      cscId: String(pc['cscId'] ?? ''),
-      cscToken: String(pc['cscToken'] ?? ''),
+      certificadoBase64: String(providerConfigDecrypted['certificadoBase64'] ?? ''),
+      certificadoSenha: String(providerConfigDecrypted['certificadoSenha'] ?? ''),
+      serie: String(providerConfigDecrypted['serie'] ?? '1'),
+      numeroNf: Number(providerConfigDecrypted['numeroNf'] ?? 1),
+      codigoMunicipio: String(providerConfigDecrypted['codigoMunicipio'] ?? ''),
+      cscId: String(providerConfigDecrypted['cscId'] ?? ''),
+      cscToken: String(providerConfigDecrypted['cscToken'] ?? ''),
     } as FiscalConfig
   }
 
   if (config.model === 'sat') {
     return {
       ...base,
-      satUrl: String(pc['satUrl'] ?? ''),
-      activationCode: String(pc['activationCode'] ?? ''),
-      signatureAC: String(pc['signatureAC'] ?? ''),
+      satUrl: String(providerConfigDecrypted['satUrl'] ?? ''),
+      activationCode: String(providerConfigDecrypted['activationCode'] ?? ''),
+      signatureAC: String(providerConfigDecrypted['signatureAC'] ?? ''),
     } as FiscalConfig
   }
 

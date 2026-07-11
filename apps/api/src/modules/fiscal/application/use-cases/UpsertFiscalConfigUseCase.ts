@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import * as schema from '@/infra/database/schema'
 import type { FiscalConfiguration } from '@/infra/database/schema'
+import { encryptSensitiveConfig } from '../FiscalConfigCrypto'
 
 type Database = NodePgDatabase<typeof schema>
 
@@ -36,6 +37,7 @@ function mergeProviderConfig(
   const merged = { ...existing }
   for (const [key, value] of Object.entries(incoming)) {
     if (value === '' || value === null || value === undefined) continue
+    if (typeof value === 'string' && value.startsWith('***')) continue
     merged[key] = value
   }
   return merged
@@ -85,7 +87,7 @@ export class UpsertFiscalConfigUseCase {
           complemento: input.complemento ?? null,
           bairro: input.bairro ?? null,
           crt: input.crt ?? '1',
-          providerConfig: mergedConfig,
+          providerConfig: encryptSensitiveConfig(mergedConfig),
           active: input.active ?? existing.active,
           updatedAt: new Date(),
         })
@@ -112,7 +114,7 @@ export class UpsertFiscalConfigUseCase {
         complemento: input.complemento ?? null,
         bairro: input.bairro ?? null,
         crt: input.crt ?? '1',
-        providerConfig: input.providerConfig ?? {},
+        providerConfig: encryptSensitiveConfig(input.providerConfig ?? {}),
         active: input.active ?? false,
       })
       .returning()

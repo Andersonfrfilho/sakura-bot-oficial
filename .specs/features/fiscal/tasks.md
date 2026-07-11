@@ -31,11 +31,14 @@ Legenda: ✅ feito · ⬜ a fazer · 🔗 depende de.
 - **Aceite**: `ioredis` dedicado com `maxRetriesPerRequest:null`; `defaultJobOptions` com retenção limitada (design §9); Bull Board sob basic auth por env, porta própria. Instalar `bullmq`, `@bull-board/api`, adapter HTTP do projeto.
 - **Verificação**: `bun run check`; subir API e acessar Bull Board com credenciais.
 
-### FISCAL-A3 ⬜ Criptografar certificado no UpsertFiscalConfig
+### FISCAL-A3 ✅ Criptografar certificado no UpsertFiscalConfig
 - 🔗 FISCAL-A1
-- **Arquivos**: `application/use-cases/UpsertFiscalConfigUseCase.ts`; `GetFiscalConfig...`; `FiscalController.getConfig`.
-- **Aceite**: `certificadoBase64`/`certificadoSenha` gravados cifrados; GET nunca retorna cifrado (só `hasCertificate`); decifra ao construir provider.
-- **Verificação**: PUT+GET via curl não vaza cert; emissão em homologação ainda funciona.
+- **Arquivos**: novo `application/FiscalConfigCrypto.ts` (+test); `UpsertFiscalConfigUseCase.ts`; decrypt em Emit/Retry/Cancel/TestConnection.
+- **Aceite**: sensíveis (`certificadoBase64/Senha`, `cscToken`, `activationCode`, `signatureAC`) cifrados com sentinela `enc:v1:`; legado texto-plano passa direto; sem dupla-cifra; provider decifra no build. ✔
+- **Verificação**: `bun test FiscalConfigCrypto.test.ts` → 6/6; typecheck sem erro novo. ✔
+- **Review**: opencode implementou; 2 agentes acharam CRITICAL (reenvio de `***mascarado` sobrescrevia cert) → corrigido em `mergeProviderConfig` (pula `***`); rename `pc`→`providerConfigDecrypted`.
+- **⚠️ Follow-up (DRY, rule 16)**: `buildProviderConfig` está duplicado em Emit/Retry/Cancel/Test. Extrair um `buildFiscalProviderConfig(config)` compartilhado — fica para **FISCAL-B2** (quando a lógica de emissão migra pro worker).
+- **Pendente**: GET config retornar `hasCertificate` em vez de `***last4` fica para **FISCAL-E3** (UI de config).
 
 ---
 
