@@ -18,10 +18,12 @@ Legenda: ✅ feito · ⬜ a fazer · 🔗 depende de.
 
 ## Sprint A — Infra de fila + criptografia (fundação)
 
-### FISCAL-A1 ⬜ SecretCipher (AES-256-GCM)
-- **Arquivos**: `apps/api/src/infra/crypto/SecretCipher.ts` (novo); env schema (adicionar `APP_SECRET`).
-- **Aceite**: `encrypt(x)` → string `iv.tag.ct`; `decrypt(encrypt(x))===x`; boot falha se `APP_SECRET` ausente.
-- **Verificação**: teste unitário round-trip (`bun run test`), `bun run check`.
+### FISCAL-A1 ✅ SecretCipher (AES-256-GCM)
+- **Arquivos**: `apps/api/src/infra/crypto/SecretCipher.ts`, `SecretCipher.test.ts`.
+- **Aceite**: `encrypt(x)` → `iv.tag.ct` base64; `decrypt(encrypt(x))===x`; erro claro se `APP_SECRET` ausente. ✔
+- **Verificação**: `bun test src/infra/crypto/SecretCipher.test.ts` → 6/6 pass; `tsc --noEmit` limpo. ✔
+- **Review**: opencode(qwen3.7-max) implementou; 2 agentes revisaram; aplicado hardening (validação de tamanho de IV/authTag). Salt estático e scrypt default aceitos p/ segredo único.
+- **Pendente env**: adicionar `APP_SECRET` ao schema de env acontece junto de FISCAL-A3 (consumo real).
 
 ### FISCAL-A2 ⬜ Conexão Redis + Queue BullMQ + Bull Board
 - 🔗 —
