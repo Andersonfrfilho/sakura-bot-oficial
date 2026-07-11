@@ -25,11 +25,17 @@ Legenda: ✅ feito · ⬜ a fazer · 🔗 depende de.
 - **Review**: opencode(qwen3.7-max) implementou; 2 agentes revisaram; aplicado hardening (validação de tamanho de IV/authTag). Salt estático e scrypt default aceitos p/ segredo único.
 - **Pendente env**: adicionar `APP_SECRET` ao schema de env acontece junto de FISCAL-A3 (consumo real).
 
-### FISCAL-A2 ⬜ Conexão Redis + Queue BullMQ + Bull Board
+### FISCAL-A2a ✅ Conexão Redis dedicada + Queue BullMQ
 - 🔗 —
-- **Arquivos**: `infra/queue/redisConnection.ts`, `QueueNames.constant.ts`, `fiscalQueue.ts`, `bullBoard.ts`.
-- **Aceite**: `ioredis` dedicado com `maxRetriesPerRequest:null`; `defaultJobOptions` com retenção limitada (design §9); Bull Board sob basic auth por env, porta própria. Instalar `bullmq`, `@bull-board/api`, adapter HTTP do projeto.
-- **Verificação**: `bun run check`; subir API e acessar Bull Board com credenciais.
+- **Arquivos**: `infra/queue/redisConnection.ts`, `QueueNames.constant.ts`, `fiscalQueue.ts`. Dep `bullmq@5.80.2`.
+- **Aceite**: `ioredis` dedicado `maxRetriesPerRequest:null`; `Queue<FiscalJobData,unknown,FiscalJobName>` tipada; `defaultJobOptions` com retenção limitada (sucesso 7d/2000, falha 30d/2000), `attempts:5`, backoff expo 5s. ✔
+- **Verificação**: `tsc --noEmit` limpo; smoke import → `fiscalQueue.name === 'fiscal'`. ✔
+- **Review**: 1 agente (config-only) → typou a Queue genericamente (enforça nome/data do job), add `FiscalSweepJobData`, cast simplificado.
+
+### FISCAL-A2b ⬜ Bull Board (observabilidade) — DEFERIDO
+- 🔗 FISCAL-A2a
+- **Motivo do split**: a API usa **uWebSockets.js**, sem adapter oficial de Bull Board. Solução: mini-Express em porta própria, basic auth por env. Não bloqueia B1/B2.
+- **Arquivos**: `infra/queue/bullBoard.ts` (+ `express`, `@bull-board/api`, `@bull-board/express`).
 
 ### FISCAL-A3 ✅ Criptografar certificado no UpsertFiscalConfig
 - 🔗 FISCAL-A1
