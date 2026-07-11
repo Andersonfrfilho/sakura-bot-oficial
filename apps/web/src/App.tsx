@@ -12,6 +12,7 @@ import { StaffPage } from '@/pages/staff/StaffPage'
 import { CatalogPage } from '@/pages/catalog/CatalogPage'
 import { ReportsPage } from '@/pages/reports/ReportsPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
+import { FiscalDocumentsPage } from '@/pages/fiscal/FiscalDocumentsPage'
 import { ChangePasswordPage } from '@/pages/auth/ChangePasswordPage'
 import { ComandaConfirmPage } from '@/pages/comanda/ComandaConfirmPage'
 import { Sidebar } from '@/components/layout/Sidebar'
@@ -84,6 +85,14 @@ export default function App() {
             element={
               <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.ATTENDANT]}>
                 <ConversationsPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/fiscal"
+            element={
+              <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.CASHIER]}>
+                <FiscalDocumentsPage />
               </RoleGuard>
             }
           />

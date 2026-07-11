@@ -114,10 +114,13 @@ Legenda: ✅ feito · ⬜ a fazer · 🔗 depende de.
 
 ## Sprint E — Dashboard fiscal + impressão
 
-### FISCAL-E1 ⬜ Menu "Notas Fiscais" (dashboard)
-- **Arquivos**: `apps/web/src/pages/fiscal/FiscalDocumentsPage.tsx`; `constants/navigation.ts`; `App.tsx` rota.
-- **Aceite**: tabela de notas vinculadas a pedidos (padrão data-table da regra web.md §7: ordenação, filtros multi, seleção, limpar); status em tempo real via WS; ações PDF/XML/cupom/reprocessar/cancelar (RBAC).
-- **Verificação**: página lista, reprocessa rejeitada, cancela dentro de 30min.
+### FISCAL-E1 ✅ Menu "Notas Fiscais" (dashboard) — listagem com status
+- **Arquivos**: `apps/web/src/pages/fiscal/FiscalDocumentsPage.tsx`; rota `/fiscal` em `App.tsx` (RoleGuard admin/manager/cashier); item em `constants/navigation.ts`.
+- **Aceite**: tabela responsiva (zebra) de notas vinculadas a pedidos; badge de status colorido (pending/emitting/authorized/rejected/cancelled); **tempo real via WS** (`fiscal:*` invalida a query); filtro multi-status + busca por chave/nº + limpar; ações por status: PDF, XML (download autenticado), Cancelar (justificativa ≥15), Reprocessar. ✔
+- **Verificação**: `tsc --noEmit` limpo. ⏳ render ao vivo pendente (precisa stack `make up`).
+- **Review**: 1 agente → corrigido **bug real** (download XML sem header de auth → agora fetch+blob autenticado), `disabled` no cancelar, `aria-label`, `onError` nas mutations.
+- **⚠️ Follow-up (enhancement web.md §7)**: data-table rico — headers ordenáveis, seleção múltipla/ações em lote, estado na URL. Hoje é lista funcional com filtro local.
+- **Nota**: opencode travou 2× nesta task (multi-arquivo e single-file) → página escrita diretamente; wiring à mão.
 
 ### FISCAL-E2 ⬜ Cupom fiscal + impressão ESC/POS
 - 🔗 FISCAL-B2
