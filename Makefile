@@ -7,7 +7,7 @@ PROJECT := $(if $(PROJECT),$(PROJECT),whatsapp-bot)
 
 COMPOSE = docker compose -f infra/docker-compose.yml -p $(PROJECT)
 
-.PHONY: help all setup init up down restart logs ps db-reset db-seed n8n-import directus-init chatwoot-init test test-order test-msg evolution-start evolution-stop evolution-logs validate build hub-up hub-down hub-restart hub-logs hub-seed hub-generate hub-wait
+.PHONY: help all setup init up down restart logs ps db-reset db-seed n8n-import directus-init test test-order test-msg evolution-start evolution-stop evolution-logs validate build hub-up hub-down hub-restart hub-logs hub-seed hub-generate hub-wait
 
 help:
 	@echo ""
@@ -27,7 +27,6 @@ help:
 	@echo "  make db-seed       Importa cardapio.csv e faq.csv para o banco"
 	@echo "  make test-order    Insere pedido de teste completo no banco"
 	@echo "  make test-msg      Simula uma mensagem WhatsApp no n8n (webhook)"
-	@echo "  make chatwoot-init Cria admin + inbox do Chatwoot e salva config no banco"
 	@echo ""
 	@echo "  Order Hub (painel de pedidos):"
 	@echo "  make hub-up        Sobe apenas order-hub-api e order-hub-web"
@@ -39,9 +38,8 @@ help:
 	@echo ""
 	@echo "  Serviços após 'make up':"
 	@echo "    http://localhost:3333  Order Hub API  (REST + WebSocket)"
-	@echo "    http://localhost:4000  Order Hub Web  (painel operacional)"
+	@echo "    http://localhost:4000  Order Hub Web  (painel operacional + atendimento humano)"
 	@echo "    http://localhost:3001  Typebot        (fluxos do bot)"
-	@echo "    http://localhost:3010  Chatwoot       (atendimento humano)"
 	@echo "    http://localhost:4100  Metabase       (dashboards e relatórios)"
 	@echo "    http://localhost:5678  n8n            (workflows)"
 	@echo "    http://localhost:8055  Directus       (painel admin cardápio/config)"
@@ -69,8 +67,8 @@ all: setup up
 	@echo "🌸 Ambiente pronto! Acesse os serviços com 'make help'."
 	@echo ""
 
-# Seed banco + importa workflows + configura Directus + Chatwoot + Order Hub
-init: db-seed n8n-import directus-init chatwoot-init hub-wait hub-seed
+# Seed banco + importa workflows + configura Directus + Order Hub
+init: db-seed n8n-import directus-init hub-wait hub-seed
 	@echo ""
 	@echo "🚀 Inicialização concluída."
 
@@ -94,51 +92,6 @@ directus-init:
 	  echo "  Admin Directus criado: $(DIRECTUS_EMAIL)"; \
 	else \
 	  echo "  Admin Directus já existe — pulando"; \
-	fi
-
-CHATWOOT_ADMIN_NAME     := $(shell grep -s ^CHATWOOT_ADMIN_NAME     $(ENV_FILE) | cut -d= -f2)
-CHATWOOT_ADMIN_NAME     := $(if $(CHATWOOT_ADMIN_NAME),$(CHATWOOT_ADMIN_NAME),Admin)
-CHATWOOT_ADMIN_EMAIL    := $(shell grep -s ^CHATWOOT_ADMIN_EMAIL    $(ENV_FILE) | cut -d= -f2)
-CHATWOOT_ADMIN_EMAIL    := $(if $(CHATWOOT_ADMIN_EMAIL),$(CHATWOOT_ADMIN_EMAIL),admin@sakura.local)
-CHATWOOT_ADMIN_PASSWORD := $(shell grep -s ^CHATWOOT_ADMIN_PASSWORD $(ENV_FILE) | cut -d= -f2)
-CHATWOOT_ADMIN_PASSWORD := $(if $(CHATWOOT_ADMIN_PASSWORD),$(CHATWOOT_ADMIN_PASSWORD),SakuraBot123)
-
-chatwoot-init:
-	@echo "💬 Configurando Chatwoot..."
-	@SCRIPT='email = "$(CHATWOOT_ADMIN_EMAIL)"; \
-	  user = User.find_by(email: email); \
-	  if user.nil?; \
-	    user = User.new(name: "$(CHATWOOT_ADMIN_NAME)", email: email, \
-	      password: "$(CHATWOOT_ADMIN_PASSWORD)", password_confirmation: "$(CHATWOOT_ADMIN_PASSWORD)"); \
-	    user.skip_confirmation!; user.save!; \
-	  end; \
-	  account = AccountUser.where(user_id: user.id).first&.account; \
-	  account ||= Account.create!(name: "Sakura"); \
-	  AccountUser.find_or_create_by!(account_id: account.id, user_id: user.id) { |au| au.role = :administrator }; \
-	  inbox = Inbox.where(account: account).first; \
-	  if inbox.nil?; \
-	    channel = Channel::Api.create!(account: account); \
-	    inbox = Inbox.create!(name: "WhatsApp Bot", channel: channel, account: account); \
-	  end; \
-	  token = AccessToken.find_or_create_by!(owner: user); \
-	  puts "ACCOUNT_ID=" + account.id.to_s; \
-	  puts "INBOX_ID=" + inbox.id.to_s; \
-	  puts "API_TOKEN=" + token.token.to_s'; \
-	RESULT=$$(docker exec chatwoot sh -c \
-	  "bundle exec rails runner '$$SCRIPT' 2>/dev/null" 2>/dev/null \
-	  | grep -E '^(ACCOUNT_ID|INBOX_ID|API_TOKEN)='); \
-	ACCOUNT_ID=$$(echo "$$RESULT" | grep ^ACCOUNT_ID | cut -d= -f2); \
-	INBOX_ID=$$(echo  "$$RESULT"  | grep ^INBOX_ID   | cut -d= -f2); \
-	API_TOKEN=$$(echo "$$RESULT"  | grep ^API_TOKEN  | cut -d= -f2); \
-	if [ -n "$$API_TOKEN" ]; then \
-	  docker exec postgres psql -U $(DB_USER) -d $(DB_NAME) -c \
-	    "UPDATE settings SET value='$$ACCOUNT_ID' WHERE key='chatwoot_account_id'; \
-	     UPDATE settings SET value='$$INBOX_ID'   WHERE key='chatwoot_inbox_id'; \
-	     UPDATE settings SET value='$$API_TOKEN'  WHERE key='chatwoot_api_token';" > /dev/null; \
-	  echo "  Chatwoot pronto: $(CHATWOOT_ADMIN_EMAIL) | Account $$ACCOUNT_ID | Inbox $$INBOX_ID"; \
-	  echo "  Configurações salvas no banco."; \
-	else \
-	  echo "  ⚠️  Chatwoot não respondeu — execute 'make chatwoot-init' após os containers subirem"; \
 	fi
 
 setup:
@@ -165,7 +118,7 @@ ps:
 	$(COMPOSE) ps
 
 # Recria apenas o schema da aplicação (tabelas do bot)
-# Não afeta os bancos do Typebot e Chatwoot
+# Não afeta o banco do Typebot
 # 1. Drop + recria schema público + drizzle (migração tracking)
 # 2. Roda migrations do Drizzle (Order Hub)
 # 3. Roda schema do bot (tabelas exclusivas)

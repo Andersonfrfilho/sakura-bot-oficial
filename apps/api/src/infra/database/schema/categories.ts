@@ -10,6 +10,9 @@ export const categories = pgTable('categories', {
   slug: varchar('slug', { length: 100 }).notNull(),
   active: boolean('active').default(true).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
+  ncmCode: varchar('ncm_code', { length: 8 }).default('21069090'),
+  cfopCode: varchar('cfop_code', { length: 4 }).default('5102'),
+  cstIcms: varchar('cst_icms', { length: 3 }).default('400'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
 

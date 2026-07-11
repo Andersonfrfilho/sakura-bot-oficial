@@ -11,8 +11,8 @@ if (!isOpen) {
     save_customer_name: false, customer_name_to_save: null,
     save_marketing_opt_in: false, marketing_opt_in_value: null,
     kitchen_phone: '',
-    create_chatwoot_conversation: false,
-    chatwoot_customer_name: customerName || '',
+    request_human_handoff: false,
+    handoff_customer_name: customerName || '',
   };
 }
 

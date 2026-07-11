@@ -21,6 +21,8 @@ import { registerTableRoutes } from '@/modules/tables/infra/http/TableRoutes'
 import { registerMenuRoutes } from '@/modules/products/infra/http/MenuRoutes'
 import { registerStaffRoutes } from '@/modules/users/infra/http/StaffRoutes'
 import { registerCatalogRoutes } from '@/modules/products/infra/http/CatalogRoutes'
+import { registerConversationRoutes } from '@/modules/conversations/infra/http/ConversationRoutes'
+import { registerFiscalRoutes } from '@/modules/fiscal/infra/http/FiscalRoutes'
 import { generateOpenAPISpec } from '@/infra/docs/openapi'
 
 const PORT = parseInt(process.env.PORT ?? '3333')
@@ -106,6 +108,8 @@ export async function createServer() {
   registerMenuRoutes(router, container.menuController)
   registerStaffRoutes(router, container.staffController)
   registerCatalogRoutes(router, container.catalogController)
+  registerConversationRoutes(router, container.conversationController)
+  registerFiscalRoutes(router, container.fiscalController)
 
   return {
     listen() {

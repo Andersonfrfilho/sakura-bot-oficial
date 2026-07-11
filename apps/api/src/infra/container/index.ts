@@ -50,6 +50,7 @@ import { StaffController } from '@/modules/users/infra/http/StaffController'
 // Orders
 import { CreateOrderUseCase } from '@/modules/orders/application/use-cases/CreateOrderUseCase'
 import { UpdateOrderStatusUseCase } from '@/modules/orders/application/use-cases/UpdateOrderStatusUseCase'
+import { UpdateOrderNotesUseCase } from '@/modules/orders/application/use-cases/UpdateOrderNotesUseCase'
 import { GetOrderUseCase } from '@/modules/orders/application/use-cases/GetOrderUseCase'
 import { ListOrdersUseCase } from '@/modules/orders/application/use-cases/ListOrdersUseCase'
 import { OrderController } from '@/modules/orders/infra/http/OrderController'
@@ -90,6 +91,34 @@ import { CreateAuditLogUseCase } from '@/modules/audit/application/use-cases/Cre
 import { ReceiveWhatsAppWebhookUseCase } from '@/modules/webhook/application/use-cases/ReceiveWhatsAppWebhookUseCase'
 import { WebhookController } from '@/modules/webhook/infra/http/WebhookController'
 
+// Conversations
+import { DrizzleConversationRepository } from '@/modules/conversations/infra/repositories/DrizzleConversationRepository'
+import { WhatsAppSender } from '@/modules/conversations/infra/WhatsAppSender'
+import { ListConversationsUseCase } from '@/modules/conversations/application/use-cases/ListConversationsUseCase'
+import { GetConversationHistoryUseCase } from '@/modules/conversations/application/use-cases/GetConversationHistoryUseCase'
+import { GetConversationContextUseCase } from '@/modules/conversations/application/use-cases/GetConversationContextUseCase'
+import { LogMessageUseCase } from '@/modules/conversations/application/use-cases/LogMessageUseCase'
+import { TakeoverConversationUseCase } from '@/modules/conversations/application/use-cases/TakeoverConversationUseCase'
+import { ReleaseConversationUseCase } from '@/modules/conversations/application/use-cases/ReleaseConversationUseCase'
+import { RequestHumanUseCase } from '@/modules/conversations/application/use-cases/RequestHumanUseCase'
+import { MarkConversationReadUseCase } from '@/modules/conversations/application/use-cases/MarkConversationReadUseCase'
+import { MarkAllConversationsReadUseCase } from '@/modules/conversations/application/use-cases/MarkAllConversationsReadUseCase'
+import { SendAgentMessageUseCase } from '@/modules/conversations/application/use-cases/SendAgentMessageUseCase'
+import { SendAgentMediaUseCase } from '@/modules/conversations/application/use-cases/SendAgentMediaUseCase'
+import { SendAgentTemplateUseCase } from '@/modules/conversations/application/use-cases/SendAgentTemplateUseCase'
+import { ExportConversationUseCase } from '@/modules/conversations/application/use-cases/ExportConversationUseCase'
+import { FetchConversationMediaUseCase } from '@/modules/conversations/application/use-cases/FetchConversationMediaUseCase'
+import { ConversationController } from '@/modules/conversations/infra/http/ConversationController'
+
+// Fiscal
+import { EmitFiscalDocumentUseCase } from '@/modules/fiscal/application/use-cases/EmitFiscalDocumentUseCase'
+import { CancelFiscalDocumentUseCase } from '@/modules/fiscal/application/use-cases/CancelFiscalDocumentUseCase'
+import { GetFiscalDocumentUseCase } from '@/modules/fiscal/application/use-cases/GetFiscalDocumentUseCase'
+import { UpsertFiscalConfigUseCase } from '@/modules/fiscal/application/use-cases/UpsertFiscalConfigUseCase'
+import { TestFiscalConnectionUseCase } from '@/modules/fiscal/application/use-cases/TestFiscalConnectionUseCase'
+import { RetryFiscalDocumentUseCase } from '@/modules/fiscal/application/use-cases/RetryFiscalDocumentUseCase'
+import { FiscalController } from '@/modules/fiscal/infra/http/FiscalController'
+
 // WebSocket Hub (passed in from server bootstrap to avoid circular dep)
 import type { WebSocketHub } from '@/infra/websocket/WebSocketHub'
 
@@ -109,6 +138,8 @@ export interface AppContainer {
   customerController: CustomerController
   tableController: TableController
   staffController: StaffController
+  conversationController: ConversationController
+  fiscalController: FiscalController
 }
 
 export function buildContainer(wsHub: WebSocketHub): AppContainer {
@@ -135,11 +166,13 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
 
   // Orders
   const createOrderUseCase = new CreateOrderUseCase(db, wsHub)
+  const updateOrderNotesUseCase = new UpdateOrderNotesUseCase(db)
   const getOrderUseCase = new GetOrderUseCase(db)
   const listOrdersUseCase = new ListOrdersUseCase(db)
   const orderController = new OrderController(
     createOrderUseCase,
     updateOrderStatusUseCase,
+    updateOrderNotesUseCase,
     getOrderUseCase,
     listOrdersUseCase
   )
@@ -227,6 +260,40 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     comandaRepository
   )
 
+  // Conversations
+  const conversationRepository = new DrizzleConversationRepository(db)
+  const whatsAppSender = new WhatsAppSender()
+  const listConversationsUseCase = new ListConversationsUseCase(conversationRepository)
+  const getConversationHistoryUseCase = new GetConversationHistoryUseCase(conversationRepository)
+  const getConversationContextUseCase = new GetConversationContextUseCase(conversationRepository)
+  const logMessageUseCase = new LogMessageUseCase(conversationRepository, wsHub)
+  const takeoverConversationUseCase = new TakeoverConversationUseCase(conversationRepository, wsHub)
+  const releaseConversationUseCase = new ReleaseConversationUseCase(conversationRepository, wsHub)
+  const requestHumanUseCase = new RequestHumanUseCase(conversationRepository, wsHub)
+  const markConversationReadUseCase = new MarkConversationReadUseCase(conversationRepository)
+  const markAllConversationsReadUseCase = new MarkAllConversationsReadUseCase(conversationRepository)
+  const sendAgentMessageUseCase = new SendAgentMessageUseCase(conversationRepository, whatsAppSender, wsHub)
+  const sendAgentMediaUseCase = new SendAgentMediaUseCase(conversationRepository, whatsAppSender, wsHub)
+  const sendAgentTemplateUseCase = new SendAgentTemplateUseCase(conversationRepository, whatsAppSender, wsHub)
+  const exportConversationUseCase = new ExportConversationUseCase(conversationRepository)
+  const fetchConversationMediaUseCase = new FetchConversationMediaUseCase(whatsAppSender)
+  const conversationController = new ConversationController(
+    listConversationsUseCase,
+    getConversationHistoryUseCase,
+    getConversationContextUseCase,
+    logMessageUseCase,
+    takeoverConversationUseCase,
+    releaseConversationUseCase,
+    requestHumanUseCase,
+    markConversationReadUseCase,
+    markAllConversationsReadUseCase,
+    sendAgentMessageUseCase,
+    sendAgentMediaUseCase,
+    sendAgentTemplateUseCase,
+    exportConversationUseCase,
+    fetchConversationMediaUseCase
+  )
+
   // Staff
   const staffRepository = new DrizzleStaffRepository(db)
   const listStaffUseCase = new ListStaffUseCase(staffRepository)
@@ -246,6 +313,22 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     listRolesUseCase
   )
 
+  // Fiscal
+  const emitFiscalDocumentUseCase = new EmitFiscalDocumentUseCase(db, wsHub)
+  const cancelFiscalDocumentUseCase = new CancelFiscalDocumentUseCase(db, wsHub)
+  const getFiscalDocumentUseCase = new GetFiscalDocumentUseCase(db)
+  const upsertFiscalConfigUseCase = new UpsertFiscalConfigUseCase(db)
+  const testFiscalConnectionUseCase = new TestFiscalConnectionUseCase()
+  const retryFiscalDocumentUseCase = new RetryFiscalDocumentUseCase(db, wsHub)
+  const fiscalController = new FiscalController(
+    emitFiscalDocumentUseCase,
+    cancelFiscalDocumentUseCase,
+    getFiscalDocumentUseCase,
+    upsertFiscalConfigUseCase,
+    testFiscalConnectionUseCase,
+    retryFiscalDocumentUseCase
+  )
+
   return {
     cache,
     menuController,
@@ -262,5 +345,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     customerController,
     tableController,
     staffController,
+    conversationController,
+    fiscalController,
   }
 }

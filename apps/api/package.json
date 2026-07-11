@@ -12,6 +12,8 @@
     "db:seed": "bun run src/infra/database/seeds/index.ts"
   },
   "dependencies": {
+    "@adatechnology/fiscal-provider": "file:../../../adatechnology-packages/packages/backend/fiscal-provider",
+    "@adatechnology/whatsapp-provider": "file:../../../adatechnology-packages/packages/backend/whatsapp-provider",
     "argon2": "^0.44.0",
     "drizzle-orm": "^0.36.4",
     "ioredis": "^5.4.1",

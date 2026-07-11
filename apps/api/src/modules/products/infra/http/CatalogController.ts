@@ -12,6 +12,9 @@ const categorySchema = z.object({
   name: z.string().min(1).max(100),
   active: z.boolean().optional(),
   sortOrder: z.number().int().min(0).optional(),
+  ncmCode: z.string().max(8).optional(),
+  cfopCode: z.string().max(4).optional(),
+  cstIcms: z.string().max(3).optional(),
 })
 
 const productSchema = z.object({
@@ -87,6 +90,9 @@ export class CatalogController {
         slug,
         ...(parsed.data.active !== undefined && { active: parsed.data.active }),
         ...(parsed.data.sortOrder !== undefined && { sortOrder: parsed.data.sortOrder }),
+        ...(parsed.data.ncmCode !== undefined && { ncmCode: parsed.data.ncmCode }),
+        ...(parsed.data.cfopCode !== undefined && { cfopCode: parsed.data.cfopCode }),
+        ...(parsed.data.cstIcms !== undefined && { cstIcms: parsed.data.cstIcms }),
       })
       .returning()
 
@@ -130,6 +136,9 @@ export class CatalogController {
         slug,
         ...(parsed.data.active !== undefined && { active: parsed.data.active }),
         ...(parsed.data.sortOrder !== undefined && { sortOrder: parsed.data.sortOrder }),
+        ...(parsed.data.ncmCode !== undefined && { ncmCode: parsed.data.ncmCode }),
+        ...(parsed.data.cfopCode !== undefined && { cfopCode: parsed.data.cfopCode }),
+        ...(parsed.data.cstIcms !== undefined && { cstIcms: parsed.data.cstIcms }),
       })
       .where(and(eq(schema.categories.id, id), eq(schema.categories.establishmentId, establishmentId)))
       .returning()

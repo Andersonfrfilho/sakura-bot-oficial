@@ -7,8 +7,8 @@ class MiscHandler extends BaseHandler {
 
     if (!expectingRawInput && (texto === '4' || texto.includes('atendente') || texto.includes('humano'))) {
       newState = BotState.HUMAN_HANDOFF;
-      create_chatwoot_conversation = true;
-      chatwootCustomerName = customerName || '';
+      request_human_handoff = true;
+      handoffCustomerName = customerName || '';
       respostas.push(MessagesConstants.CONECTANDO_ATENDENTE);
       return true;
     }

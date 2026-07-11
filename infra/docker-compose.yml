@@ -1,6 +1,6 @@
 services:
 
-  # Banco de dados principal (app + Typebot + Chatwoot)
+  # Banco de dados principal (app + Typebot)
   postgres:
     image: pgvector/pgvector:pg16
     container_name: postgres
@@ -23,7 +23,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis (usado por Chatwoot e n8n)
+  # Redis (usado pelo n8n e pela API do Order Hub)
   redis:
     image: redis:7-alpine
     container_name: redis
@@ -68,6 +68,10 @@ services:
       - WHATSAPP_BUSINESS_ACCOUNT_ID=${WHATSAPP_BUSINESS_ACCOUNT_ID}
       - WHATSAPP_WEBHOOK_VERIFY_TOKEN=${WHATSAPP_WEBHOOK_VERIFY_TOKEN}
       - WHATSAPP_API_VERSION=${WHATSAPP_API_VERSION:-v21.0}
+      # Order Hub API — endpoints internos de conversas (substituem o Chatwoot)
+      - ORDER_HUB_API_URL=${ORDER_HUB_API_URL:-http://order_hub_api:3333}
+      - ORDER_HUB_N8N_INTERNAL_TOKEN=${ORDER_HUB_N8N_INTERNAL_TOKEN:-change-internal-token}
+      - ORDER_HUB_WEB_PUBLIC_URL=${ORDER_HUB_WEB_PUBLIC_URL:-http://localhost:4000}
     volumes:
       - n8n_data:/home/node/.n8n
     networks:
@@ -109,64 +113,6 @@ services:
       - sakura_net
     depends_on:
       postgres:
-        condition: service_healthy
-
-  # Prepara banco do Chatwoot (roda apenas uma vez; reinicia até ter sucesso)
-  chatwoot-init:
-    image: chatwoot/chatwoot:latest
-    container_name: chatwoot_init
-    command: bundle exec rails db:chatwoot_prepare
-    environment:
-      - SECRET_KEY_BASE=${SECRET_KEY_BASE}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/chatwoot
-      - REDIS_URL=redis://redis:6379
-    networks:
-      - sakura_net
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: on-failure
-
-  # Atendimento humano
-  chatwoot:
-    image: chatwoot/chatwoot:latest
-    container_name: chatwoot
-    restart: always
-    ports:
-      - "3010:3000"
-    environment:
-      - SECRET_KEY_BASE=${SECRET_KEY_BASE}
-      - FRONTEND_URL=${CHATWOOT_URL:-http://localhost:3010}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/chatwoot
-      - REDIS_URL=redis://redis:6379
-    command: bundle exec rails s -p 3000 -b 0.0.0.0
-    volumes:
-      - chatwoot_data:/app/storage
-    networks:
-      - sakura_net
-    depends_on:
-      chatwoot-init:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
-
-  chatwoot-sidekiq:
-    image: chatwoot/chatwoot:latest
-    container_name: chatwoot_sidekiq
-    restart: always
-    command: bundle exec sidekiq -C config/sidekiq.yml
-    environment:
-      - SECRET_KEY_BASE=${SECRET_KEY_BASE}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/chatwoot
-      - REDIS_URL=redis://redis:6379
-    networks:
-      - sakura_net
-    depends_on:
-      chatwoot-init:
-        condition: service_completed_successfully
-      redis:
         condition: service_healthy
 
   # Painel admin do estabelecimento (cardápio, horários, configurações)
@@ -219,12 +165,24 @@ services:
   order-hub-api:
     image: node:22
     container_name: order_hub_api
-    working_dir: /app
-    # instala deps, gera migrations, sobe com tsx watch (reinicia ao salvar qualquer .ts)
-    command: sh -c "npm install && npx drizzle-kit generate && npx tsx watch src/index.ts"
+    # monorepo irmão adatechnology-packages montado à parte — apps/api referencia
+    # @adatechnology/fiscal-provider e @adatechnology/whatsapp-provider via
+    # "file:../../../adatechnology-packages/...", caminho que só resolve dentro do
+    # container se esse repo também estiver montado.
+    # ATENÇÃO: isso só funciona em dev local (bind mount). Deploy (Railway) não tem
+    # acesso a esse diretório irmão — publicar o pacote ou vendorizar antes de subir prod.
+    working_dir: /workspace/apps/api
+    command: >
+      sh -c "cd /adatechnology-packages/packages/backend/fiscal-provider && npm install && npm run build &&
+             cd /adatechnology-packages/packages/backend/whatsapp-provider && npm install && npm run build &&
+             cd /workspace && npm install --workspaces --include-workspace-root &&
+             cd apps/api && npx drizzle-kit generate && npx tsx watch src/index.ts"
     volumes:
-      - ../apps/api:/app
-      - api_node_modules:/app/node_modules
+      - ..:/workspace
+      - ../../adatechnology-packages:/adatechnology-packages
+      - api_node_modules:/workspace/apps/api/node_modules
+      - fiscal_node_modules:/adatechnology-packages/packages/backend/fiscal-provider/node_modules
+      - whatsapp_node_modules:/adatechnology-packages/packages/backend/whatsapp-provider/node_modules
     environment:
       - PORT=3333
       - NODE_ENV=development
@@ -235,6 +193,10 @@ services:
       - JWT_ACCESS_EXPIRES_IN=15m
       - JWT_REFRESH_EXPIRES_IN=7d
       - WEBHOOK_SECRET=${ORDER_HUB_WEBHOOK_SECRET:-changeme_hmac_secret_compartilhado}
+      - N8N_INTERNAL_API_TOKEN=${ORDER_HUB_N8N_INTERNAL_TOKEN:-change-internal-token}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID}
+      - WHATSAPP_API_VERSION=${WHATSAPP_API_VERSION:-v21.0}
       - ALLOWED_ORIGINS=http://localhost:4000
       - LOG_LEVEL=info
     ports:
@@ -308,11 +270,12 @@ volumes:
   postgres_data:
   redis_data:
   n8n_data:
-  chatwoot_data:
   directus_uploads:
   directus_extensions:
   api_node_modules:
   web_node_modules:
+  fiscal_node_modules:
+  whatsapp_node_modules:
 
 networks:
   sakura_net:

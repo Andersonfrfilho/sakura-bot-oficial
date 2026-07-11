@@ -58,5 +58,7 @@ export type Resource =
   | 'products'
   | 'reports'
   | 'settings'
+  | 'conversations'
+  | 'fiscal'
 
 export type Action = 'read' | 'write' | 'delete' | 'manage'

@@ -115,6 +115,9 @@ interface CustomerFormData {
 
 const emptyForm: CustomerFormData = { name: '', whatsappNumber: '', phone: '', document: '', birthDate: '' }
 
+type CustomerSortField = 'name' | 'orderCount' | 'totalSpent' | 'createdAt'
+type SortDirection = 'asc' | 'desc'
+
 export function CustomersPage() {
   const accessToken = useAuthStore((state) => state.accessToken)
   const queryClient = useQueryClient()
@@ -127,6 +130,8 @@ export function CustomersPage() {
   const [formLoading, setFormLoading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<CustomerSortField>('createdAt')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pageSize = 20
 
@@ -139,10 +144,24 @@ export function CustomersPage() {
     }, 300)
   }, [])
 
+  function handleSort(field: CustomerSortField) {
+    if (field === sortBy) {
+      setSortDirection((direction) => (direction === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setSortBy(field)
+    setSortDirection('asc')
+  }
+
   const { data, isLoading } = useQuery({
-    queryKey: ['customers', page, debouncedSearch],
+    queryKey: ['customers', page, debouncedSearch, sortBy, sortDirection],
     queryFn: () => {
-      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+        sortBy,
+        sortDirection,
+      })
       if (debouncedSearch) params.set('search', debouncedSearch)
       return api.get<CustomersResponse>(`/customers?${params}`, accessToken ?? undefined)
     },
@@ -248,11 +267,11 @@ export function CustomersPage() {
             <table className="w-full min-w-[620px]">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Cliente</th>
+                  <SortableHeader field="name" label="Cliente" align="left" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Contato</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Pedidos</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Total gasto</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Desde</th>
+                  <SortableHeader field="orderCount" label="Pedidos" align="right" className="hidden md:table-cell" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                  <SortableHeader field="totalSpent" label="Total gasto" align="right" className="hidden md:table-cell" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                  <SortableHeader field="createdAt" label="Desde" align="left" className="hidden lg:table-cell" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -265,12 +284,16 @@ export function CustomersPage() {
                     </td>
                   </tr>
                 ) : (
-                  data?.data.map((customer) => (
+                  data?.data.map((customer, index) => (
                     <tr
                       key={customer.id}
                       onClick={() => setSelectedId(customer.id === selectedId ? null : customer.id)}
-                      className={`hover:bg-gray-50 transition-colors cursor-pointer ${
-                        selectedId === customer.id ? 'bg-brand-50 border-l-2 border-l-brand-500' : ''
+                      className={`hover:bg-gray-100 transition-colors cursor-pointer ${
+                        selectedId === customer.id
+                          ? 'bg-brand-50 border-l-2 border-l-brand-500'
+                          : index % 2 === 1
+                            ? 'bg-gray-50'
+                            : 'bg-white'
                       }`}
                     >
                       <td className="px-4 py-3">
@@ -551,5 +574,32 @@ function StatCard({ label, value, small }: { label: string; value: string; small
       <p className="text-xs text-gray-500 mb-0.5">{label}</p>
       <p className={`font-semibold text-gray-900 ${small ? 'text-sm' : 'text-lg'}`}>{value}</p>
     </div>
+  )
+}
+
+interface SortableHeaderProps {
+  field: CustomerSortField
+  label: string
+  align: 'left' | 'right'
+  sortBy: CustomerSortField
+  sortDirection: SortDirection
+  onSort: (field: CustomerSortField) => void
+  className?: string
+}
+
+function SortableHeader({ field, label, align, sortBy, sortDirection, onSort, className }: SortableHeaderProps) {
+  const isActive = sortBy === field
+  return (
+    <th className={`px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider ${align === 'right' ? 'text-right' : 'text-left'} ${className ?? ''}`}>
+      <button
+        onClick={() => onSort(field)}
+        className={`inline-flex items-center gap-1 hover:text-gray-700 transition-colors ${isActive ? 'text-gray-900' : ''} ${align === 'right' ? 'flex-row-reverse' : ''}`}
+      >
+        {label}
+        <span className="text-[10px] leading-none">
+          {isActive ? (sortDirection === 'asc' ? '▲' : '▼') : '⇅'}
+        </span>
+      </button>
+    </th>
   )
 }

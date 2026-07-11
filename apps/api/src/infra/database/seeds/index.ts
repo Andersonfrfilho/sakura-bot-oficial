@@ -41,7 +41,7 @@ const DEFAULT_ROLES = [
   },
 ]
 
-const ALL_RESOURCES = ['orders', 'kitchen', 'cashier', 'delivery', 'users', 'products', 'reports', 'settings'] as const
+const ALL_RESOURCES = ['orders', 'kitchen', 'cashier', 'delivery', 'users', 'products', 'reports', 'settings', 'conversations'] as const
 const ALL_ACTIONS = ['read', 'write', 'delete', 'manage'] as const
 
 // Admin gets all permissions
@@ -77,6 +77,12 @@ const ROLE_PERMISSIONS = [
   // Atendente
   { roleId: '00000000-0000-0000-0001-000000000006', resource: 'orders', action: 'read' },
   { roleId: '00000000-0000-0000-0001-000000000006', resource: 'orders', action: 'write' },
+  { roleId: '00000000-0000-0000-0001-000000000006', resource: 'conversations', action: 'read' },
+  { roleId: '00000000-0000-0000-0001-000000000006', resource: 'conversations', action: 'write' },
+  // Gerente: conversations
+  { roleId: '00000000-0000-0000-0001-000000000002', resource: 'conversations', action: 'read' },
+  { roleId: '00000000-0000-0000-0001-000000000002', resource: 'conversations', action: 'write' },
+  { roleId: '00000000-0000-0000-0001-000000000002', resource: 'conversations', action: 'manage' },
 ]
 
 async function seed() {

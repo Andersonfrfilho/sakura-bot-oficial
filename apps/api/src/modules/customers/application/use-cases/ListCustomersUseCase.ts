@@ -1,10 +1,12 @@
-import type { CustomerRepository, CustomerWithStats } from '../../domain/repositories/CustomerRepository'
+import type { CustomerRepository, CustomerWithStats, CustomerSortField, SortDirection } from '../../domain/repositories/CustomerRepository'
 
 interface ListCustomersInput {
   establishmentId: string
   page?: number
   pageSize?: number
   search?: string
+  sortBy?: CustomerSortField
+  sortDirection?: SortDirection
 }
 
 interface ListCustomersOutput {
@@ -19,11 +21,6 @@ export class ListCustomersUseCase {
   constructor(private readonly customerRepository: CustomerRepository) {}
 
   async execute(input: ListCustomersInput): Promise<ListCustomersOutput> {
-    return this.customerRepository.listByEstablishment(
-      input.establishmentId,
-      input.page ?? 1,
-      input.pageSize ?? 20,
-      input.search
-    )
+    return this.customerRepository.listByEstablishment(input)
   }
 }

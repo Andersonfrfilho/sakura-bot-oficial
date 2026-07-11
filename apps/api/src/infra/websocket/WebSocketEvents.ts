@@ -28,6 +28,17 @@ export const WS_EVENTS = {
   CASHIER_REGISTER_OPENED: 'cashier:register_opened',
   CASHIER_REGISTER_CLOSED: 'cashier:register_closed',
   CASHIER_PAYMENT_RECEIVED: 'cashier:payment_received',
+
+  // Conversations
+  CONVERSATION_MESSAGE: 'conversation:message',
+  CONVERSATION_MESSAGE_STATUS: 'conversation:message-status',
+  CONVERSATION_SESSION: 'conversation:session',
+
+  // Fiscal
+  FISCAL_EMITTING: 'fiscal:emitting',
+  FISCAL_AUTHORIZED: 'fiscal:authorized',
+  FISCAL_REJECTED: 'fiscal:rejected',
+  FISCAL_CANCELLED: 'fiscal:cancelled',
 } as const
 
 export type WsEventType = (typeof WS_EVENTS)[keyof typeof WS_EVENTS]

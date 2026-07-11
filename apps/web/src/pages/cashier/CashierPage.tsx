@@ -23,6 +23,16 @@ interface CurrentRegister {
   balance: string
 }
 
+interface FiscalDoc {
+  id: string
+  orderId: string
+  status: string
+  chaveAcesso: string | null
+  numeroDocumento: number | null
+  totalLiquido: string | null
+  createdAt: string
+}
+
 const MOVEMENT_LABELS = { payment: 'Pagamento', withdrawal: 'Retirada', supply: 'Suprimento' }
 const PAYMENT_LABELS: Record<string, string> = {
   pix: 'Pix', card_credit: 'Crédito', card_debit: 'Débito', cash: 'Dinheiro', voucher: 'Voucher',
@@ -58,6 +68,12 @@ export function CashierPage() {
     queryKey: ['cashier-current'],
     queryFn: () => api.get<CurrentRegister | null>('/cashier/registers/current', accessToken ?? undefined),
     refetchInterval: 30_000,
+  })
+
+  const { data: fiscalDocs = [] } = useQuery({
+    queryKey: ['fiscal-documents-list'],
+    queryFn: () => api.get<FiscalDoc[]>('/fiscal-documents', accessToken ?? undefined),
+    refetchInterval: 60_000,
   })
 
   const openMutation = useMutation({
@@ -213,6 +229,39 @@ export function CashierPage() {
                       </span>
                       <p className="text-xs text-gray-400">{formatTime(m.createdAt)}</p>
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Fiscal documents */}
+          {fiscalDocs.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm p-5">
+              <h2 className="font-semibold text-gray-900 mb-1">Notas Fiscais do dia</h2>
+              <p className="text-xs text-gray-400 mb-3">{fiscalDocs.length} documento{fiscalDocs.length !== 1 ? 's' : ''}</p>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {fiscalDocs.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
+                    <div>
+                      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
+                        doc.status === 'authorized' ? 'bg-green-100 text-green-800' :
+                        doc.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                        doc.status === 'cancelled' ? 'bg-orange-100 text-orange-700' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {doc.status === 'authorized' ? 'Autorizada' :
+                         doc.status === 'rejected' ? 'Rejeitada' :
+                         doc.status === 'cancelled' ? 'Cancelada' :
+                         doc.status}
+                      </span>
+                      {doc.numeroDocumento && (
+                        <span className="ml-1.5 text-xs text-gray-500">Nº {doc.numeroDocumento}</span>
+                      )}
+                    </div>
+                    <span className="font-semibold text-gray-900">
+                      {doc.totalLiquido ? `R$ ${Number(doc.totalLiquido).toFixed(2)}` : '—'}
+                    </span>
                   </div>
                 ))}
               </div>

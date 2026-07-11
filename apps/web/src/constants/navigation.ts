@@ -21,6 +21,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/delivery', label: 'Entregas', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.DELIVERY] },
   { to: '/cashier', label: 'Caixa', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.CASHIER] },
   { to: '/orders', label: 'Pedidos', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.ATTENDANT] },
+  { to: '/conversations', label: 'Conversas', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.ATTENDANT] },
   { to: '/tables', label: 'Mesas', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.ATTENDANT] },
   { to: '/customers', label: 'Clientes', roles: [ROLES.ADMIN, ROLES.MANAGER] },
   { to: '/staff', label: 'Funcionários', roles: [ROLES.ADMIN, ROLES.MANAGER] },

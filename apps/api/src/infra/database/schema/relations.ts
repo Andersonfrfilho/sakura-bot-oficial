@@ -16,6 +16,8 @@ import { cashRegisters } from './cash-registers'
 import { cashMovements } from './cash-movements'
 import { settings } from './settings'
 import { auditLogs } from './audit-logs'
+import { conversationSessions } from './conversation-sessions'
+import { conversationMessages } from './conversation-messages'
 
 export const establishmentsRelations = relations(establishments, ({ many }) => ({
   roles: many(roles),
@@ -29,6 +31,8 @@ export const establishmentsRelations = relations(establishments, ({ many }) => (
   cashRegisters: many(cashRegisters),
   settings: many(settings),
   auditLogs: many(auditLogs),
+  conversationSessions: many(conversationSessions),
+  conversationMessages: many(conversationMessages),
 }))
 
 export const rolesRelations = relations(roles, ({ one, many }) => ({
@@ -183,4 +187,27 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
     references: [establishments.id],
   }),
   user: one(users, { fields: [auditLogs.userId], references: [users.id] }),
+}))
+
+export const conversationSessionsRelations = relations(conversationSessions, ({ one, many }) => ({
+  establishment: one(establishments, {
+    fields: [conversationSessions.establishmentId],
+    references: [establishments.id],
+  }),
+  assignedUser: one(users, {
+    fields: [conversationSessions.assignedUserId],
+    references: [users.id],
+  }),
+  messages: many(conversationMessages),
+}))
+
+export const conversationMessagesRelations = relations(conversationMessages, ({ one }) => ({
+  establishment: one(establishments, {
+    fields: [conversationMessages.establishmentId],
+    references: [establishments.id],
+  }),
+  agentUser: one(users, {
+    fields: [conversationMessages.agentUserId],
+    references: [users.id],
+  }),
 }))

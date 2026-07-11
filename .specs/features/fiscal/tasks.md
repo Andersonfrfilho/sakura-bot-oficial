@@ -1,0 +1,135 @@
+# Módulo Fiscal — Tasks (Revisão 2026-07, orientado a execução via opencode)
+
+Cada task é auto-contida: **contexto**, **arquivos**, **critério de aceite**, **verificação**.
+Estado da lib: `@adatechnology/fiscal-provider` já integrada (direto SEFAZ). Ver `design.md`.
+
+Legenda: ✅ feito · ⬜ a fazer · 🔗 depende de.
+
+---
+
+## ✅ Já implementado (não refazer — apenas revisar no diff)
+- Schemas `fiscal_configurations`, `fiscal_documents`; enums `fiscal_model`, `fiscal_document_status`.
+- NCM/CFOP/CST por categoria + `buildFiscalItems`.
+- Use-cases: Emit (in-process), Cancel, Get, Retry, RetryPending, TestConnection, UpsertConfig.
+- FiscalController + FiscalRoutes (emit, getByOrder, list, cancel, downloadXml, getPdfUrl, config, test, retry, retryPending).
+- Eventos WS `fiscal:emitting|authorized|rejected|cancelled`.
+
+---
+
+## Sprint A — Infra de fila + criptografia (fundação)
+
+### FISCAL-A1 ⬜ SecretCipher (AES-256-GCM)
+- **Arquivos**: `apps/api/src/infra/crypto/SecretCipher.ts` (novo); env schema (adicionar `APP_SECRET`).
+- **Aceite**: `encrypt(x)` → string `iv.tag.ct`; `decrypt(encrypt(x))===x`; boot falha se `APP_SECRET` ausente.
+- **Verificação**: teste unitário round-trip (`bun run test`), `bun run check`.
+
+### FISCAL-A2 ⬜ Conexão Redis + Queue BullMQ + Bull Board
+- 🔗 —
+- **Arquivos**: `infra/queue/redisConnection.ts`, `QueueNames.constant.ts`, `fiscalQueue.ts`, `bullBoard.ts`.
+- **Aceite**: `ioredis` dedicado com `maxRetriesPerRequest:null`; `defaultJobOptions` com retenção limitada (design §9); Bull Board sob basic auth por env, porta própria. Instalar `bullmq`, `@bull-board/api`, adapter HTTP do projeto.
+- **Verificação**: `bun run check`; subir API e acessar Bull Board com credenciais.
+
+### FISCAL-A3 ⬜ Criptografar certificado no UpsertFiscalConfig
+- 🔗 FISCAL-A1
+- **Arquivos**: `application/use-cases/UpsertFiscalConfigUseCase.ts`; `GetFiscalConfig...`; `FiscalController.getConfig`.
+- **Aceite**: `certificadoBase64`/`certificadoSenha` gravados cifrados; GET nunca retorna cifrado (só `hasCertificate`); decifra ao construir provider.
+- **Verificação**: PUT+GET via curl não vaza cert; emissão em homologação ainda funciona.
+
+---
+
+## Sprint B — Worker + resiliência offline
+
+### FISCAL-B1 ⬜ EnqueueFiscalEmissionUseCase (refactor do Emit)
+- 🔗 FISCAL-A2
+- **Arquivos**: novo `EnqueueFiscalEmissionUseCase.ts`; ajustar `EmitFiscalDocumentUseCase` p/ só criar `pending` + `fiscalQueue.add('emit', {fiscalDocumentId})` (remover `processEmission` inline).
+- **Aceite**: `POST /orders/:id/fiscal-document` responde 202 em ≤500ms sem chamar SEFAZ no request; job enfileirado.
+- **Verificação**: curl mede latência; job aparece no Bull Board.
+
+### FISCAL-B2 ⬜ FiscalEmissionProcessor (worker)
+- 🔗 FISCAL-B1, FISCAL-A3
+- **Arquivos**: `application/workers/FiscalEmissionProcessor.ts`; registrar Worker no boot sob `FISCAL_WORKER_ENABLED`.
+- **Aceite**: consome 'emit', idempotente (relê doc; pula se authorized/cancelled); sucesso→authorized+WS+enfileira 'deliver'; erro transitório→throw (backoff BullMQ); rejeição→rejected. Graceful shutdown no SIGTERM.
+- **Verificação**: emissão homologação autoriza via worker; matar rede → job retenta.
+
+### FISCAL-B3 ⬜ FiscalSweeper (repeatable job offline)
+- 🔗 FISCAL-B2
+- **Arquivos**: `application/workers/FiscalSweeper.ts`; repeatable job (`FISCAL_SWEEP_INTERVAL_MS`).
+- **Aceite**: reenfileira `pending`/`emitting` presos e `rejected` por causa transitória; não toca `authorized`/`cancelled`/rejeição fatal.
+- **Verificação**: doc preso em pending volta a `authorized` após sweep com internet.
+
+---
+
+## Sprint C — Toggle por-pedido + gatilho configurável
+
+### FISCAL-C1 ⬜ Schema toggle + trigger
+- **Arquivos**: `schema/orders.ts` (+`fiscal_enabled bool default true`); `schema/fiscal-configurations.ts` (+`emit_trigger`, `email_provider`); migration Drizzle.
+- **Aceite**: `bun drizzle-kit generate` + push sem erro.
+- **Verificação**: colunas existem.
+
+### FISCAL-C2 ⬜ Gatilho automático no pagamento/conclusão
+- 🔗 FISCAL-C1, FISCAL-B1
+- **Arquivos**: use-case de registrar pagamento no caixa e/ou `UpdateOrderStatusUseCase`.
+- **Aceite**: dispara `EnqueueFiscalEmissionUseCase` só se `order.fiscal_enabled && config.active && trigger casa`; nunca duplica (checa doc existente).
+- **Verificação**: pagar pedido com toggle on → doc criado; toggle off → nenhum.
+
+---
+
+## Sprint D — Envio ao cliente
+
+### FISCAL-D1 ⬜ FiscalDeliveryProvider (interface) + Resend + SMTP
+- **Arquivos**: `providers/FiscalDeliveryProvider.interface.ts`, `ResendDeliveryProvider.ts`, `SmtpDeliveryProvider.ts`. Instalar `resend`, `nodemailer`.
+- **Aceite**: envia PDF/XML/link; escolha por `config.email_provider`; falha registra erro sem invalidar nota.
+- **Verificação**: teste com provider mock; envio real opcional em homologação.
+
+### FISCAL-D2 ⬜ WhatsappN8nDeliveryProvider + DeliverFiscalDocumentUseCase
+- 🔗 FISCAL-D1, FISCAL-B2
+- **Arquivos**: `WhatsappN8nDeliveryProvider.ts`, `DeliverFiscalDocumentUseCase.ts`; job 'deliver'.
+- **Aceite**: envia cupom+link via webhook n8n (`N8N_FISCAL_WEBHOOK_URL`); grava `deliveryStatus`.
+- **Verificação**: job 'deliver' processa após authorized.
+
+### FISCAL-D3 ⬜ Página pública do cliente (token HMAC)
+- 🔗 FISCAL-B2
+- **Arquivos**: rotas públicas `GET /public/fiscal/:token(/pdf|/xml)`; `apps/web/src/pages/public/CustomerInvoicePage.tsx`.
+- **Aceite**: token HMAC (`FISCAL_PUBLIC_TOKEN_SECRET`) sem auth de usuário; PWA-first; QR/chave/downloads.
+- **Verificação**: link abre nota sem login; token inválido → 404.
+
+---
+
+## Sprint E — Dashboard fiscal + impressão
+
+### FISCAL-E1 ⬜ Menu "Notas Fiscais" (dashboard)
+- **Arquivos**: `apps/web/src/pages/fiscal/FiscalDocumentsPage.tsx`; `constants/navigation.ts`; `App.tsx` rota.
+- **Aceite**: tabela de notas vinculadas a pedidos (padrão data-table da regra web.md §7: ordenação, filtros multi, seleção, limpar); status em tempo real via WS; ações PDF/XML/cupom/reprocessar/cancelar (RBAC).
+- **Verificação**: página lista, reprocessa rejeitada, cancela dentro de 30min.
+
+### FISCAL-E2 ⬜ Cupom fiscal + impressão ESC/POS
+- 🔗 FISCAL-B2
+- **Arquivos**: `providers/ThermalPrinterProvider.ts` (instalar `node-thermal-printer`); endpoint `POST /orders/:id/fiscal-document/print`; botão no dashboard.
+- **Aceite**: gera cupom (DANFCe já vem da lib) com QR/chave; imprime via TCP/USB.
+- **Verificação**: endpoint retorna 200; impressão simulada/loga ESC/POS.
+
+### FISCAL-E3 ⬜ Toggle "Emitir NF" no CreateOrderModal + config Settings
+- 🔗 FISCAL-C1
+- **Arquivos**: `CreateOrderModal.tsx`, `FiscalSettingsPage.tsx`.
+- **Aceite**: checkbox default = config; Settings expõe `emit_trigger`, `email_provider`, upload de certificado (mostra só `hasCertificate`).
+- **Verificação**: criar pedido sem NF não gera doc; upload de cert persiste cifrado.
+
+---
+
+## Ordem de execução (dependências)
+```
+A1 ─┬─ A3 ─┐
+A2 ─┴─ B1 ─┴─ B2 ─┬─ B3
+                  ├─ D2 ── (D1)
+                  ├─ D3
+                  └─ E2
+C1 ─ C2 (após B1)
+C1 ─ E3
+E1 (após B-series p/ dados reais)
+```
+
+## Protocolo por task (Claude + opencode + review)
+1. Claude passa a task ao opencode: `opencode run "<task>" --dangerously-skip-permissions -c`.
+2. 2 agentes de review analisam o diff (correção + aderência às regras Ada).
+3. Claude roda `bun run check` + testes e valida o critério; corrige/reprocessa se falhar.
+4. Marca ✅ e segue a próxima respeitando dependências.

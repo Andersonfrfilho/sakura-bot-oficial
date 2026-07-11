@@ -51,7 +51,7 @@ const REQUIRED_NODES = [
   'enviar', 'salvar_sessao', 'filtrar_pedido', 'salvar_pedido',
   'filtrar_reserva', 'salvar_reserva', 'filtrar_nome', 'atualizar_nome',
   'filtrar_cozinha', 'notificar_cozinha', 'filtrar_marketing', 'salvar_marketing',
-  'filtrar_chatwoot', 'criar_conversa_chatwoot', 'notificar_agente',
+  'filtrar_handoff_humano', 'solicitar_atendimento_humano', 'notificar_agente',
 ];
 
 for (const id of REQUIRED_NODES) {
@@ -125,7 +125,7 @@ const REQUIRED_KEYS = [
   'save_order', 'save_reservation',
   'save_customer_name', 'customer_name_to_save',
   'save_marketing_opt_in', 'marketing_opt_in_value',
-  'kitchen_phone', 'create_chatwoot_conversation',
+  'kitchen_phone', 'request_human_handoff',
 ];
 // Campos que aceitam dois nomes (estado fechado usa current*, demais usam new*)
 const STATE_VARIANTS  = ['state: newState',  'state: currentState'];
@@ -252,28 +252,28 @@ check("meu pedido não capturado pelo includes('pedido') do ordering", () => {
   assert(!hasPlainPedido, "ordering trigger tem includes('pedido') sem guard — captura 'meu pedido'");
 });
 
-// ── 6. Chatwoot integration ──────────────────────────────────────────────────
-console.log('\n💬 Chatwoot handoff');
+// ── 6. Human handoff integration (Order Hub) ─────────────────────────────────
+console.log('\n💬 Human handoff');
 
 check('human_handoff state handler presente', () =>
   assert(code.includes("currentState === 'human_handoff'"), 'handler human_handoff não encontrado'));
 
-check('create_chatwoot_conversation declarado (let)', () =>
-  assert(code.includes('let create_chatwoot_conversation'), 'variável create_chatwoot_conversation ausente'));
+check('request_human_handoff declarado (let)', () =>
+  assert(code.includes('let request_human_handoff'), 'variável request_human_handoff ausente'));
 
-check('filtrar_chatwoot node presente', () =>
-  assert(nodeById['filtrar_chatwoot'], 'nó filtrar_chatwoot não encontrado'));
+check('filtrar_handoff_humano node presente', () =>
+  assert(nodeById['filtrar_handoff_humano'], 'nó filtrar_handoff_humano não encontrado'));
 
-check('criar_conversa_chatwoot node presente', () =>
-  assert(nodeById['criar_conversa_chatwoot'], 'nó criar_conversa_chatwoot não encontrado'));
+check('solicitar_atendimento_humano node presente', () =>
+  assert(nodeById['solicitar_atendimento_humano'], 'nó solicitar_atendimento_humano não encontrado'));
 
 check('notificar_agente node presente', () =>
   assert(nodeById['notificar_agente'], 'nó notificar_agente não encontrado'));
 
-check('Filtrar Chatwoot no fan-out do Rotear', () => {
+check('Filtrar Handoff Humano no fan-out do Rotear', () => {
   const rotearConns2 = (conns['Rotear e Responder'] || {}).main || [];
   const connected = (rotearConns2[0] || []).map(c => c.node);
-  assert(connected.includes('Filtrar Chatwoot'), '"Filtrar Chatwoot" não está no fan-out do Rotear');
+  assert(connected.includes('Filtrar Handoff Humano'), '"Filtrar Handoff Humano" não está no fan-out do Rotear');
 });
 
 // ── 7. buscar_dados ──────────────────────────────────────────────────────────
