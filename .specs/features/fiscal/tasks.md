@@ -88,11 +88,13 @@ Legenda: ✅ feito · ⬜ a fazer · 🔗 depende de.
 - **Aceite**: `drizzle-kit generate` OK; migration = 3 ALTER TABLE ADD COLUMN. ✔ typecheck limpo.
 - **Verificação push**: ⏳ pendente (Postgres via `make up`).
 
-### FISCAL-C2 ⬜ Gatilho automático no pagamento/conclusão
+### FISCAL-C2 ✅ Gatilho automático no pagamento/conclusão
 - 🔗 FISCAL-C1, FISCAL-B1
-- **Arquivos**: use-case de registrar pagamento no caixa e/ou `UpdateOrderStatusUseCase`.
-- **Aceite**: dispara `EnqueueFiscalEmissionUseCase` só se `order.fiscal_enabled && config.active && trigger casa`; nunca duplica (checa doc existente).
-- **Verificação**: pagar pedido com toggle on → doc criado; toggle off → nenhum.
+- **Arquivos**: novo `TriggerFiscalEmissionUseCase.ts` + `FiscalEmissionEnqueue.ts` (helper DRY compartilhado c/ Emit); wiring em `AddCashMovementUseCase` (pagamento) e `UpdateOrderStatusUseCase` (completed); container injeta o trigger; migration `0005` (UNIQUE order_id).
+- **Aceite**: dispara só se `order.fiscalEnabled && config.active && config.emitTrigger === evento`; `manual` nunca auto-dispara; **fire-and-forget** (não bloqueia caixa/pedido); nunca duplica. ✔
+- **Hardening pós-review**: **UNIQUE(order_id)** em fiscal_documents (mata race SELECT-then-INSERT → nota duplicada); `on_payment` só dispara quando **pago integralmente** (soma dos movimentos ≥ total), não no 1º pagamento parcial.
+- **Verificação**: `tsc` — arquivos tocados zero erros (erro em CashierController é pré-existente). ⏳ ao vivo pendente.
+- **Follow-up**: manual `EmitFiscalDocumentUseCase` hoje NÃO checa `fiscalEnabled` (override explícito do operador — decisão de design); logging estruturado no lugar de console.error.
 
 ---
 

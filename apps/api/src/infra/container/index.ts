@@ -50,6 +50,7 @@ import { StaffController } from '@/modules/users/infra/http/StaffController'
 // Orders
 import { CreateOrderUseCase } from '@/modules/orders/application/use-cases/CreateOrderUseCase'
 import { UpdateOrderStatusUseCase } from '@/modules/orders/application/use-cases/UpdateOrderStatusUseCase'
+import { TriggerFiscalEmissionUseCase } from '@/modules/fiscal/application/use-cases/TriggerFiscalEmissionUseCase'
 import { UpdateOrderNotesUseCase } from '@/modules/orders/application/use-cases/UpdateOrderNotesUseCase'
 import { GetOrderUseCase } from '@/modules/orders/application/use-cases/GetOrderUseCase'
 import { ListOrdersUseCase } from '@/modules/orders/application/use-cases/ListOrdersUseCase'
@@ -165,7 +166,8 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   // Shared use cases
   const findOrCreateCustomerUseCase = new FindOrCreateCustomerUseCase(db)
   const createAuditLogUseCase = new CreateAuditLogUseCase(db)
-  const updateOrderStatusUseCase = new UpdateOrderStatusUseCase(db, wsHub)
+  const triggerFiscalEmissionUseCase = new TriggerFiscalEmissionUseCase(db, wsHub)
+  const updateOrderStatusUseCase = new UpdateOrderStatusUseCase(db, wsHub, triggerFiscalEmissionUseCase)
 
   // Orders
   const createOrderUseCase = new CreateOrderUseCase(db, wsHub)
@@ -195,7 +197,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   // Cashier
   const openCashRegisterUseCase = new OpenCashRegisterUseCase(db)
   const closeCashRegisterUseCase = new CloseCashRegisterUseCase(db)
-  const addCashMovementUseCase = new AddCashMovementUseCase(db)
+  const addCashMovementUseCase = new AddCashMovementUseCase(db, triggerFiscalEmissionUseCase)
   const cashierController = new CashierController(
     openCashRegisterUseCase,
     closeCashRegisterUseCase,

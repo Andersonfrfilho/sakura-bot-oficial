@@ -10,6 +10,7 @@ export const fiscalDocuments = pgTable('fiscal_documents', {
     .references(() => establishments.id, { onDelete: 'cascade' }),
   orderId: uuid('order_id')
     .notNull()
+    .unique()
     .references(() => orders.id, { onDelete: 'restrict' }),
 
   model: fiscalModelEnum('model').notNull(),
