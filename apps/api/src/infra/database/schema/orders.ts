@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, numeric, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, text, numeric, timestamp, boolean } from 'drizzle-orm/pg-core'
 import { establishments } from './establishments'
 import { customers } from './customers'
 import { restaurantTables } from './tables'
@@ -16,6 +16,7 @@ export const orders = pgTable('orders', {
   type: orderTypeEnum('type').notNull(),
   totalAmount: numeric('total_amount', { precision: 10, scale: 2 }).notNull(),
   notes: text('notes'),
+  fiscalEnabled: boolean('fiscal_enabled').notNull().default(true),
   whatsappMessageId: varchar('whatsapp_message_id', { length: 255 }).unique(),
   receivedAt: timestamp('received_at', { withTimezone: true }).defaultNow().notNull(),
   productionStartedAt: timestamp('production_started_at', { withTimezone: true }),

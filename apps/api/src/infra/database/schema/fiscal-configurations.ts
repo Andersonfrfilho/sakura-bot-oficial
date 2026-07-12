@@ -27,6 +27,11 @@ export const fiscalConfigurations = pgTable('fiscal_configurations', {
 
   environment: varchar('environment', { length: 20 }).notNull().default('homologacao'),
 
+  // Quando emitir a NF: 'on_payment' | 'on_completed' | 'manual'
+  emitTrigger: varchar('emit_trigger', { length: 20 }).notNull().default('on_payment'),
+  // Provider de e-mail p/ envio ao cliente: 'resend' | 'smtp'
+  emailProvider: varchar('email_provider', { length: 20 }).notNull().default('resend'),
+
   active: boolean('active').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

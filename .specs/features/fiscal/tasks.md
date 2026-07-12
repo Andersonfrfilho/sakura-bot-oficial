@@ -83,10 +83,10 @@ Legenda: ✅ feito · ⬜ a fazer · 🔗 depende de.
 
 ## Sprint C — Toggle por-pedido + gatilho configurável
 
-### FISCAL-C1 ⬜ Schema toggle + trigger
-- **Arquivos**: `schema/orders.ts` (+`fiscal_enabled bool default true`); `schema/fiscal-configurations.ts` (+`emit_trigger`, `email_provider`); migration Drizzle.
-- **Aceite**: `bun drizzle-kit generate` + push sem erro.
-- **Verificação**: colunas existem.
+### FISCAL-C1 ✅ Schema toggle + trigger
+- **Arquivos**: `schema/orders.ts` (+`fiscal_enabled bool default true`); `schema/fiscal-configurations.ts` (+`emit_trigger` default 'on_payment', +`email_provider` default 'resend'); migration `0004_damp_nightshade.sql`.
+- **Aceite**: `drizzle-kit generate` OK; migration = 3 ALTER TABLE ADD COLUMN. ✔ typecheck limpo.
+- **Verificação push**: ⏳ pendente (Postgres via `make up`).
 
 ### FISCAL-C2 ⬜ Gatilho automático no pagamento/conclusão
 - 🔗 FISCAL-C1, FISCAL-B1
