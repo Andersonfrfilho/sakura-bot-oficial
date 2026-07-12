@@ -22,6 +22,7 @@ const createOrderSchema = z.object({
   type: z.enum(['delivery', 'pickup', 'table']),
   items: z.array(orderItemSchema).min(1),
   notes: z.string().max(1000).optional(),
+  fiscalEnabled: z.boolean().optional(),
   whatsappMessageId: z.string().max(255).optional(),
 })
 

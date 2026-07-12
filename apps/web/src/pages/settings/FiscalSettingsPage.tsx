@@ -18,6 +18,8 @@ interface FiscalConfig {
   complemento: string | null
   bairro: string | null
   crt: string | null
+  emitTrigger?: string
+  emailProvider?: string
   providerConfig: Record<string, unknown>
   active: boolean
 }
@@ -41,6 +43,8 @@ const EMPTY_CONFIG: FiscalConfig = {
   complemento: null,
   bairro: null,
   crt: '1',
+  emitTrigger: 'on_payment',
+  emailProvider: 'resend',
   providerConfig: {},
   active: false,
 }
@@ -258,6 +262,33 @@ export function FiscalSettingsPage() {
               >
                 Produção
               </button>
+            </div>
+          </div>
+
+          {/* Emissão automática + envio */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Emitir NF quando</label>
+              <select
+                value={form.emitTrigger ?? 'on_payment'}
+                onChange={(e) => setForm((prev) => ({ ...prev, emitTrigger: e.target.value }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              >
+                <option value="on_payment">Ao registrar pagamento</option>
+                <option value="on_completed">Ao concluir o pedido</option>
+                <option value="manual">Somente manual</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Provedor de e-mail</label>
+              <select
+                value={form.emailProvider ?? 'resend'}
+                onChange={(e) => setForm((prev) => ({ ...prev, emailProvider: e.target.value }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              >
+                <option value="resend">Resend</option>
+                <option value="smtp">SMTP</option>
+              </select>
             </div>
           </div>
 

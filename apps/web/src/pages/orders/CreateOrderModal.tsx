@@ -127,10 +127,7 @@ export function CreateOrderModal({ onClose }: { onClose: () => void }) {
     : allCategories
 
   function handleSubmit() {
-    const notes = [
-      ...(globalNotes ? [globalNotes] : []),
-      ...(requiresFiscal ? ['NF SOLICITADA'] : []),
-    ].join(' | ') || undefined
+    const notes = globalNotes || undefined
 
     const body = {
       channel: 'manual' as const,
@@ -143,6 +140,7 @@ export function CreateOrderModal({ onClose }: { onClose: () => void }) {
         quantity: i.quantity,
         ...(i.notes ? { notes: i.notes } : {}),
       })),
+      fiscalEnabled: requiresFiscal,
       ...(notes ? { notes } : {}),
     }
     mutation.mutate(body)

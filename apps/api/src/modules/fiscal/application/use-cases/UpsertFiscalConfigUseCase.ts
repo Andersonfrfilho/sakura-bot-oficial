@@ -21,6 +21,8 @@ type UpsertFiscalConfigInput = {
   complemento: string | null
   bairro: string | null
   crt: string | null
+  emitTrigger?: string | undefined
+  emailProvider?: string | undefined
   providerConfig?: Record<string, unknown>
   active: boolean
 }
@@ -87,6 +89,8 @@ export class UpsertFiscalConfigUseCase {
           complemento: input.complemento ?? null,
           bairro: input.bairro ?? null,
           crt: input.crt ?? '1',
+          emitTrigger: input.emitTrigger ?? existing.emitTrigger,
+          emailProvider: input.emailProvider ?? existing.emailProvider,
           providerConfig: encryptSensitiveConfig(mergedConfig),
           active: input.active ?? existing.active,
           updatedAt: new Date(),
@@ -114,6 +118,8 @@ export class UpsertFiscalConfigUseCase {
         complemento: input.complemento ?? null,
         bairro: input.bairro ?? null,
         crt: input.crt ?? '1',
+        emitTrigger: input.emitTrigger ?? 'on_payment',
+        emailProvider: input.emailProvider ?? 'resend',
         providerConfig: encryptSensitiveConfig(input.providerConfig ?? {}),
         active: input.active ?? false,
       })

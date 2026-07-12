@@ -137,11 +137,11 @@ Legenda: ✅ feito · ⬜ a fazer · 🔗 depende de.
 - **Aceite**: gera cupom (DANFCe já vem da lib) com QR/chave; imprime via TCP/USB.
 - **Verificação**: endpoint retorna 200; impressão simulada/loga ESC/POS.
 
-### FISCAL-E3 ⬜ Toggle "Emitir NF" no CreateOrderModal + config Settings
+### FISCAL-E3 ✅ Toggle "Emitir NF" no CreateOrderModal + config Settings
 - 🔗 FISCAL-C1
-- **Arquivos**: `CreateOrderModal.tsx`, `FiscalSettingsPage.tsx`.
-- **Aceite**: checkbox default = config; Settings expõe `emit_trigger`, `email_provider`, upload de certificado (mostra só `hasCertificate`).
-- **Verificação**: criar pedido sem NF não gera doc; upload de cert persiste cifrado.
+- **Backend**: UpsertFiscalConfig + zod schema aceitam `emitTrigger`/`emailProvider` (update preserva existente); CreateOrder aceita `fiscalEnabled` (default true).
+- **Frontend**: `CreateOrderModal` toggle "Nota Fiscal" agora manda `fiscalEnabled` (removido o hack de notes); `FiscalSettingsPage` ganhou selects de gatilho + provedor de e-mail (upload de certificado **já existia**).
+- **Verificação ao vivo (DB real)**: emitTrigger/emailProvider persistem + preservam; order.fiscalEnabled false/true default. ✔ `tsc` web+api limpo.
 
 ---
 

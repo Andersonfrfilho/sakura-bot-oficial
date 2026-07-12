@@ -24,6 +24,8 @@ const upsertFiscalConfigSchema = z.object({
   complemento: z.string().max(100).optional(),
   bairro: z.string().max(100).optional(),
   crt: z.enum(['1', '2', '3']).optional(),
+  emitTrigger: z.enum(['on_payment', 'on_completed', 'manual']).optional(),
+  emailProvider: z.enum(['resend', 'smtp']).optional(),
   providerConfig: z.record(z.unknown()).optional(),
   active: z.boolean().optional(),
 })
@@ -185,6 +187,8 @@ export class FiscalController {
       complemento: data.complemento ?? null,
       bairro: data.bairro ?? null,
       crt: data.crt ?? '1',
+      emitTrigger: data.emitTrigger,
+      emailProvider: data.emailProvider,
       providerConfig: data.providerConfig ?? {},
       active: data.active ?? false,
     })
