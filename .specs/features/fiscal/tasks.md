@@ -111,7 +111,8 @@ Legenda: ✅ feito · ⬜ a fazer · 🔗 depende de.
 - **Verificação ao vivo (DB real, 6 asserts)**: seleção de canal, respeito ao emailProvider, partial/failed, no-contact→failed, pending→no-op, erro inesperado→failed sem throw. ✔
 - **Review**: 1 agente → blindado enqueue do deliver (não derruba emissão), `execute` try/catch grava failed, status tipado union, DRY do subject. **Follow-up**: re-envio automático é manual (endpoint futuro); n8n deve ser interno/HTTPS.
 
-### FISCAL-D3 🟡 Página pública do cliente (token HMAC) — BACKEND ✅ / frontend ⬜
+### FISCAL-D3 ✅ Página pública do cliente (token HMAC) — backend ✅ / frontend ✅
+- **Frontend ✅**: `apps/web/src/pages/public/CustomerInvoicePage.tsx` (rota pública `/nota/:token` fora do AuthGuard); mostra nº/série, modelo, valor, chave formatada, link QR SEFAZ, download PDF + XML (via endpoint público). `tsc` limpo.
 - 🔗 FISCAL-B2
 - **Backend ✅**: `FiscalPublicToken.ts` (HMAC-SHA256 create/verify, constant-time, `FISCAL_PUBLIC_TOKEN_SECRET`) + `GET /public/fiscal/:token` (metadata) e `/xml` (download), sem auth. `findByIdPublic` (sem escopo). 5 testes do token. ✔
 - **Hardening pós-review**: só expõe docs `authorized`; **metadata sem o XML** (XML só no endpoint explícito — evita vazar CNPJ/IE/CPF em toda carga); guarda UUID (evita 500). Não vaza establishmentId/erros.

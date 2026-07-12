@@ -15,6 +15,7 @@ import { SettingsPage } from '@/pages/settings/SettingsPage'
 import { FiscalDocumentsPage } from '@/pages/fiscal/FiscalDocumentsPage'
 import { ChangePasswordPage } from '@/pages/auth/ChangePasswordPage'
 import { ComandaConfirmPage } from '@/pages/comanda/ComandaConfirmPage'
+import { CustomerInvoicePage } from '@/pages/public/CustomerInvoicePage'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { MobileNav } from '@/components/layout/MobileNav'
 import { AuthGuard, RoleGuard } from '@/components/layout/RoleGuard'
@@ -148,6 +149,7 @@ export default function App() {
 
         {/* Rota pública — sem autenticação */}
         <Route path="/comanda/:code" element={<ComandaConfirmPage />} />
+        <Route path="/nota/:token" element={<CustomerInvoicePage />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
