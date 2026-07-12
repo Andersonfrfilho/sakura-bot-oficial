@@ -13,6 +13,8 @@ import {
   type FiscalResult,
 } from '@adatechnology/fiscal-provider'
 import { decryptSensitiveConfig } from './FiscalConfigCrypto'
+import { fiscalQueue } from '@/infra/queue/fiscalQueue'
+import { FISCAL_JOB } from '@/infra/queue/QueueNames.constant'
 
 type Database = NodePgDatabase<typeof schema>
 
@@ -154,6 +156,14 @@ export class FiscalEmissionService {
         chaveAcesso: result.chaveAcesso,
         numeroDocumento: result.numeroDocumento,
       })
+
+      // Deliver the authorized note to the customer asynchronously (WhatsApp/e-mail).
+      // A queue hiccup here must not fail the already-successful emission.
+      try {
+        await fiscalQueue.add(FISCAL_JOB.DELIVER, { fiscalDocumentId })
+      } catch (enqueueError) {
+        console.error('[Fiscal] failed to enqueue delivery job', fiscalDocumentId, enqueueError)
+      }
     } else {
       await this.database.update(schema.fiscalDocuments)
         .set({

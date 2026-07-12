@@ -43,6 +43,12 @@ export const fiscalDocuments = pgTable('fiscal_documents', {
   lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
 
   authorizedAt: timestamp('authorized_at', { withTimezone: true }),
+
+  // Envio ao cliente (WhatsApp/e-mail): 'sent' | 'partial' | 'failed'
+  deliveryStatus: varchar('delivery_status', { length: 20 }),
+  deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+  deliveryError: text('delivery_error'),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })

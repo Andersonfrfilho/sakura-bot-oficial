@@ -50,6 +50,13 @@
       "when": 1783817090938,
       "tag": "0006_gifted_maddog",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1783817764685,
+      "tag": "0007_massive_pepper_potts",
+      "breakpoints": true
     }
   ]
 }

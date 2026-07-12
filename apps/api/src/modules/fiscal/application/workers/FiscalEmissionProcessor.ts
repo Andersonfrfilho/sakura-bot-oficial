@@ -5,8 +5,12 @@ import * as schema from '@/infra/database/schema'
 import type { WebSocketHub } from '@/infra/websocket/WebSocketHub'
 import { WS_EVENTS } from '@/infra/websocket/WebSocketEvents'
 import { queueConnection } from '@/infra/queue/redisConnection'
-import { FISCAL_QUEUE, FISCAL_JOB, type FiscalEmitJobData } from '@/infra/queue/QueueNames.constant'
+import { FISCAL_QUEUE, FISCAL_JOB, type FiscalEmitJobData, type FiscalDeliverJobData } from '@/infra/queue/QueueNames.constant'
 import { FiscalEmissionService, extractFiscalErrorCode } from '../FiscalEmissionService'
+import { DeliverFiscalDocumentUseCase } from '../use-cases/DeliverFiscalDocumentUseCase'
+import { ResendDeliveryProvider } from '../delivery/ResendDeliveryProvider'
+import { SmtpDeliveryProvider } from '../delivery/SmtpDeliveryProvider'
+import { WhatsappN8nDeliveryProvider } from '../delivery/WhatsappN8nDeliveryProvider'
 import { runFiscalSweep, scheduleFiscalSweep } from './FiscalSweeper'
 
 type Database = NodePgDatabase<typeof schema>
@@ -14,12 +18,20 @@ type Database = NodePgDatabase<typeof schema>
 export function startFiscalWorker(params: { database: Database; websocketHub: WebSocketHub }): Worker {
   const { database, websocketHub } = params
   const service = new FiscalEmissionService(database, websocketHub)
+  const deliverUseCase = new DeliverFiscalDocumentUseCase(database, new WhatsappN8nDeliveryProvider(), {
+    resend: new ResendDeliveryProvider(),
+    smtp: new SmtpDeliveryProvider(),
+  })
 
   const worker = new Worker(
     FISCAL_QUEUE,
     async (job) => {
       if (job.name === FISCAL_JOB.EMIT) {
         await service.process(job.data as FiscalEmitJobData)
+        return
+      }
+      if (job.name === FISCAL_JOB.DELIVER) {
+        await deliverUseCase.execute(job.data as FiscalDeliverJobData)
         return
       }
       if (job.name === FISCAL_JOB.SWEEP) {

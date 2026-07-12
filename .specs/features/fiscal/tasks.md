@@ -100,16 +100,16 @@ Legenda: ✅ feito · ⬜ a fazer · 🔗 depende de.
 
 ## Sprint D — Envio ao cliente
 
-### FISCAL-D1 ⬜ FiscalDeliveryProvider (interface) + Resend + SMTP
-- **Arquivos**: `providers/FiscalDeliveryProvider.interface.ts`, `ResendDeliveryProvider.ts`, `SmtpDeliveryProvider.ts`. Instalar `resend`, `nodemailer`.
-- **Aceite**: envia PDF/XML/link; escolha por `config.email_provider`; falha registra erro sem invalidar nota.
-- **Verificação**: teste com provider mock; envio real opcional em homologação.
+### FISCAL-D1 ✅ FiscalDeliveryProvider (interface) + Resend + SMTP
+- **Arquivos**: `delivery/FiscalDeliveryProvider.interface.ts` (+`buildFiscalDeliveryMessage/Subject`), `ResendDeliveryProvider.ts`, `SmtpDeliveryProvider.ts`. Deps `resend`, `nodemailer`.
+- **Aceite**: envia link `/nota/:token`; escolha por `config.email_provider`; provider não configurado ou falha → `{ok:false,error}` sem lançar. ✔
 
-### FISCAL-D2 ⬜ WhatsappN8nDeliveryProvider + DeliverFiscalDocumentUseCase
+### FISCAL-D2 ✅ WhatsappN8nDeliveryProvider + DeliverFiscalDocumentUseCase + job 'deliver'
 - 🔗 FISCAL-D1, FISCAL-B2
-- **Arquivos**: `WhatsappN8nDeliveryProvider.ts`, `DeliverFiscalDocumentUseCase.ts`; job 'deliver'.
-- **Aceite**: envia cupom+link via webhook n8n (`N8N_FISCAL_WEBHOOK_URL`); grava `deliveryStatus`.
-- **Verificação**: job 'deliver' processa após authorized.
+- **Arquivos**: `WhatsappN8nDeliveryProvider.ts` (POST n8n c/ timeout+abort), `DeliverFiscalDocumentUseCase.ts`; schema `delivery_status/delivered_at/delivery_error` (migration 0007); serviço enfileira 'deliver' após authorized (tolerante a falha); processor trata DELIVER.
+- **Aceite**: phone→WhatsApp, email→Resend/SMTP conforme config; grava `sent|partial|failed`+`deliveryError`; nunca lança (erro inesperado → grava `failed`).
+- **Verificação ao vivo (DB real, 6 asserts)**: seleção de canal, respeito ao emailProvider, partial/failed, no-contact→failed, pending→no-op, erro inesperado→failed sem throw. ✔
+- **Review**: 1 agente → blindado enqueue do deliver (não derruba emissão), `execute` try/catch grava failed, status tipado union, DRY do subject. **Follow-up**: re-envio automático é manual (endpoint futuro); n8n deve ser interno/HTTPS.
 
 ### FISCAL-D3 🟡 Página pública do cliente (token HMAC) — BACKEND ✅ / frontend ⬜
 - 🔗 FISCAL-B2
