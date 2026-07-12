@@ -7,7 +7,8 @@ import type { UpsertFiscalConfigUseCase } from '../../application/use-cases/Upse
 import type { TestFiscalConnectionUseCase } from '../../application/use-cases/TestFiscalConnectionUseCase'
 import type { RetryFiscalDocumentUseCase } from '../../application/use-cases/RetryFiscalDocumentUseCase'
 import { buildFiscalConfigFromDb } from '../../application/use-cases/TestFiscalConnectionUseCase'
-import { ValidationError, UnauthorizedError, UnprocessableError } from '@/shared/errors/AppError'
+import { verifyFiscalPublicToken } from '../../application/FiscalPublicToken'
+import { ValidationError, UnauthorizedError, UnprocessableError, NotFoundError } from '@/shared/errors/AppError'
 
 const upsertFiscalConfigSchema = z.object({
   model: z.enum(['sat', 'nfce', 'nfe', 'none']),
@@ -30,6 +31,8 @@ const upsertFiscalConfigSchema = z.object({
 const cancelFiscalDocumentSchema = z.object({
   justificativa: z.string().min(15).max(255),
 })
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const testConnectionSchema = z.object({
   model: z.enum(['sat', 'nfce', 'nfe']),
@@ -57,6 +60,41 @@ export class FiscalController {
     private readonly testConnectionUseCase: TestFiscalConnectionUseCase,
     private readonly retryUseCase: RetryFiscalDocumentUseCase
   ) {}
+
+  // Public (no auth) — the signed token is the authorization. Only authorized notes are exposed,
+  // metadata only (the full XML is a separate explicit download, not shipped on every view).
+  getPublicByToken: RouteHandler = async (request, response) => {
+    const document = await this.resolvePublicDocument(request.params['token'])
+
+    response.json({
+      status: document.status,
+      model: document.model,
+      numeroDocumento: document.numeroDocumento,
+      serie: document.serie,
+      chaveAcesso: document.chaveAcesso,
+      totalLiquido: document.totalLiquido,
+      qrCodeUrl: document.qrCodeUrl,
+      danfePdfUrl: document.danfePdfUrl,
+      hasXml: document.xmlAutorizado !== null,
+      authorizedAt: document.authorizedAt,
+    })
+  }
+
+  // Public XML download — explicit action by the token holder (their own fiscal note).
+  getPublicXml: RouteHandler = async (request, response) => {
+    const document = await this.resolvePublicDocument(request.params['token'])
+    if (!document.xmlAutorizado) throw new NotFoundError('Fiscal document')
+    response.json({ xml: document.xmlAutorizado, chaveAcesso: document.chaveAcesso })
+  }
+
+  private resolvePublicDocument = async (token: string | undefined) => {
+    const documentId = verifyFiscalPublicToken(token ?? '')
+    if (!documentId || !UUID_PATTERN.test(documentId)) throw new NotFoundError('Fiscal document')
+
+    const document = await this.getUseCase.findByIdPublic(documentId)
+    if (!document || document.status !== 'authorized') throw new NotFoundError('Fiscal document')
+    return document
+  }
 
   emit: RouteHandler = async (request, response) => {
     if (!request.user) throw new UnauthorizedError()

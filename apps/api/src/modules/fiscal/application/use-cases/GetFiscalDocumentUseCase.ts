@@ -32,6 +32,13 @@ export class GetFiscalDocumentUseCase {
     return doc
   }
 
+  // Unscoped lookup for public (token-authorized) access — no establishment filter.
+  async findByIdPublic(id: string) {
+    return this.db.query.fiscalDocuments.findFirst({
+      where: eq(schema.fiscalDocuments.id, id),
+    })
+  }
+
   async listByEstablishment(establishmentId: string, limit = 50) {
     return this.db.query.fiscalDocuments.findMany({
       where: eq(schema.fiscalDocuments.establishmentId, establishmentId),

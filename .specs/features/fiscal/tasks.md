@@ -111,11 +111,12 @@ Legenda: ✅ feito · ⬜ a fazer · 🔗 depende de.
 - **Aceite**: envia cupom+link via webhook n8n (`N8N_FISCAL_WEBHOOK_URL`); grava `deliveryStatus`.
 - **Verificação**: job 'deliver' processa após authorized.
 
-### FISCAL-D3 ⬜ Página pública do cliente (token HMAC)
+### FISCAL-D3 🟡 Página pública do cliente (token HMAC) — BACKEND ✅ / frontend ⬜
 - 🔗 FISCAL-B2
-- **Arquivos**: rotas públicas `GET /public/fiscal/:token(/pdf|/xml)`; `apps/web/src/pages/public/CustomerInvoicePage.tsx`.
-- **Aceite**: token HMAC (`FISCAL_PUBLIC_TOKEN_SECRET`) sem auth de usuário; PWA-first; QR/chave/downloads.
-- **Verificação**: link abre nota sem login; token inválido → 404.
+- **Backend ✅**: `FiscalPublicToken.ts` (HMAC-SHA256 create/verify, constant-time, `FISCAL_PUBLIC_TOKEN_SECRET`) + `GET /public/fiscal/:token` (metadata) e `/xml` (download), sem auth. `findByIdPublic` (sem escopo). 5 testes do token. ✔
+- **Hardening pós-review**: só expõe docs `authorized`; **metadata sem o XML** (XML só no endpoint explícito — evita vazar CNPJ/IE/CPF em toda carga); guarda UUID (evita 500). Não vaza establishmentId/erros.
+- **Falta**: `apps/web/src/pages/public/CustomerInvoicePage.tsx` (rota pública, PWA-first, QR/chave/downloads) + geração do link (usado no envio D2).
+- **Verificação**: `tsc` limpo, token 5/5. ⏳ E2E ao vivo pendente.
 
 ---
 

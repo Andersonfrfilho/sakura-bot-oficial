@@ -3,6 +3,10 @@ import { authenticate, authorize, internalAuth } from '@/infra/http/middlewares'
 import type { FiscalController } from './FiscalController'
 
 export function registerFiscalRoutes(router: Router, controller: FiscalController): void {
+  // Public (no auth) — customer views their note via a signed link token
+  router.get('/public/fiscal/:token', controller.getPublicByToken)
+  router.get('/public/fiscal/:token/xml', controller.getPublicXml)
+
   // Emit fiscal document for an order
   router.post(
     '/orders/:orderId/fiscal-document',
