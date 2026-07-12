@@ -118,6 +118,8 @@ import { GetFiscalDocumentUseCase } from '@/modules/fiscal/application/use-cases
 import { UpsertFiscalConfigUseCase } from '@/modules/fiscal/application/use-cases/UpsertFiscalConfigUseCase'
 import { TestFiscalConnectionUseCase } from '@/modules/fiscal/application/use-cases/TestFiscalConnectionUseCase'
 import { RetryFiscalDocumentUseCase } from '@/modules/fiscal/application/use-cases/RetryFiscalDocumentUseCase'
+import { PrintFiscalCupomUseCase } from '@/modules/fiscal/application/use-cases/PrintFiscalCupomUseCase'
+import { ThermalPrinterProvider } from '@/modules/fiscal/application/printing/ThermalPrinterProvider'
 import { FiscalController } from '@/modules/fiscal/infra/http/FiscalController'
 import { startFiscalWorker } from '@/modules/fiscal/application/workers/FiscalEmissionProcessor'
 import { startBullBoard } from '@/infra/queue/bullBoard'
@@ -326,13 +328,15 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const upsertFiscalConfigUseCase = new UpsertFiscalConfigUseCase(db)
   const testFiscalConnectionUseCase = new TestFiscalConnectionUseCase()
   const retryFiscalDocumentUseCase = new RetryFiscalDocumentUseCase(db, wsHub)
+  const printFiscalCupomUseCase = new PrintFiscalCupomUseCase(db, new ThermalPrinterProvider())
   const fiscalController = new FiscalController(
     emitFiscalDocumentUseCase,
     cancelFiscalDocumentUseCase,
     getFiscalDocumentUseCase,
     upsertFiscalConfigUseCase,
     testFiscalConnectionUseCase,
-    retryFiscalDocumentUseCase
+    retryFiscalDocumentUseCase,
+    printFiscalCupomUseCase
   )
 
   // Fiscal emission worker — opt-in per environment (consumes the BullMQ fiscal queue)

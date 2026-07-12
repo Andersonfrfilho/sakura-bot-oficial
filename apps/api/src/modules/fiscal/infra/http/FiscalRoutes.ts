@@ -31,6 +31,14 @@ export function registerFiscalRoutes(router: Router, controller: FiscalControlle
     controller.list
   )
 
+  // Print fiscal cupom (thermal printer)
+  router.post(
+    '/orders/:orderId/fiscal-document/print',
+    authenticate,
+    authorize('orders', 'write'),
+    controller.printCupom
+  )
+
   // Cancel fiscal document
   router.post(
     '/fiscal-documents/:id/cancel',

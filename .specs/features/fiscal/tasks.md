@@ -131,11 +131,12 @@ Legenda: ✅ feito · ⬜ a fazer · 🔗 depende de.
 - **⚠️ Follow-up (enhancement web.md §7)**: data-table rico — headers ordenáveis, seleção múltipla/ações em lote, estado na URL. Hoje é lista funcional com filtro local.
 - **Nota**: opencode travou 2× nesta task (multi-arquivo e single-file) → página escrita diretamente; wiring à mão.
 
-### FISCAL-E2 ⬜ Cupom fiscal + impressão ESC/POS
+### FISCAL-E2 ✅ Cupom fiscal + impressão ESC/POS
 - 🔗 FISCAL-B2
-- **Arquivos**: `providers/ThermalPrinterProvider.ts` (instalar `node-thermal-printer`); endpoint `POST /orders/:id/fiscal-document/print`; botão no dashboard.
-- **Aceite**: gera cupom (DANFCe já vem da lib) com QR/chave; imprime via TCP/USB.
-- **Verificação**: endpoint retorna 200; impressão simulada/loga ESC/POS.
+- **Arquivos**: `printing/PrinterProvider.interface.ts` (+`buildFiscalCupomText` puro/testável), `ThermalPrinterProvider.ts` (`node-thermal-printer`, EPSON, QR, `FISCAL_PRINTER_INTERFACE`), `PrintFiscalCupomUseCase.ts`; endpoint `POST /orders/:orderId/fiscal-document/print` (RBAC orders:write); container.
+- **Aceite**: monta cupom (razão social, CNPJ, itens, total, chave, QR) do doc autorizado; só imprime `authorized`; sem impressora configurada → `{ok:false}` (não quebra).
+- **Verificação ao vivo (DB real + printer mock)**: builder correto; use-case monta emitente/itens/total do doc+config+pedido; não-autorizado lança. ✔ Provider ESC/POS real precisa de hardware.
+- **Falta (UI, menor)**: botão "Imprimir" no dashboard de notas (E1) chamando o endpoint.
 
 ### FISCAL-E3 ✅ Toggle "Emitir NF" no CreateOrderModal + config Settings
 - 🔗 FISCAL-C1

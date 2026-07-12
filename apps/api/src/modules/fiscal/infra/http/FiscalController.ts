@@ -6,6 +6,7 @@ import type { GetFiscalDocumentUseCase } from '../../application/use-cases/GetFi
 import type { UpsertFiscalConfigUseCase } from '../../application/use-cases/UpsertFiscalConfigUseCase'
 import type { TestFiscalConnectionUseCase } from '../../application/use-cases/TestFiscalConnectionUseCase'
 import type { RetryFiscalDocumentUseCase } from '../../application/use-cases/RetryFiscalDocumentUseCase'
+import type { PrintFiscalCupomUseCase } from '../../application/use-cases/PrintFiscalCupomUseCase'
 import { buildFiscalConfigFromDb } from '../../application/use-cases/TestFiscalConnectionUseCase'
 import { verifyFiscalPublicToken } from '../../application/FiscalPublicToken'
 import { ValidationError, UnauthorizedError, UnprocessableError, NotFoundError } from '@/shared/errors/AppError'
@@ -60,8 +61,17 @@ export class FiscalController {
     private readonly getUseCase: GetFiscalDocumentUseCase,
     private readonly configUseCase: UpsertFiscalConfigUseCase,
     private readonly testConnectionUseCase: TestFiscalConnectionUseCase,
-    private readonly retryUseCase: RetryFiscalDocumentUseCase
+    private readonly retryUseCase: RetryFiscalDocumentUseCase,
+    private readonly printUseCase: PrintFiscalCupomUseCase
   ) {}
+
+  printCupom: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const orderId = request.params['orderId'] ?? ''
+    const result = await this.printUseCase.execute({ orderId, establishmentId: request.user.establishmentId })
+    if (!result.ok) throw new UnprocessableError(result.error ?? 'Falha ao imprimir o cupom')
+    response.json({ ok: true })
+  }
 
   // Public (no auth) — the signed token is the authorization. Only authorized notes are exposed,
   // metadata only (the full XML is a separate explicit download, not shipped on every view).
