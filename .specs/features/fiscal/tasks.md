@@ -68,11 +68,16 @@ Legenda: ✅ feito · ⬜ a fazer · 🔗 depende de.
 - **Verificação**: `tsc` limpo; lógica CAS revisada. ⏳ **teste ao vivo do worker pendente** (subir Redis: `make up`, então `FISCAL_WORKER_ENABLED=true`, emitir e observar pending→emitting→authorized).
 - **⚠️ Follow-ups anotados**: (a) graceful shutdown amplo (uWS listen socket + pool pg + Redis) — hoje só o worker é drenado (antes não havia shutdown algum); (b) checagem `config inativa` triplicada — extrair helper.
 
-### FISCAL-B3 ⬜ FiscalSweeper (repeatable job offline)
+### FISCAL-B3 ✅ FiscalSweeper (repeatable job offline) — versão SEGURA
 - 🔗 FISCAL-B2
-- **Arquivos**: `application/workers/FiscalSweeper.ts`; repeatable job (`FISCAL_SWEEP_INTERVAL_MS`).
-- **Aceite**: reenfileira `pending`/`emitting` presos e `rejected` por causa transitória; não toca `authorized`/`cancelled`/rejeição fatal.
-- **Verificação**: doc preso em pending volta a `authorized` após sweep com internet.
+- **Arquivos**: `application/workers/FiscalSweeper.ts`; repeatable job (`FISCAL_SWEEP_INTERVAL_MS`, default 120s); processor trata `SWEEP`; serviço/listener preservam o código de erro real (`extractFiscalErrorCode`).
+- **Aceite (revisado por agente — evita NOTA DUPLICADA)**:
+  - reenfileira `pending` (nunca enviados) + `rejected` cujo erro é **de conexão** (pré-envio, `SAFE_TO_REEMIT_CODES`) → seguro, sem duplicar.
+  - `emitting` preso (crash) → **não** reemite; marca `rejected/NEEDS_REVIEW` (revisão humana) pois pode ter chegado à SEFAZ.
+  - **timeout** ambíguo e rejeição fatal SEFAZ → **não** varridos.
+  - `orderBy createdAt asc` + `limit 100` (sem starvation); idempotência pelo claim atômico.
+- **Verificação**: `tsc` limpo. ⏳ ao vivo pendente (Redis).
+- **🚨 GATE DE PRODUÇÃO**: auto-recuperação de casos ambíguos (timeout após a SEFAZ receber) exige **consulta SEFAZ** (por chave/protocolo) antes de reemitir — precisa de suporte na lib. Documentado.
 
 ---
 

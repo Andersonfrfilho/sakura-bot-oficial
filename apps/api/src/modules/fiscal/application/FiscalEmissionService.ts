@@ -16,6 +16,18 @@ import { decryptSensitiveConfig } from './FiscalConfigCrypto'
 
 type Database = NodePgDatabase<typeof schema>
 
+// Extracts a stable code from a thrown emission error so the sweeper can tell connection-level
+// failures (safe to auto-retry) apart from ambiguous timeouts and fatal rejections.
+export function extractFiscalErrorCode(error: unknown): string {
+  if (typeof error === 'object' && error !== null) {
+    const candidate = error as { code?: unknown; errorCode?: unknown; name?: unknown }
+    if (typeof candidate.code === 'string') return candidate.code
+    if (typeof candidate.errorCode === 'string') return candidate.errorCode
+    if (typeof candidate.name === 'string') return candidate.name
+  }
+  return 'TRANSIENT_ERROR'
+}
+
 export class FiscalEmissionService {
   constructor(
     private readonly database: Database,
@@ -104,10 +116,12 @@ export class FiscalEmissionService {
       const errorMessage = error instanceof Error ? error.message : 'Unexpected error'
 
       // Transient failure (network/timeout): reset to 'pending' so the next BullMQ attempt
-      // can re-claim it. Do NOT broadcast REJECTED here — it is still retrying, not rejected.
+      // can re-claim it. Persist the error code so the sweeper can classify it (connection vs
+      // timeout). Do NOT broadcast REJECTED here — it is still retrying, not rejected.
       await this.database.update(schema.fiscalDocuments)
         .set({
           status: 'pending',
+          errorCode: extractFiscalErrorCode(error),
           errorMessage,
           lastAttemptAt: new Date(),
           updatedAt: new Date(),
