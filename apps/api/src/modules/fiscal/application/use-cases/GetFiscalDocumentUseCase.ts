@@ -39,6 +39,15 @@ export class GetFiscalDocumentUseCase {
     })
   }
 
+  // Emitter's public name (razão social) for the customer-facing receipt.
+  async findEstablishmentName(establishmentId: string): Promise<string | null> {
+    const config = await this.db.query.fiscalConfigurations.findFirst({
+      where: eq(schema.fiscalConfigurations.establishmentId, establishmentId),
+      columns: { razaoSocial: true },
+    })
+    return config?.razaoSocial ?? null
+  }
+
   async listByEstablishment(establishmentId: string, limit = 50) {
     return this.db.query.fiscalDocuments.findMany({
       where: eq(schema.fiscalDocuments.establishmentId, establishmentId),

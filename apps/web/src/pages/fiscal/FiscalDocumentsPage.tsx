@@ -88,6 +88,12 @@ export function FiscalDocumentsPage() {
     onError: () => window.alert('Falha ao cancelar a nota. Tente novamente.'),
   })
 
+  const printMutation = useMutation({
+    mutationFn: (orderId: string) =>
+      api.post(`/orders/${orderId}/fiscal-document/print`, {}, accessToken ?? undefined),
+    onError: () => window.alert('Não foi possível imprimir. Verifique a impressora.'),
+  })
+
   async function handleDownloadXml(documentId: string) {
     const response = await fetch(`${API_URL}/fiscal-documents/${documentId}/xml`, {
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
@@ -143,7 +149,15 @@ export function FiscalDocumentsPage() {
 
   return (
     <div className="p-4 md:p-6">
-      <h1 className="mb-4 text-2xl font-bold text-gray-900">Notas Fiscais</h1>
+      <div className="mb-5 flex items-center gap-3">
+        <span className="h-8 w-1.5 rounded-full bg-brand-500" />
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Notas Fiscais</h1>
+          <p className="text-sm text-gray-500">
+            {documents.length} {documents.length === 1 ? 'nota emitida' : 'notas emitidas'}
+          </p>
+        </div>
+      </div>
 
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-wrap gap-2">
@@ -241,6 +255,14 @@ export function FiscalDocumentsPage() {
                             className="text-blue-600 hover:underline"
                           >
                             XML
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => printMutation.mutate(doc.orderId)}
+                            disabled={printMutation.isPending}
+                            className="text-gray-600 hover:underline disabled:opacity-50"
+                          >
+                            Imprimir
                           </button>
                           <button
                             type="button"

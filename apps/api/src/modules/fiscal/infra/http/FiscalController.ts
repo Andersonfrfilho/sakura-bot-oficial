@@ -77,8 +77,10 @@ export class FiscalController {
   // metadata only (the full XML is a separate explicit download, not shipped on every view).
   getPublicByToken: RouteHandler = async (request, response) => {
     const document = await this.resolvePublicDocument(request.params['token'])
+    const razaoSocial = await this.getUseCase.findEstablishmentName(document.establishmentId)
 
     response.json({
+      razaoSocial,
       status: document.status,
       model: document.model,
       numeroDocumento: document.numeroDocumento,
