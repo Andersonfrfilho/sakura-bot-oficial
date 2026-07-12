@@ -116,12 +116,12 @@ CREATE TABLE IF NOT EXISTS "fiscal_documents" (
 	CONSTRAINT "fiscal_documents_chave_acesso_unique" UNIQUE("chave_acesso")
 );
 --> statement-breakpoint
-ALTER TABLE "categories" ADD COLUMN "ncm_code" varchar(8) DEFAULT '21069090';--> statement-breakpoint
-ALTER TABLE "categories" ADD COLUMN "cfop_code" varchar(4) DEFAULT '5102';--> statement-breakpoint
-ALTER TABLE "categories" ADD COLUMN "cst_icms" varchar(3) DEFAULT '400';--> statement-breakpoint
-ALTER TABLE "customers" ADD COLUMN "phone" varchar(20);--> statement-breakpoint
-ALTER TABLE "customers" ADD COLUMN "document" varchar(20);--> statement-breakpoint
-ALTER TABLE "customers" ADD COLUMN "birth_date" date;--> statement-breakpoint
+ALTER TABLE "categories" ADD COLUMN IF NOT EXISTS "ncm_code" varchar(8) DEFAULT '21069090';--> statement-breakpoint
+ALTER TABLE "categories" ADD COLUMN IF NOT EXISTS "cfop_code" varchar(4) DEFAULT '5102';--> statement-breakpoint
+ALTER TABLE "categories" ADD COLUMN IF NOT EXISTS "cst_icms" varchar(3) DEFAULT '400';--> statement-breakpoint
+ALTER TABLE "customers" ADD COLUMN IF NOT EXISTS "phone" varchar(20);--> statement-breakpoint
+ALTER TABLE "customers" ADD COLUMN IF NOT EXISTS "document" varchar(20);--> statement-breakpoint
+ALTER TABLE "customers" ADD COLUMN IF NOT EXISTS "birth_date" date;--> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "comandas" ADD CONSTRAINT "comandas_establishment_id_establishments_id_fk" FOREIGN KEY ("establishment_id") REFERENCES "public"."establishments"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
