@@ -1,6 +1,21 @@
-CREATE TYPE "public"."comanda_status" AS ENUM('open', 'closed', 'paid');--> statement-breakpoint
-CREATE TYPE "public"."fiscal_document_status" AS ENUM('pending', 'emitting', 'authorized', 'rejected', 'cancelled');--> statement-breakpoint
-CREATE TYPE "public"."fiscal_model" AS ENUM('sat', 'nfce', 'nfe', 'none');--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."comanda_status" AS ENUM('open', 'closed', 'paid');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."fiscal_document_status" AS ENUM('pending', 'emitting', 'authorized', 'rejected', 'cancelled');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."fiscal_model" AS ENUM('sat', 'nfce', 'nfe', 'none');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "comandas" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"establishment_id" uuid NOT NULL,

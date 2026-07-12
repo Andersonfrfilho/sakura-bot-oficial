@@ -9,6 +9,7 @@ export const customers = pgTable('customers', {
   name: varchar('name', { length: 255 }).notNull(),
   whatsappNumber: varchar('whatsapp_number', { length: 20 }).notNull(),
   phone: varchar('phone', { length: 20 }),
+  email: varchar('email', { length: 255 }),
   document: varchar('document', { length: 20 }),
   birthDate: date('birth_date'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

@@ -54,6 +54,7 @@ export class FiscalEmissionService {
       await this.database.update(schema.fiscalDocuments)
         .set({
           status: 'rejected',
+          errorCode: 'CONFIG_INACTIVE',
           errorMessage: 'Fiscal configuration not active for this establishment',
           updatedAt: new Date(),
         })

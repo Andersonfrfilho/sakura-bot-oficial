@@ -43,6 +43,13 @@
       "when": 1783815307821,
       "tag": "0005_short_doctor_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783817090938,
+      "tag": "0006_gifted_maddog",
+      "breakpoints": true
     }
   ]
 }
