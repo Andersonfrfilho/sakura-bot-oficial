@@ -187,11 +187,6 @@ INSERT INTO bot_settings (key, value, description, group_name) VALUES
   ('reminder_send_hour',       '12',         'Hora do dia (0-23) para disparar os lembretes',                        'general'),
   ('reminder_message_template','Olá, {name}! 😊 Faz {days} dias que você pediu {last_item}. Que saudade! Bora repetir? Digite *2* para pedir 🛒', 'Template do lembrete — variáveis: {name} {days} {last_item}', 'messages'),
   ('reservation_reminder_hour','10',          'Hora do dia (0-23) para disparar lembretes de reserva',               'general'),
-  ('chatwoot_url',        'http://chatwoot:3000', 'URL interna do Chatwoot (dentro do Docker)',                         'integrations'),
-  ('chatwoot_public_url', 'http://localhost:3010','URL pública do Chatwoot — link enviado ao agente',                   'integrations'),
-  ('chatwoot_account_id', '',                     'ID da conta Chatwoot (Settings → Account)',                          'integrations'),
-  ('chatwoot_api_token',  '',                     'Token do agente Chatwoot (Profile → Access Token)',                  'integrations'),
-  ('chatwoot_inbox_id',   '',                     'ID do inbox WhatsApp no Chatwoot',                                   'integrations'),
   ('agent_phone',         '',                     'Número WhatsApp do atendente para receber o link (ex: 5511999999999)', 'integrations')
 ON CONFLICT (key) DO NOTHING;
 
@@ -287,7 +282,6 @@ CREATE TABLE IF NOT EXISTS sessions (
   cart                     JSONB DEFAULT '{}',
   temp_data                JSONB DEFAULT '{}',
   reservation_temp         JSONB DEFAULT '{}',
-  chatwoot_conversation_id TEXT,
   last_activity_at         TIMESTAMPTZ DEFAULT now(),
   created_at               TIMESTAMPTZ DEFAULT now(),
   updated_at               TIMESTAMPTZ DEFAULT now(),

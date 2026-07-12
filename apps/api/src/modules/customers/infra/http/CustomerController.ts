@@ -8,6 +8,8 @@ import type { DeleteCustomerUseCase } from '../../application/use-cases/DeleteCu
 import { UnauthorizedError, ValidationError } from '@/shared/errors/AppError'
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+const CUSTOMER_SORT_FIELDS = ['name', 'orderCount', 'totalSpent', 'createdAt'] as const
+const SORT_DIRECTIONS = ['asc', 'desc'] as const
 
 const createSchema = z.object({
   name: z.string().min(2).max(255),
@@ -35,12 +37,16 @@ export class CustomerController {
 
   list: RouteHandler = async (request, response) => {
     if (!request.user) throw new UnauthorizedError()
-    const { page, pageSize, search } = request.query
+    const { page, pageSize, search, sortBy, sortDirection } = request.query
+    const validSortBy = CUSTOMER_SORT_FIELDS.find((field) => field === sortBy)
+    const validSortDirection = SORT_DIRECTIONS.find((direction) => direction === sortDirection)
     const result = await this.listCustomersUseCase.execute({
       establishmentId: request.user.establishmentId,
       page: page ? parseInt(page) : 1,
       pageSize: pageSize ? parseInt(pageSize) : 20,
       ...(search ? { search } : {}),
+      ...(validSortBy ? { sortBy: validSortBy } : {}),
+      ...(validSortDirection ? { sortDirection: validSortDirection } : {}),
     })
     response.json(result)
   }

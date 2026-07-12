@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { RouteHandler } from '@/infra/http/router'
 import type { CreateOrderUseCase } from '../../application/use-cases/CreateOrderUseCase'
 import type { UpdateOrderStatusUseCase } from '../../application/use-cases/UpdateOrderStatusUseCase'
+import type { UpdateOrderNotesUseCase } from '../../application/use-cases/UpdateOrderNotesUseCase'
 import type { GetOrderUseCase } from '../../application/use-cases/GetOrderUseCase'
 import type { ListOrdersUseCase } from '../../application/use-cases/ListOrdersUseCase'
 import { ValidationError, UnauthorizedError } from '@/shared/errors/AppError'
@@ -21,6 +22,7 @@ const createOrderSchema = z.object({
   type: z.enum(['delivery', 'pickup', 'table']),
   items: z.array(orderItemSchema).min(1),
   notes: z.string().max(1000).optional(),
+  fiscalEnabled: z.boolean().optional(),
   whatsappMessageId: z.string().max(255).optional(),
 })
 
@@ -29,10 +31,15 @@ const updateStatusSchema = z.object({
   cancellationReason: z.string().max(500).optional(),
 })
 
+const updateNotesSchema = z.object({
+  notes: z.string().max(1000).nullable(),
+})
+
 export class OrderController {
   constructor(
     private readonly createOrderUseCase: CreateOrderUseCase,
     private readonly updateStatusUseCase: UpdateOrderStatusUseCase,
+    private readonly updateNotesUseCase: UpdateOrderNotesUseCase,
     private readonly getOrderUseCase: GetOrderUseCase,
     private readonly listOrdersUseCase: ListOrdersUseCase
   ) {}
@@ -82,6 +89,20 @@ export class OrderController {
       establishmentId: request.user.establishmentId,
       newStatus: parsed.data.status,
       cancellationReason: parsed.data.cancellationReason,
+    })
+    response.json(order)
+  }
+
+  updateNotes: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const parsed = updateNotesSchema.safeParse(request.body)
+    if (!parsed.success) {
+      throw new ValidationError('Validation failed', parsed.error.flatten().fieldErrors)
+    }
+    const order = await this.updateNotesUseCase.execute({
+      orderId: request.params['id']!,
+      establishmentId: request.user.establishmentId,
+      notes: parsed.data.notes,
     })
     response.json(order)
   }

@@ -5,14 +5,17 @@ import { KitchenPage } from '@/pages/kitchen/KitchenPage'
 import { DeliveryPage } from '@/pages/delivery/DeliveryPage'
 import { CashierPage } from '@/pages/cashier/CashierPage'
 import { OrdersPage } from '@/pages/orders/OrdersPage'
+import { ConversationsPage } from '@/pages/conversations/ConversationsPage'
 import { CustomersPage } from '@/pages/customers/CustomersPage'
 import { TablesPage } from '@/pages/tables/TablesPage'
 import { StaffPage } from '@/pages/staff/StaffPage'
 import { CatalogPage } from '@/pages/catalog/CatalogPage'
 import { ReportsPage } from '@/pages/reports/ReportsPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
+import { FiscalDocumentsPage } from '@/pages/fiscal/FiscalDocumentsPage'
 import { ChangePasswordPage } from '@/pages/auth/ChangePasswordPage'
 import { ComandaConfirmPage } from '@/pages/comanda/ComandaConfirmPage'
+import { CustomerInvoicePage } from '@/pages/public/CustomerInvoicePage'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { MobileNav } from '@/components/layout/MobileNav'
 import { AuthGuard, RoleGuard } from '@/components/layout/RoleGuard'
@@ -79,6 +82,22 @@ export default function App() {
             }
           />
           <Route
+            path="/conversations"
+            element={
+              <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.ATTENDANT]}>
+                <ConversationsPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/fiscal"
+            element={
+              <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.CASHIER]}>
+                <FiscalDocumentsPage />
+              </RoleGuard>
+            }
+          />
+          <Route
             path="/tables"
             element={
               <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.ATTENDANT]}>
@@ -130,6 +149,7 @@ export default function App() {
 
         {/* Rota pública — sem autenticação */}
         <Route path="/comanda/:code" element={<ComandaConfirmPage />} />
+        <Route path="/nota/:token" element={<CustomerInvoicePage />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -59,6 +59,7 @@ export function CreateOrderModal({ onClose }: { onClose: () => void }) {
   const [selectedTable, setSelectedTable] = useState<TableWithComanda | null>(null)
   const [cart, setCart] = useState<CartItem[]>([])
   const [globalNotes, setGlobalNotes] = useState('')
+  const [requiresFiscal, setRequiresFiscal] = useState(false)
   const [search, setSearch] = useState('')
   const [activeCat, setActiveCat] = useState<string | null>(null)
 
@@ -126,6 +127,8 @@ export function CreateOrderModal({ onClose }: { onClose: () => void }) {
     : allCategories
 
   function handleSubmit() {
+    const notes = globalNotes || undefined
+
     const body = {
       channel: 'manual' as const,
       type: orderType,
@@ -137,7 +140,8 @@ export function CreateOrderModal({ onClose }: { onClose: () => void }) {
         quantity: i.quantity,
         ...(i.notes ? { notes: i.notes } : {}),
       })),
-      ...(globalNotes ? { notes: globalNotes } : {}),
+      fiscalEnabled: requiresFiscal,
+      ...(notes ? { notes } : {}),
     }
     mutation.mutate(body)
   }
@@ -437,6 +441,18 @@ export function CreateOrderModal({ onClose }: { onClose: () => void }) {
                 <span className="font-semibold text-gray-900">Total</span>
                 <span className="text-lg font-bold text-brand-600">{formatBRL(total)}</span>
               </div>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-t border-gray-100">
+              <span className="text-sm text-gray-700">Cliente solicitou Nota Fiscal?</span>
+              <button
+                onClick={() => setRequiresFiscal((prev) => !prev)}
+                className={`relative w-11 h-6 rounded-full transition-colors ${requiresFiscal ? 'bg-brand-600' : 'bg-gray-200'}`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${requiresFiscal ? 'translate-x-5' : 'translate-x-0'}`}
+                />
+              </button>
             </div>
 
             <div>

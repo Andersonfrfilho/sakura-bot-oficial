@@ -138,4 +138,7 @@ O arquivo `dados/processos.md` é injetado como contexto do modelo de IA (Groq/L
 - Adicionar instruções sobre alergênicos, promoções, políticas
 - Definir quando transferir para atendente humano
 
-Veja [`handoff.md`](handoff.md) para as regras de transferência.
+A transferência para atendimento humano é feita pelo próprio Order Hub Web (`/conversations`), que
+recebe o pedido de handoff do n8n (nós "Filtrar Handoff Humano" → "Solicitar Atendimento Humano" em
+`n8n/workflows/01-receber-mensagem.json`) e registra/loga toda a conversa nas tabelas
+`conversation_sessions`/`conversation_messages` do `apps/api`.

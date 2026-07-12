@@ -112,8 +112,8 @@ let save_customer_name              = false;
 let customerNameToSave: string | null = null;
 let save_marketing_opt_in           = false;
 let marketing_opt_in_value: boolean | null = null;
-let create_chatwoot_conversation    = false;
-let chatwootCustomerName            = '';
+let request_human_handoff            = false;
+let handoffCustomerName              = '';
 
 // Usado pelos handlers para retorno antecipado (evita top-level return)
 let _earlyResponse: N8nResponsePayload | null = null;
@@ -435,8 +435,8 @@ function buildPayload(): N8nResponsePayload {
     save_customer_name, customer_name_to_save: customerNameToSave,
     save_marketing_opt_in, marketing_opt_in_value,
     kitchen_phone: kitchenPhone,
-    create_chatwoot_conversation,
-    chatwoot_customer_name: chatwootCustomerName,
+    request_human_handoff,
+    handoff_customer_name: handoffCustomerName,
   };
 }
 

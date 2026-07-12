@@ -9,6 +9,9 @@ interface Category {
   slug: string
   active: boolean
   sortOrder: number
+  ncmCode?: string
+  cfopCode?: string
+  cstIcms?: string
 }
 
 interface Product {
@@ -32,10 +35,13 @@ type ProductFormData = {
 type CategoryFormData = {
   name: string
   sortOrder: string
+  ncmCode: string
+  cfopCode: string
+  cstIcms: string
 }
 
 const EMPTY_PRODUCT: ProductFormData = { name: '', description: '', price: '', categoryId: '', sortOrder: '0' }
-const EMPTY_CATEGORY: CategoryFormData = { name: '', sortOrder: '0' }
+const EMPTY_CATEGORY: CategoryFormData = { name: '', sortOrder: '0', ncmCode: '', cfopCode: '', cstIcms: '' }
 
 function formatBRL(value: string | number) {
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -130,7 +136,13 @@ export function CatalogPage() {
 
   function openEditCat(cat: Category) {
     setSelectedCat(cat)
-    setCatForm({ name: cat.name, sortOrder: String(cat.sortOrder) })
+    setCatForm({
+      name: cat.name,
+      sortOrder: String(cat.sortOrder),
+      ncmCode: cat.ncmCode ?? '',
+      cfopCode: cat.cfopCode ?? '',
+      cstIcms: cat.cstIcms ?? '',
+    })
     setCatError(null)
     setCatModal('edit')
   }
@@ -152,6 +164,9 @@ export function CatalogPage() {
     const body = {
       name: catForm.name,
       sortOrder: parseInt(catForm.sortOrder) || 0,
+      ncmCode: catForm.ncmCode || undefined,
+      cfopCode: catForm.cfopCode || undefined,
+      cstIcms: catForm.cstIcms || undefined,
     }
     if (catModal === 'create') createCat.mutate(body)
     else if (catModal === 'edit' && selectedCat) updateCat.mutate({ id: selectedCat.id, body })
@@ -408,6 +423,44 @@ export function CatalogPage() {
                       onChange={(e) => setCatForm((prev) => ({ ...prev, sortOrder: e.target.value }))}
                       className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
+                  </div>
+                  <div className="border-t border-gray-100 pt-3">
+                    <p className="text-xs font-medium text-gray-500 mb-2">Tributação fiscal (consultar contador)</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">NCM</label>
+                        <input
+                          type="text"
+                          value={catForm.ncmCode}
+                          onChange={(e) => setCatForm((prev) => ({ ...prev, ncmCode: e.target.value }))}
+                          placeholder="21069090"
+                          maxLength={8}
+                          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">CFOP</label>
+                        <input
+                          type="text"
+                          value={catForm.cfopCode}
+                          onChange={(e) => setCatForm((prev) => ({ ...prev, cfopCode: e.target.value }))}
+                          placeholder="5102"
+                          maxLength={4}
+                          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">CST ICMS</label>
+                        <input
+                          type="text"
+                          value={catForm.cstIcms}
+                          onChange={(e) => setCatForm((prev) => ({ ...prev, cstIcms: e.target.value }))}
+                          placeholder="400"
+                          maxLength={3}
+                          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </>
               )}

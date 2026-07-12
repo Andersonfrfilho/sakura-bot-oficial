@@ -24,6 +24,7 @@ interface CreateOrderInput {
   type: OrderType
   items: CreateOrderItemInput[]
   notes?: string
+  fiscalEnabled?: boolean
   whatsappMessageId?: string
 }
 
@@ -62,6 +63,7 @@ export class CreateOrderUseCase {
         status: 'received',
         totalAmount: totalAmount.toFixed(2),
         notes: input.notes ?? null,
+        fiscalEnabled: input.fiscalEnabled ?? true,
         whatsappMessageId: input.whatsappMessageId ?? null,
       })
       .returning()

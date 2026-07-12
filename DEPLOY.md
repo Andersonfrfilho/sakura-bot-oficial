@@ -48,7 +48,7 @@ Crie sua conta em: https://hetzner.com/cloud
 | Plano | Mensalidade sugerida | Inclui |
 |---|---|---|
 | Essencial | R$ 399/mês | 1 número WhatsApp, cardápio, pedidos, FAQ com IA |
-| Profissional | R$ 699/mês | + Atendente humano (Chatwoot), notificações de status, relatórios (Metabase) |
+| Profissional | R$ 699/mês | + Atendente humano (Order Hub), notificações de status, relatórios (Metabase) |
 | Premium | R$ 1.199/mês | + Setup personalizado, suporte prioritário, dados/processos personalizados |
 
 **Taxa de setup:** R$ 800–1.500 (cobre onboarding + personalização do cardápio/FAQ/regras).
@@ -117,11 +117,6 @@ AUTHENTICATION_JWT_SECRET=jwt-secret-longo
 # IA (obter em console.groq.com)
 GROQ_API_KEY=gsk_xxxx
 
-# Chatwoot
-SECRET_KEY_BASE=string-aleatoria-64-chars
-CHATWOOT_ADMIN_EMAIL=admin@seudominio.com.br
-CHATWOOT_ADMIN_PASSWORD=SenhaForte123!
-
 # Directus
 DIRECTUS_SECRET=string-aleatoria-longa
 DIRECTUS_ADMIN_EMAIL=admin@seudominio.com.br
@@ -131,7 +126,6 @@ DIRECTUS_ADMIN_PASSWORD=SenhaForte123!
 N8N_HOST=n8n.seudominio.com.br
 N8N_WEBHOOK_URL=https://n8n.seudominio.com.br
 TYPEBOT_URL=https://bot.seudominio.com.br
-CHATWOOT_URL=https://chat.seudominio.com.br
 DIRECTUS_URL=https://admin.seudominio.com.br
 ```
 
@@ -158,7 +152,6 @@ Esse comando:
 3. Importa cardápio, categorias e FAQ
 4. Configura o n8n (owner, credenciais, workflows, ativação)
 5. Configura o Directus (admin)
-6. Configura o Chatwoot (admin, account, inbox, salva token no banco)
 
 Aguarde a mensagem: `Ambiente pronto! Acesse os serviços com 'make help'.`
 
@@ -193,7 +186,7 @@ Serviços após o deploy:
 | Evolution API | `:8081/manager` | Gerenciar instância WhatsApp |
 | n8n | `:5678` | Ver/editar workflows |
 | Directus | `:8055` | Painel admin (cardápio, config) |
-| Chatwoot | `:3010` | Atendimento humano |
+| Order Hub Web | `:4000` | Atendimento humano |
 | Metabase | `:4100` | Dashboards e relatórios |
 | Adminer | `:8181` | Acesso direto ao banco |
 
@@ -276,6 +269,6 @@ docker exec postgres pg_dump -U botuser botdb > backup-$(date +%Y%m%d).sql
 |---|---|---|
 | Bot não responde | WhatsApp desconectado | Reescaneie QR em `:8081/manager` |
 | `make all` falha no n8n-import | n8n ainda inicializando | `make n8n-import` após 2 minutos |
-| Chatwoot não abre | Container ainda subindo | Aguarde 2-3 min após `make up` |
+| Order Hub Web não abre | Container ainda subindo | Aguarde 2-3 min após `make up` |
 | IA respondendo errado | `processos.md` desatualizado | Edite `dados/processos.md` e reinicie n8n |
 | Pedido não chega | Webhook Evolution → n8n | `make logs` e verifique n8n recebendo eventos |

@@ -136,9 +136,6 @@ interface EstablishmentConfig {
   feature_pedido_mesa: boolean;
   kitchen_phone: string | null;
   agent_phone: string | null;
-  chatwoot_account_id: string | null;
-  chatwoot_api_token: string | null;
-  chatwoot_inbox_id: string | null;
   reminder_interval_days: number;
   reminder_min_gap_days: number;
   reminder_send_hour: number;

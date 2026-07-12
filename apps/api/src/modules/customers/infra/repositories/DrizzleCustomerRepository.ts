@@ -1,35 +1,49 @@
-import { eq, count, ilike, or, desc, and, sum, max, min, getTableColumns } from 'drizzle-orm'
+import { eq, count, ilike, or, asc, desc, and, sum, max, min, getTableColumns, type SQL } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
-import type { CustomerRepository, CustomerWithStats, CustomerDetails, CreateCustomerInput, UpdateCustomerInput } from '../../domain/repositories/CustomerRepository'
+import type {
+  CustomerRepository,
+  CustomerWithStats,
+  CustomerDetails,
+  CreateCustomerInput,
+  UpdateCustomerInput,
+  ListCustomersByEstablishmentParams,
+  CustomerSortField,
+  SortDirection,
+} from '../../domain/repositories/CustomerRepository'
 import * as schema from '@/infra/database/schema'
 import type { Customer } from '@/infra/database/schema'
+
+function buildCustomerOrderBy(sortBy: CustomerSortField, sortDirection: SortDirection): SQL {
+  const direction = sortDirection === 'asc' ? asc : desc
+  if (sortBy === 'name') return direction(schema.customers.name)
+  if (sortBy === 'orderCount') return direction(count(schema.orders.id))
+  if (sortBy === 'totalSpent') return direction(sum(schema.orders.totalAmount))
+  return direction(schema.customers.createdAt)
+}
 
 export class DrizzleCustomerRepository implements CustomerRepository {
   constructor(private readonly db: NodePgDatabase<typeof schema>) {}
 
-  async listByEstablishment(
-    establishmentId: string,
-    page = 1,
-    pageSize = 20,
-    search?: string
-  ): Promise<{
+  async listByEstablishment(params: ListCustomersByEstablishmentParams): Promise<{
     data: CustomerWithStats[]
     total: number
     page: number
     pageSize: number
     totalPages: number
   }> {
+    const page = params.page ?? 1
+    const pageSize = params.pageSize ?? 20
     const offset = (page - 1) * pageSize
 
-    const searchCondition = search
+    const searchCondition = params.search
       ? or(
-          ilike(schema.customers.name, `%${search}%`),
-          ilike(schema.customers.whatsappNumber, `%${search}%`)
+          ilike(schema.customers.name, `%${params.search}%`),
+          ilike(schema.customers.whatsappNumber, `%${params.search}%`)
         )
       : undefined
 
     const whereClause = and(
-      eq(schema.customers.establishmentId, establishmentId),
+      eq(schema.customers.establishmentId, params.establishmentId),
       searchCondition
     )
 
@@ -56,7 +70,7 @@ export class DrizzleCustomerRepository implements CustomerRepository {
         )
         .where(whereClause)
         .groupBy(schema.customers.id)
-        .orderBy(desc(schema.customers.createdAt))
+        .orderBy(buildCustomerOrderBy(params.sortBy ?? 'createdAt', params.sortDirection ?? 'desc'))
         .limit(pageSize)
         .offset(offset),
     ])

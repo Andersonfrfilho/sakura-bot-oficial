@@ -51,6 +51,6 @@ interface N8nResponsePayload {
   save_marketing_opt_in: boolean;
   marketing_opt_in_value: boolean | null;
   kitchen_phone: string;
-  create_chatwoot_conversation: boolean;
-  chatwoot_customer_name: string;
+  request_human_handoff: boolean;
+  handoff_customer_name: string;
 }

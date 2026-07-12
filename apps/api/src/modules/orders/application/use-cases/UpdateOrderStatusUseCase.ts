@@ -8,6 +8,7 @@ import { NotFoundError, UnprocessableError } from '@/shared/errors/AppError'
 import { canTransitionTo } from '../../domain/entities/Order'
 import { MessagesConstants } from '@/shared/constants/MessagesConstants'
 import type { OrderStatus } from '@/shared/types'
+import type { TriggerFiscalEmissionUseCase } from '@/modules/fiscal/application/use-cases/TriggerFiscalEmissionUseCase'
 
 type Database = NodePgDatabase<typeof schema>
 
@@ -22,7 +23,8 @@ interface UpdateStatusInput {
 export class UpdateOrderStatusUseCase {
   constructor(
     private readonly db: Database,
-    private readonly wsHub: WebSocketHub
+    private readonly wsHub: WebSocketHub,
+    private readonly triggerFiscal?: TriggerFiscalEmissionUseCase
   ) {}
 
   async execute(input: UpdateStatusInput) {
@@ -68,6 +70,13 @@ export class UpdateOrderStatusUseCase {
       previousStatus: order.status,
       newStatus: input.newStatus,
     })
+
+    // Fire-and-forget: a fiscal hiccup must never block the order status change.
+    if (input.newStatus === 'completed' && this.triggerFiscal) {
+      this.triggerFiscal
+        .execute({ orderId: input.orderId, establishmentId: input.establishmentId, event: 'on_completed' })
+        .catch((error) => console.error('[Fiscal] trigger on_completed failed', error))
+    }
 
     return updated!
   }

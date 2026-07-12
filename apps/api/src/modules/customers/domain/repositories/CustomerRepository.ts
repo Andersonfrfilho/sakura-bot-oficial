@@ -33,13 +33,20 @@ export interface UpdateCustomerInput {
   birthDate?: string | null
 }
 
+export type CustomerSortField = 'name' | 'orderCount' | 'totalSpent' | 'createdAt'
+export type SortDirection = 'asc' | 'desc'
+
+export interface ListCustomersByEstablishmentParams {
+  establishmentId: string
+  page?: number
+  pageSize?: number
+  search?: string
+  sortBy?: CustomerSortField
+  sortDirection?: SortDirection
+}
+
 export interface CustomerRepository {
-  listByEstablishment(
-    establishmentId: string,
-    page?: number,
-    pageSize?: number,
-    search?: string
-  ): Promise<{
+  listByEstablishment(params: ListCustomersByEstablishmentParams): Promise<{
     data: CustomerWithStats[]
     total: number
     page: number

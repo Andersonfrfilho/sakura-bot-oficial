@@ -2,7 +2,7 @@
 # Contém apenas o necessário para o webhook da Meta funcionar em produção:
 # n8n (recebe webhook + orquestra) + postgres + redis
 #
-# Para o stack completo local (chatwoot, typebot, directus, metabase):
+# Para o stack completo local (order-hub, typebot, directus, metabase):
 #   cd infra && docker compose up
 
 services:

@@ -88,7 +88,7 @@ WhatsApp ───────►│  Webhook POST → n8n                      
                                │
                     ┌──────────┼──────────┐
                     ▼          ▼          ▼
-                 Typebot    Groq IA    Chatwoot
+                 Typebot    Groq IA    Order Hub
                (fluxos)   (dúvidas)  (humano)
                     │
                     ▼
@@ -96,7 +96,7 @@ WhatsApp ───────►│  Webhook POST → n8n                      
 ```
 
 **Stack mínimo para webhook funcionar:** n8n + postgres + redis (no `docker-compose.yml` da raiz).
-**Stack completo para produção:** + chatwoot + typebot + directus + metabase (em `infra/docker-compose.yml`).
+**Stack completo para produção:** + order-hub + typebot + directus + metabase (em `infra/docker-compose.yml`).
 
 ---
 
@@ -192,7 +192,7 @@ make test-msg   # simula mensagem: MSG="oi" TEL=5511999999999
 |---|---|
 | n8n (webhook + workflows) | http://localhost:5678 |
 | Directus (painel admin) | http://localhost:8055 |
-| Chatwoot (atendimento humano) | http://localhost:3010 |
+| Order Hub Web (atendimento humano) | http://localhost:4000 |
 | Typebot Builder | http://localhost:3001 |
 | Metabase (dashboards) | http://localhost:4100 |
 | Adminer (banco de dados) | http://localhost:8181 |

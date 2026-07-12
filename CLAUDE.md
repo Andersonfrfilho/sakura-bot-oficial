@@ -32,8 +32,8 @@ WhatsApp → Meta Cloud API (hospedado pela Meta)
             PostgreSQL [:5432]
                   ↓
      ┌────────────┴────────────┐
-  Chatwoot [:3010]       Directus [:8055]
-  (atendente humano)     (painel admin)
+ Order Hub Web [:4000]   Directus [:8055]
+ (atendente humano)      (painel admin)
 ```
 
 Não há Evolution API neste projeto. O n8n recebe webhooks diretamente da Meta.
@@ -157,7 +157,7 @@ make test-msg   # simula mensagem: MSG="oi" TEL=5511999999999
 
 - n8n: http://localhost:5678
 - Directus: http://localhost:8055
-- Chatwoot: http://localhost:3010
+- Order Hub Web: http://localhost:4000
 - Typebot Builder: http://localhost:3001
 - Metabase: http://localhost:4100
 - Adminer: http://localhost:8181
