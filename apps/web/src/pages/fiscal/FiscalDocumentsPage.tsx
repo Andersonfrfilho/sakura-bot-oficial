@@ -102,7 +102,8 @@ export function FiscalDocumentsPage() {
       window.alert('Não foi possível baixar o XML.')
       return
     }
-    const blob = await response.blob()
+    const data = (await response.json()) as { xml: string }
+    const blob = new Blob([data.xml], { type: 'application/xml' })
     const objectUrl = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = objectUrl
@@ -120,7 +121,8 @@ export function FiscalDocumentsPage() {
       if (term.length === 0) return true
       const chave = doc.chaveAcesso?.toLowerCase() ?? ''
       const numero = String(doc.numeroDocumento ?? '')
-      return chave.includes(term) || numero.includes(term)
+      const orderId = doc.orderId.toLowerCase()
+      return chave.includes(term) || numero.includes(term) || orderId.includes(term)
     })
   }, [documents, statusFilter, search])
 
@@ -247,7 +249,9 @@ export function FiscalDocumentsPage() {
                               PDF
                             </a>
                           ) : (
-                            <span className="text-gray-300">PDF</span>
+                            <span className="text-gray-300" title="Geração de PDF ainda não disponível para este documento">
+                              PDF
+                            </span>
                           )}
                           <button
                             type="button"
