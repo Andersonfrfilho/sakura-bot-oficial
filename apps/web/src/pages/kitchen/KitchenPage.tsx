@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { useWebSocket } from '@/hooks/useWebSocket'
+import { ORDER_CHANNEL_LABELS, ORDER_TYPE_LABELS } from '@/constants/orderLabels'
 
 interface OrderItem {
   id: string
@@ -43,7 +44,8 @@ function OrderCard({ order, onAdvance }: { order: KitchenOrder; onAdvance: (id: 
     <div className={`bg-white rounded-xl shadow-sm border-l-4 ${SLA_COLORS[order.slaStatus]} p-4 flex flex-col gap-3`}>
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold uppercase tracking-wide text-gray-400">
-          {order.channel} · {order.type}
+          {ORDER_CHANNEL_LABELS[order.channel] ?? order.channel} ·{' '}
+          {ORDER_TYPE_LABELS[order.type as keyof typeof ORDER_TYPE_LABELS] ?? order.type}
         </span>
         <span className={`text-sm font-semibold ${SLA_AGE_COLORS[order.slaStatus]}`}>
           {order.ageMinutes}min

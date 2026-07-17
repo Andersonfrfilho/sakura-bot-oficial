@@ -3,9 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { useWebSocket } from '@/hooks/useWebSocket'
+import {
+  ORDER_STATUS_LABELS,
+  ORDER_STATUS_COLORS,
+  ORDER_CHANNEL_LABELS,
+  ORDER_TYPE_LABELS,
+  type OrderStatus,
+} from '@/constants/orderLabels'
 import { CreateOrderModal } from './CreateOrderModal'
-
-type OrderStatus = 'received' | 'in_production' | 'ready' | 'in_delivery' | 'picked_up' | 'completed' | 'cancelled'
 
 interface Order {
   id: string
@@ -37,26 +42,6 @@ interface FiscalDoc {
   errorCode: string | null
   errorMessage: string | null
   danfePdfUrl: string | null
-}
-
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  received: 'Recebido',
-  in_production: 'Em preparo',
-  ready: 'Pronto',
-  in_delivery: 'Em entrega',
-  picked_up: 'Retirado',
-  completed: 'Concluído',
-  cancelled: 'Cancelado',
-}
-
-const STATUS_COLORS: Record<OrderStatus, string> = {
-  received: 'bg-blue-100 text-blue-800',
-  in_production: 'bg-yellow-100 text-yellow-800',
-  ready: 'bg-green-100 text-green-800',
-  in_delivery: 'bg-purple-100 text-purple-800',
-  picked_up: 'bg-indigo-100 text-indigo-800',
-  completed: 'bg-gray-100 text-gray-600',
-  cancelled: 'bg-red-100 text-red-700',
 }
 
 const FISCAL_STATUS_LABELS: Record<FiscalDocStatus, string> = {
@@ -234,13 +219,15 @@ export function OrdersPage() {
           return (
             <div key={order.id} className="bg-white rounded-xl shadow-sm p-4">
               <div className="flex items-start justify-between mb-2">
-                <div>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[order.status]}`}>
-                    {STATUS_LABELS[order.status]}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ORDER_STATUS_COLORS[order.status]}`}>
+                    {ORDER_STATUS_LABELS[order.status]}
                   </span>
-                  <span className="ml-2 text-xs text-gray-400 uppercase">{order.channel} · {order.type}</span>
+                  <span className="text-xs text-gray-400 uppercase">
+                    {ORDER_CHANNEL_LABELS[order.channel] ?? order.channel} · {ORDER_TYPE_LABELS[order.type as keyof typeof ORDER_TYPE_LABELS] ?? order.type}
+                  </span>
                   {fiscalDoc && (
-                    <span className={`ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${FISCAL_STATUS_COLORS[fiscalDoc.status]}`}>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${FISCAL_STATUS_COLORS[fiscalDoc.status]}`}>
                       NF: {FISCAL_STATUS_LABELS[fiscalDoc.status]}
                     </span>
                   )}
@@ -363,7 +350,7 @@ export function OrdersPage() {
                       onClick={() => handleAdvance(order.id, next)}
                       className="px-3 py-1.5 bg-brand-600 text-white text-xs font-semibold rounded-lg hover:bg-brand-700 transition-colors active:scale-95"
                     >
-                      → {STATUS_LABELS[next]}
+                      → {ORDER_STATUS_LABELS[next]}
                     </button>
                   )}
                 </div>

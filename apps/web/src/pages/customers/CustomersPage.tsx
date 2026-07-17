@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ORDER_CHANNEL_LABELS, type OrderStatus } from '@/constants/orderLabels'
 
 interface Customer {
   id: string
@@ -27,8 +28,6 @@ interface CustomersResponse {
   totalPages: number
 }
 
-type OrderStatus = 'received' | 'in_production' | 'ready' | 'in_delivery' | 'picked_up' | 'completed' | 'cancelled'
-
 interface CustomerDetails {
   customer: Customer
   stats: {
@@ -47,25 +46,6 @@ interface CustomerDetails {
   }>
 }
 
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  received: 'Recebido',
-  in_production: 'Em preparo',
-  ready: 'Pronto',
-  in_delivery: 'Em entrega',
-  picked_up: 'Retirado',
-  completed: 'Concluído',
-  cancelled: 'Cancelado',
-}
-
-const STATUS_COLORS: Record<OrderStatus, string> = {
-  received: 'bg-blue-100 text-blue-800',
-  in_production: 'bg-yellow-100 text-yellow-800',
-  ready: 'bg-green-100 text-green-800',
-  in_delivery: 'bg-purple-100 text-purple-800',
-  picked_up: 'bg-indigo-100 text-indigo-800',
-  completed: 'bg-gray-100 text-gray-600',
-  cancelled: 'bg-red-100 text-red-700',
-}
 
 function formatWhatsApp(number: string) {
   const n = number.replace(/\D/g, '')
@@ -549,10 +529,10 @@ function CustomerDetailPanel({
                   <div key={order.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[order.status]}`}>
-                          {STATUS_LABELS[order.status]}
+                        <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${ORDER_STATUS_COLORS[order.status]}`}>
+                          {ORDER_STATUS_LABELS[order.status]}
                         </span>
-                        <span className="text-xs text-gray-400 capitalize">{order.channel}</span>
+                        <span className="text-xs text-gray-400">{ORDER_CHANNEL_LABELS[order.channel] ?? order.channel}</span>
                       </div>
                       <p className="text-xs text-gray-400">{formatDateTime(order.receivedAt)}</p>
                     </div>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
+import { ORDER_CHANNEL_LABELS, ORDER_TYPE_LABELS, ORDER_STATUS_LABELS } from '@/constants/orderLabels'
 
 interface DailyBreakdown {
   day: number
@@ -24,28 +25,6 @@ interface MonthlyReport {
   byPaymentMethod: Array<{ method: string; total: string }>
   topProducts: Array<{ productName: string; quantity: number; revenue: string }>
   dailyBreakdown: DailyBreakdown[]
-}
-
-const CHANNEL_LABELS: Record<string, string> = {
-  whatsapp: 'WhatsApp',
-  ifood: 'iFood',
-  manual: 'Manual',
-}
-
-const TYPE_LABELS: Record<string, string> = {
-  delivery: 'Entrega',
-  pickup: 'Retirada',
-  table: 'Mesa',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  received: 'Recebido',
-  in_production: 'Em preparo',
-  ready: 'Pronto',
-  in_delivery: 'Em entrega',
-  picked_up: 'Retirado',
-  completed: 'Concluído',
-  cancelled: 'Cancelado',
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -220,7 +199,7 @@ export function ReportsPage() {
                 <div className="space-y-2">
                   {report.byChannel.map((r) => (
                     <div key={r.channel} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{CHANNEL_LABELS[r.channel] ?? r.channel}</span>
+                      <span className="text-gray-600">{ORDER_CHANNEL_LABELS[r.channel] ?? r.channel}</span>
                       <div className="text-right">
                         <p className="font-semibold text-gray-900">{formatBRL(r.revenue)}</p>
                         <p className="text-xs text-gray-400">{r.count} pedidos</p>
@@ -240,7 +219,9 @@ export function ReportsPage() {
                 <div className="space-y-2">
                   {report.byType.map((r) => (
                     <div key={r.type} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{TYPE_LABELS[r.type] ?? r.type}</span>
+                      <span className="text-gray-600">
+                  {ORDER_TYPE_LABELS[r.type as keyof typeof ORDER_TYPE_LABELS] ?? r.type}
+                </span>
                       <div className="text-right">
                         <p className="font-semibold text-gray-900">{formatBRL(r.revenue)}</p>
                         <p className="text-xs text-gray-400">{r.count} pedidos</p>
@@ -309,7 +290,9 @@ export function ReportsPage() {
               {report.byStatus.map((r) => (
                 <div key={r.status} className="text-center">
                   <p className="text-2xl font-bold text-gray-900">{r.count}</p>
-                  <p className="text-xs text-gray-400">{STATUS_LABELS[r.status] ?? r.status}</p>
+                  <p className="text-xs text-gray-400">
+                {ORDER_STATUS_LABELS[r.status as keyof typeof ORDER_STATUS_LABELS] ?? r.status}
+              </p>
                 </div>
               ))}
             </div>

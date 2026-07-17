@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
+import { ORDER_TYPE_LABELS, type OrderType } from '@/constants/orderLabels'
 
 interface Product {
   id: string
@@ -36,14 +37,6 @@ interface CartItem {
   unitPrice: number
   quantity: number
   notes: string
-}
-
-type OrderType = 'table' | 'delivery' | 'pickup'
-
-const TYPE_LABELS: Record<OrderType, string> = {
-  table: 'Mesa',
-  delivery: 'Entrega',
-  pickup: 'Retirada',
 }
 
 function formatBRL(value: number | string) {
@@ -186,7 +179,7 @@ export function CreateOrderModal({ onClose }: { onClose: () => void }) {
                   <div className="text-2xl mb-1">
                     {t === 'table' ? '🪑' : t === 'delivery' ? '🛵' : '🏃'}
                   </div>
-                  {TYPE_LABELS[t]}
+                  {ORDER_TYPE_LABELS[t]}
                 </button>
               ))}
             </div>
@@ -358,7 +351,7 @@ export function CreateOrderModal({ onClose }: { onClose: () => void }) {
             <div className="w-64 flex-shrink-0 flex flex-col">
               <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
                 <p className="text-sm font-semibold text-gray-700">
-                  {orderType === 'table' && selectedTable ? `Mesa ${selectedTable.number}` : TYPE_LABELS[orderType]}
+                  {orderType === 'table' && selectedTable ? `Mesa ${selectedTable.number}` : ORDER_TYPE_LABELS[orderType]}
                   {selectedTable?.comanda && (
                     <span className="ml-1.5 text-xs font-mono text-brand-500">{selectedTable.comanda.code}</span>
                   )}
@@ -421,7 +414,7 @@ export function CreateOrderModal({ onClose }: { onClose: () => void }) {
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-semibold text-gray-700">Resumo</p>
                 <span className="text-xs px-2 py-1 bg-brand-100 text-brand-700 rounded-full font-medium">
-                  {TYPE_LABELS[orderType]}
+                  {ORDER_TYPE_LABELS[orderType]}
                   {selectedTable && ` · Mesa ${selectedTable.number}`}
                   {selectedTable?.comanda && ` · ${selectedTable.comanda.code}`}
                 </span>
