@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3333'
 
@@ -35,17 +36,21 @@ function formatDate(value: string | null): string {
 // paper edges, a sakura petal mark, and monospace fiscal codes. Sakura pink is the app's brand.
 const receiptStyles = `
   .cupom-shell { background: radial-gradient(120% 80% at 50% 0%, #fdf2f8 0%, #fbe9f2 45%, #f7f5f6 100%); }
-  .cupom { position: relative; filter: drop-shadow(0 24px 40px rgba(190, 24, 93, 0.12)); }
-  .cupom::before, .cupom::after {
-    content: ''; position: absolute; left: 0; right: 0; height: 14px;
-    background-image: radial-gradient(circle at 8px 0, transparent 7px, #ffffff 8px);
-    background-size: 16px 14px; background-repeat: repeat-x;
+  .cupom {
+    position: relative; background: #fff;
+    filter: drop-shadow(0 18px 34px rgba(190, 24, 93, 0.13));
+    --sc: 13px;
+    -webkit-mask:
+      radial-gradient(circle at 50% 0, #0000 var(--sc), #000 calc(var(--sc) + 0.5px)) top / calc(var(--sc) * 2.6) 51% repeat-x,
+      radial-gradient(circle at 50% 100%, #0000 var(--sc), #000 calc(var(--sc) + 0.5px)) bottom / calc(var(--sc) * 2.6) 51% repeat-x;
+    mask:
+      radial-gradient(circle at 50% 0, #0000 var(--sc), #000 calc(var(--sc) + 0.5px)) top / calc(var(--sc) * 2.6) 51% repeat-x,
+      radial-gradient(circle at 50% 100%, #0000 var(--sc), #000 calc(var(--sc) + 0.5px)) bottom / calc(var(--sc) * 2.6) 51% repeat-x;
   }
-  .cupom::before { top: -13px; transform: scaleY(-1); }
-  .cupom::after { bottom: -13px; }
   .cupom-rule { height: 2px; background-image: linear-gradient(90deg, #f0d4e2 60%, transparent 0);
     background-size: 10px 2px; background-repeat: repeat-x; }
   .petal { width: 34px; height: 34px; color: #ec4899; }
+  .qr-frame { border: 1px solid #fbe0ec; border-radius: 14px; padding: 12px; background: #fff; line-height: 0; }
   @media (prefers-reduced-motion: no-preference) {
     .cupom { animation: cupom-in 520ms cubic-bezier(.2,.7,.2,1) both; }
     @keyframes cupom-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
@@ -152,7 +157,23 @@ export function CustomerInvoicePage() {
                 </p>
               </div>
 
-              <div className="mt-7 flex flex-col gap-2.5">
+              {data.qrCodeUrl && (
+                <div className="mt-7 flex flex-col items-center gap-2">
+                  <div className="qr-frame">
+                    <QRCodeSVG value={data.qrCodeUrl} size={132} level="M" fgColor="#1f1620" bgColor="#ffffff" />
+                  </div>
+                  <a
+                    href={data.qrCodeUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-medium text-gray-400 underline decoration-dotted underline-offset-4 hover:text-brand-600"
+                  >
+                    Consultar na SEFAZ
+                  </a>
+                </div>
+              )}
+
+              <div className="mt-6 flex flex-col gap-2.5">
                 {data.danfePdfUrl && (
                   <a
                     href={data.danfePdfUrl}
@@ -171,16 +192,6 @@ export function CustomerInvoicePage() {
                   >
                     Baixar XML
                   </button>
-                )}
-                {data.qrCodeUrl && (
-                  <a
-                    href={data.qrCodeUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-1 text-center text-xs font-medium text-gray-400 underline decoration-dotted underline-offset-4 hover:text-brand-600"
-                  >
-                    Consultar na SEFAZ
-                  </a>
                 )}
               </div>
 
