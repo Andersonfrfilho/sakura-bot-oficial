@@ -1,16 +1,40 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { NAV_ITEMS } from '@/constants/navigation'
 
+const TRANSITION_MS = 200
+
 export function MobileNav() {
   const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [visible, setVisible] = useState(false)
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
 
   const visibleItems = NAV_ITEMS.filter(
     (item) => !item.roles || (user && item.roles.includes(user.role))
   )
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true)
+      const frame = requestAnimationFrame(() => setVisible(true))
+      return () => cancelAnimationFrame(frame)
+    }
+    setVisible(false)
+    const timeout = setTimeout(() => setMounted(false), TRANSITION_MS)
+    return () => clearTimeout(timeout)
+  }, [open])
+
+  useEffect(() => {
+    if (!mounted) return
+    function handleKeyDown(event: KeyboardEvent): void {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [mounted])
 
   return (
     <>
@@ -24,10 +48,19 @@ export function MobileNav() {
         <div className="w-6" />
       </header>
 
-      {open && (
+      {mounted && (
         <div className="md:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-gray-900 text-white flex flex-col">
+          <div
+            className={`absolute inset-0 bg-black/50 transition-opacity motion-reduce:transition-none duration-200 ${
+              visible ? 'opacity-100' : 'opacity-0'
+            }`}
+            onClick={() => setOpen(false)}
+          />
+          <aside
+            className={`absolute left-0 top-0 bottom-0 w-64 bg-gray-900 text-white flex flex-col transition-transform motion-reduce:transition-none duration-200 ${
+              visible ? 'translate-x-0' : '-translate-x-full'
+            }`}
+          >
             <div className="flex items-center justify-between p-4 border-b border-gray-700">
               <h1 className="font-bold text-lg">Order Hub</h1>
               <button onClick={() => setOpen(false)} className="p-1">

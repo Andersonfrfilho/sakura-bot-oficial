@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ORDER_CHANNEL_LABELS, type OrderStatus } from '@/constants/orderLabels'
+import { Modal } from '@/components/ui/Modal'
+import { Skeleton, SkeletonList } from '@/components/ui/Skeleton'
 
 interface Customer {
   id: string
@@ -256,7 +258,7 @@ export function CustomersPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {isLoading ? (
-                  <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400">Carregando...</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-6"><SkeletonList rows={4} rowClassName="h-12 w-full" /></td></tr>
                 ) : data?.data.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-10 text-center text-gray-400">
@@ -364,16 +366,7 @@ export function CustomersPage() {
         </div>
       )}
 
-      {/* Modal criar / editar */}
-      {modalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <h2 className="font-semibold text-gray-900">
-                {modalMode === 'create' ? 'Novo cliente' : 'Editar cliente'}
-              </h2>
-              <button onClick={() => setModalMode(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
-            </div>
+      <Modal open={modalMode !== null} onClose={() => setModalMode(null)} title={modalMode === 'create' ? 'Novo cliente' : 'Editar cliente'}>
             <div className="p-5 space-y-4">
               <Field label="Nome *" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="Nome completo" />
               {modalMode === 'create' && (
@@ -396,30 +389,25 @@ export function CustomersPage() {
                 {formLoading ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {/* Modal confirmar exclusão */}
-      {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="font-semibold text-gray-900 mb-2">Excluir cliente?</h2>
-            <p className="text-sm text-gray-500 mb-5">Esta ação não pode ser desfeita. O histórico de pedidos permanece.</p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setDeleteConfirmId(null)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
-                Cancelar
-              </button>
-              <button
-                onClick={() => void handleDelete(deleteConfirmId)}
-                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors active:scale-95"
-              >
-                Excluir
-              </button>
+      <Modal open={deleteConfirmId !== null} onClose={() => setDeleteConfirmId(null)} size="sm">
+            <div className="p-6">
+              <h2 className="font-semibold text-gray-900 mb-2">Excluir cliente?</h2>
+              <p className="text-sm text-gray-500 mb-5">Esta ação não pode ser desfeita. O histórico de pedidos permanece.</p>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setDeleteConfirmId(null)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => deleteConfirmId && void handleDelete(deleteConfirmId)}
+                  className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors active:scale-95"
+                >
+                  Excluir
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   )
 }
@@ -462,7 +450,10 @@ function CustomerDetailPanel({
       </div>
 
       {isLoading ? (
-        <div className="p-6 text-center text-gray-400 text-sm">Carregando...</div>
+        <div className="p-4 space-y-3">
+          <Skeleton className="h-12 w-12 rounded-full" />
+          <SkeletonList rows={3} rowClassName="h-8 w-full" />
+        </div>
       ) : !details ? null : (
         <div className="p-4 space-y-5">
           <div className="flex items-start gap-3">

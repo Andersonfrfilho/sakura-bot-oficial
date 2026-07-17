@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { Select } from '@/components/ui/Select'
+import { Modal } from '@/components/ui/Modal'
+import { Skeleton } from '@/components/ui/Skeleton'
 
 interface StaffMember {
   id: string
@@ -164,7 +166,19 @@ export function StaffPage() {
         </button>
       </div>
 
-      {isLoading && <p className="text-gray-400 text-center py-12">Carregando...</p>}
+      {isLoading && (
+        <div className="grid gap-3">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4">
+              <Skeleton className="w-10 h-10 rounded-full flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid gap-3">
         {staff.map((member) => (
@@ -237,20 +251,21 @@ export function StaffPage() {
         )}
       </div>
 
-      {/* Modal */}
-      {modal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <h2 className="font-semibold text-gray-900">
-                {modal === 'create' && 'Novo funcionário'}
-                {modal === 'edit' && `Editar · ${selected?.name}`}
-                {modal === 'reset-password' && `Redefinir senha · ${selected?.name}`}
-                {modal === 'delete' && 'Confirmar exclusão'}
-              </h2>
-              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
-            </div>
-
+      <Modal
+        open={modal !== null}
+        onClose={closeModal}
+        title={
+          modal === 'create'
+            ? 'Novo funcionário'
+            : modal === 'edit'
+            ? `Editar · ${selected?.name}`
+            : modal === 'reset-password'
+            ? `Redefinir senha · ${selected?.name}`
+            : modal === 'delete'
+            ? 'Confirmar exclusão'
+            : undefined
+        }
+      >
             <div className="p-5 space-y-4">
               {modal === 'delete' ? (
                 <p className="text-sm text-gray-600">
@@ -352,9 +367,7 @@ export function StaffPage() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   )
 }

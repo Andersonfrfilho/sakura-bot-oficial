@@ -6,6 +6,7 @@ import { api, ApiError } from '@/lib/api'
 import { ConversationListItem } from './components/ConversationListItem'
 import { MessageBubble } from './components/MessageBubble'
 import { MessageComposer } from './components/MessageComposer'
+import { Modal } from '@/components/ui/Modal'
 
 interface ConversationMessage {
   id: string
@@ -622,30 +623,28 @@ export function ConversationsPage() {
         </div>
       )}
 
-      {mediaPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setMediaPreview(null)}>
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-4" onClick={(event) => event.stopPropagation()}>
-            <div className="flex justify-end mb-2">
-              <button onClick={() => setMediaPreview(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
-            </div>
-            {mediaPreview.mimeType.startsWith('image/') ? (
-              <img src={`data:${mediaPreview.mimeType};base64,${mediaPreview.base64}`} alt="" className="max-w-full max-h-[70vh] mx-auto rounded-lg" />
-            ) : mediaPreview.mimeType.startsWith('audio/') ? (
-              <audio controls src={`data:${mediaPreview.mimeType};base64,${mediaPreview.base64}`} className="w-full" />
-            ) : mediaPreview.mimeType.startsWith('video/') ? (
-              <video controls src={`data:${mediaPreview.mimeType};base64,${mediaPreview.base64}`} className="max-w-full max-h-[70vh] mx-auto rounded-lg" />
-            ) : (
-              <a
-                href={`data:${mediaPreview.mimeType};base64,${mediaPreview.base64}`}
-                download
-                className="text-brand-600 underline text-sm"
-              >
-                Baixar arquivo
-              </a>
-            )}
+      <Modal open={mediaPreview !== null} onClose={() => setMediaPreview(null)} size="lg">
+        <div className="p-4">
+          <div className="flex justify-end mb-2">
+            <button onClick={() => setMediaPreview(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
           </div>
+          {mediaPreview?.mimeType.startsWith('image/') ? (
+            <img src={`data:${mediaPreview.mimeType};base64,${mediaPreview.base64}`} alt="" className="max-w-full max-h-[70vh] mx-auto rounded-lg" />
+          ) : mediaPreview?.mimeType.startsWith('audio/') ? (
+            <audio controls src={`data:${mediaPreview.mimeType};base64,${mediaPreview.base64}`} className="w-full" />
+          ) : mediaPreview?.mimeType.startsWith('video/') ? (
+            <video controls src={`data:${mediaPreview.mimeType};base64,${mediaPreview.base64}`} className="max-w-full max-h-[70vh] mx-auto rounded-lg" />
+          ) : mediaPreview ? (
+            <a
+              href={`data:${mediaPreview.mimeType};base64,${mediaPreview.base64}`}
+              download
+              className="text-brand-600 underline text-sm"
+            >
+              Baixar arquivo
+            </a>
+          ) : null}
         </div>
-      )}
+      </Modal>
     </div>
   )
 }

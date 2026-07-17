@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { Select } from '@/components/ui/Select'
+import { Modal } from '@/components/ui/Modal'
 
 interface Category {
   id: string
@@ -224,6 +225,11 @@ export function CatalogPage() {
 
   const uncategorizedCount = allProducts.filter((p) => p.categoryId === null).length
 
+  const catModalTitle =
+    catModal === 'create' ? 'Nova categoria' : catModal === 'edit' ? `Editar · ${selectedCat?.name}` : 'Excluir categoria'
+  const prodModalTitle =
+    prodModal === 'create' ? 'Novo produto' : prodModal === 'edit' ? `Editar · ${selectedProd?.name}` : 'Excluir produto'
+
   return (
     <div className="flex h-full min-h-screen">
       {/* Left panel — categories */}
@@ -387,17 +393,7 @@ export function CatalogPage() {
       </div>
 
       {/* Category modal */}
-      {catModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <h2 className="font-semibold text-gray-900">
-                {catModal === 'create' && 'Nova categoria'}
-                {catModal === 'edit' && `Editar · ${selectedCat?.name}`}
-                {catModal === 'delete' && 'Excluir categoria'}
-              </h2>
-              <button onClick={closeCatModal} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
-            </div>
+      <Modal open={catModal !== null} onClose={closeCatModal} title={catModalTitle} size="sm">
             <div className="p-5 space-y-4">
               {catModal === 'delete' ? (
                 <p className="text-sm text-gray-600">
@@ -477,22 +473,10 @@ export function CatalogPage() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* Product modal */}
-      {prodModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <h2 className="font-semibold text-gray-900">
-                {prodModal === 'create' && 'Novo produto'}
-                {prodModal === 'edit' && `Editar · ${selectedProd?.name}`}
-                {prodModal === 'delete' && 'Excluir produto'}
-              </h2>
-              <button onClick={closeProdModal} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
-            </div>
+      <Modal open={prodModal !== null} onClose={closeProdModal} title={prodModalTitle} size="md">
             <div className="p-5 space-y-4">
               {prodModal === 'delete' ? (
                 <p className="text-sm text-gray-600">
@@ -570,9 +554,7 @@ export function CatalogPage() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   )
 }

@@ -11,6 +11,7 @@ import {
   type OrderStatus,
 } from '@/constants/orderLabels'
 import { CreateOrderModal } from './CreateOrderModal'
+import { Skeleton } from '@/components/ui/Skeleton'
 
 interface Order {
   id: string
@@ -210,7 +211,20 @@ export function OrdersPage() {
         </div>
       )}
 
-      {isLoading && <div className="text-gray-400 text-center py-12">Carregando pedidos...</div>}
+      {isLoading && (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className="bg-white rounded-xl shadow-sm p-4">
+              <div className="flex items-start justify-between mb-2">
+                <Skeleton className="h-5 w-24 rounded-full" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+              <Skeleton className="h-4 w-2/3 mb-2" />
+              <Skeleton className="h-4 w-1/3" />
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="space-y-3">
         {orders.map((order) => {
