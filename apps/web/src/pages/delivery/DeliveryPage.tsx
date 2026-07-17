@@ -7,6 +7,7 @@ interface DeliveryOrder {
   id: string
   status: 'pending' | 'dispatched' | 'delivered' | 'failed'
   addressSnapshot: Record<string, string>
+  deliverer: { id: string; name: string } | null
   order: {
     id: string
     totalAmount: string
@@ -70,6 +71,12 @@ export function DeliveryPage() {
             <div className="text-xs text-gray-500 mb-3">
               {delivery.order.items.map((item) => `${item.quantity}× ${item.productName}`).join(', ')}
             </div>
+
+            {delivery.deliverer && (
+              <div className="text-xs text-gray-500 mb-3">
+                Entregador: <span className="font-medium text-gray-700">{delivery.deliverer.name}</span>
+              </div>
+            )}
 
             <div className="flex gap-2">
               {delivery.status === 'pending' && (

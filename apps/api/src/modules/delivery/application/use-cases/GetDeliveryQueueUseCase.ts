@@ -8,12 +8,19 @@ export class GetDeliveryQueueUseCase {
   constructor(private readonly db: Database) {}
 
   async execute(establishmentId: string) {
-    return this.db.query.deliveries.findMany({
+    const rows = await this.db.query.deliveries.findMany({
       where: and(
         eq(schema.deliveries.establishmentId, establishmentId),
         inArray(schema.deliveries.status, ['pending', 'dispatched'])
       ),
-      with: { order: { with: { items: true } } },
+      with: { order: { with: { items: true } }, deliverer: true },
     })
+
+    return rows.map((delivery) => ({
+      ...delivery,
+      deliverer: delivery.deliverer
+        ? { id: delivery.deliverer.id, name: delivery.deliverer.name }
+        : null,
+    }))
   }
 }
