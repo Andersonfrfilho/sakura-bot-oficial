@@ -51,9 +51,16 @@ barato em seguida).
   prioridade fiscal. 🔗 T0.1 (para não conflitar).
 - ⬜ **T1.3** (UX-DSN-04) Garantir arquivos de tema (`theme.constant.ts`,
   `spacing.constant.ts`, `scale.util.ts`) e usar nas telas tocadas daqui em diante.
-- ⬜ **T1.4** (UX-DSN-05) Base de animações: transições de modal/painel,
+- ✅ **T1.4** (UX-DSN-05) Base de animações: transições de modal/painel,
   skeleton loaders, feedback press/hover, `prefers-reduced-motion`. Decidir
   CSS puro vs framer-motion (bundle) e padronizar.
+  - Feito: `Modal.tsx`/`Skeleton.tsx` (CSS puro, `motion-safe`/`motion-reduce`,
+    ESC + backdrop click); migrados StaffPage, CustomersPage, TablesPage,
+    CatalogPage, CreateOrderModal e lightbox de ConversationsPage; skeleton
+    loaders em StaffPage/CustomersPage/TablesPage/OrdersPage; drawer do
+    MobileNav com slide+fade. Pendente: animação de mudança de status do
+    Badge (sem componente Badge compartilhado ainda — fora de escopo desta
+    passada).
 
 ## Fase 2 — Pedidos completos (maior valor de negócio)
 > 🤖 Modelo: `sonnet`
