@@ -4,11 +4,6 @@ import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { FiscalSettingsPage } from './FiscalSettingsPage'
 
-interface Setting {
-  key: string
-  value: unknown
-}
-
 const KNOWN_SETTINGS: Array<{ key: string; label: string; type: 'text' | 'number' | 'boolean'; description?: string }> = [
   { key: 'business_name', label: 'Nome do estabelecimento', type: 'text' },
   { key: 'whatsapp_number', label: 'Número WhatsApp', type: 'text', description: 'Formato: 5511999999999' },
@@ -38,17 +33,18 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { data: settings = [], isLoading } = useQuery({
+  const { data: settings = {}, isLoading } = useQuery({
     queryKey: ['settings'],
-    queryFn: () => api.get<Setting[]>('/settings', accessToken ?? undefined),
+    queryFn: () => api.get<Record<string, unknown>>('/settings', accessToken ?? undefined),
     enabled: tab === 'gerais',
   })
 
   useEffect(() => {
-    if (settings.length > 0) {
+    const keys = Object.keys(settings)
+    if (keys.length > 0) {
       const map: Record<string, string> = {}
-      for (const s of settings) {
-        map[s.key] = toString(s.value)
+      for (const key of keys) {
+        map[key] = toString(settings[key])
       }
       setValues(map)
     }
@@ -82,8 +78,7 @@ export function SettingsPage() {
   function getValue(key: string, type: 'text' | 'number' | 'boolean'): string {
     const v = values[key]
     if (v !== undefined) return v
-    const existing = settings.find((s) => s.key === key)
-    if (existing) return toString(existing.value)
+    if (key in settings) return toString(settings[key])
     return type === 'boolean' ? 'false' : ''
   }
 

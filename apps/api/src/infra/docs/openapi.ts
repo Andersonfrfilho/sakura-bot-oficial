@@ -773,17 +773,12 @@ export function generateOpenAPISpec(): OpenAPIV3_1.Document {
           security: [{ bearerAuth: [] }],
           responses: {
             '200': {
-              description: 'Lista de configurações',
+              description: 'Mapa de configurações (chave → valor)',
               content: {
                 'application/json': {
                   schema: {
                     type: 'object',
-                    properties: {
-                      settings: {
-                        type: 'array',
-                        items: { $ref: '#/components/schemas/Setting' },
-                      },
-                    },
+                    additionalProperties: true,
                   },
                 },
               },
