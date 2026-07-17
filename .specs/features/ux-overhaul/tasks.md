@@ -45,8 +45,17 @@ barato em seguida).
 ## Fase 1 — Design System base (pré-requisito das telas novas)
 > 🤖 Modelo: `sonnet` para T1.1/T1.4 (componente e animações); `haiku` para T1.2/T1.3 (passes mecânicos)
 
-- ⬜ **T1.1** (UX-DSN-01) Criar `components/ui/Select.tsx` (single/multi, busca,
+- ✅ **T1.1** (UX-DSN-01) Criar `components/ui/Select.tsx` (single/multi, busca,
   teclado, tokens do tema) + migrar selects existentes tela a tela.
+  - Feito: componente já existia com single/multi-select, busca, navegação por
+    teclado (setas/Enter/Escape), fechamento por clique-fora e ARIA
+    (`listbox`/`option`) completos, usando classes Tailwind semânticas
+    (`brand-*`/`gray-*`/`red-*`, sem hex arbitrário). Já em uso em
+    CashierPage, FiscalSettingsPage, CatalogPage, StaffPage e ReportsPage;
+    confirmado por grep que não resta nenhum `<select>` nativo no codebase —
+    migração já concluída. Corrigido apenas `COLORS.brand` em
+    `theme.constant.ts` (T1.3), que estava com valores índigo divergentes da
+    paleta `brand` real definida em `tailwind.config.ts` (rosa/magenta).
 - ✅ **T1.2** (UX-DSN-02) Passe de ícones (lucide-react) nas telas atuais;
   prioridade fiscal. 🔗 T0.1 (para não conflitar).
   - Feito: FiscalDocumentsPage (download, imprimir, cancelar, reprocessar),
