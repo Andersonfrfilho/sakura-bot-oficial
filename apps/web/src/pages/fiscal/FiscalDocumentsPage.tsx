@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { useWebSocket } from '@/hooks/useWebSocket'
+import { Receipt, FileDown, Printer, Trash2, RefreshCw, X } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3333'
 
@@ -152,7 +153,7 @@ export function FiscalDocumentsPage() {
   return (
     <div className="p-4 md:p-6">
       <div className="mb-5 flex items-center gap-3">
-        <span className="h-8 w-1.5 rounded-full bg-brand-500" />
+        <Receipt className="h-8 w-8 text-brand-500" />
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Notas Fiscais</h1>
           <p className="text-sm text-gray-500">
@@ -181,8 +182,9 @@ export function FiscalDocumentsPage() {
             <button
               type="button"
               onClick={handleClearFilters}
-              className="rounded-full px-3 py-1 text-sm font-medium text-red-600 hover:bg-red-50"
+              className="flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium text-red-600 hover:bg-red-50"
             >
+              <X className="h-4 w-4" />
               Limpar filtros
             </button>
           )}
@@ -244,36 +246,41 @@ export function FiscalDocumentsPage() {
                               href={doc.danfePdfUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-blue-600 hover:underline"
+                              className="flex items-center gap-1 text-blue-600 hover:underline"
                             >
+                              <FileDown className="h-4 w-4" />
                               PDF
                             </a>
                           ) : (
-                            <span className="text-gray-300" title="Geração de PDF ainda não disponível para este documento">
+                            <span className="flex items-center gap-1 text-gray-300" title="Geração de PDF ainda não disponível para este documento">
+                              <FileDown className="h-4 w-4" />
                               PDF
                             </span>
                           )}
                           <button
                             type="button"
                             onClick={() => handleDownloadXml(doc.id)}
-                            className="text-blue-600 hover:underline"
+                            className="flex items-center gap-1 text-blue-600 hover:underline"
                           >
+                            <FileDown className="h-4 w-4" />
                             XML
                           </button>
                           <button
                             type="button"
                             onClick={() => printMutation.mutate(doc.orderId)}
                             disabled={printMutation.isPending}
-                            className="text-gray-600 hover:underline disabled:opacity-50"
+                            className="flex items-center gap-1 text-gray-600 hover:underline disabled:opacity-50"
                           >
+                            <Printer className="h-4 w-4" />
                             Imprimir
                           </button>
                           <button
                             type="button"
                             onClick={() => handleCancel(doc.id)}
                             disabled={cancelMutation.isPending}
-                            className="text-red-600 hover:underline disabled:opacity-50"
+                            className="flex items-center gap-1 text-red-600 hover:underline disabled:opacity-50"
                           >
+                            <Trash2 className="h-4 w-4" />
                             Cancelar
                           </button>
                         </>
@@ -283,9 +290,10 @@ export function FiscalDocumentsPage() {
                           type="button"
                           onClick={() => retryMutation.mutate(doc.id)}
                           disabled={retryMutation.isPending}
-                          className="text-amber-600 hover:underline disabled:opacity-50"
+                          className="flex items-center gap-1 text-amber-600 hover:underline disabled:opacity-50"
                           title={doc.errorMessage ?? undefined}
                         >
+                          <RefreshCw className="h-4 w-4" />
                           Reprocessar
                         </button>
                       )}

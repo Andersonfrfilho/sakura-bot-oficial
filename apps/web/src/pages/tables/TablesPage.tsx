@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { Modal } from '@/components/ui/Modal'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 
 type TableStatus = 'available' | 'occupied' | 'reserved'
 
@@ -154,9 +155,10 @@ export function TablesPage() {
         </div>
         <button
           onClick={openCreate}
-          className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors active:scale-95 self-start sm:self-auto"
+          className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors active:scale-95 self-start sm:self-auto"
         >
-          + Nova mesa
+          <Plus className="h-4 w-4" />
+          Nova mesa
         </button>
       </div>
 

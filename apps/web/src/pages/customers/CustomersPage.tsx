@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ORDER_CHANNEL_LABELS, type OrderStatus } from '@/constants/orderLabels'
 import { Modal } from '@/components/ui/Modal'
 import { Skeleton, SkeletonList } from '@/components/ui/Skeleton'
+import { Plus, Pencil, Trash2, MessageSquare } from 'lucide-react'
 
 interface Customer {
   id: string
@@ -237,9 +238,10 @@ export function CustomersPage() {
             />
             <button
               onClick={openCreate}
-              className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors active:scale-95 whitespace-nowrap"
+              className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors active:scale-95 whitespace-nowrap"
             >
-              + Novo
+              <Plus className="h-4 w-4" />
+              Novo
             </button>
           </div>
         </div>
@@ -487,14 +489,16 @@ function CustomerDetailPanel({
           <div className="flex gap-2">
             <button
               onClick={() => onEdit(details.customer)}
-              className="flex-1 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center justify-center gap-1 flex-1 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
+              <Pencil className="h-4 w-4" />
               Editar
             </button>
             <button
               onClick={() => onDelete(details.customer.id)}
-              className="px-3 py-1.5 text-xs font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+              className="flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
             >
+              <Trash2 className="h-4 w-4" />
               Excluir
             </button>
           </div>

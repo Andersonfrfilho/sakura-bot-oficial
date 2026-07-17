@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { Plus, Pencil, ToggleRight, Lock, Trash2 } from 'lucide-react'
 
 interface StaffMember {
   id: string
@@ -160,9 +161,10 @@ export function StaffPage() {
         </div>
         <button
           onClick={openCreate}
-          className="px-4 py-2 bg-brand-600 text-white text-sm font-semibold rounded-xl hover:bg-brand-700 transition-colors active:scale-95"
+          className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-semibold rounded-xl hover:bg-brand-700 transition-colors active:scale-95"
         >
-          + Novo funcionário
+          <Plus className="h-4 w-4" />
+          Novo funcionário
         </button>
       </div>
 
@@ -211,8 +213,9 @@ export function StaffPage() {
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <button
                 onClick={() => openEdit(member)}
-                className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               >
+                <Pencil className="h-4 w-4" />
                 Editar
               </button>
               {member.id !== currentUserId && (
@@ -220,24 +223,27 @@ export function StaffPage() {
                   <button
                     onClick={() => toggleMutation.mutate(member.id)}
                     disabled={toggleMutation.isPending}
-                    className={`px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${
+                    className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${
                       member.active
                         ? 'text-orange-600 border-orange-200 hover:bg-orange-50'
                         : 'text-green-600 border-green-200 hover:bg-green-50'
                     }`}
                   >
+                    <ToggleRight className="h-4 w-4" />
                     {member.active ? 'Desativar' : 'Ativar'}
                   </button>
                   <button
                     onClick={() => openResetPassword(member)}
-                    className="px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
                   >
+                    <Lock className="h-4 w-4" />
                     Senha
                   </button>
                   <button
                     onClick={() => openDelete(member)}
-                    className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
                   >
+                    <Trash2 className="h-4 w-4" />
                     Excluir
                   </button>
                 </>

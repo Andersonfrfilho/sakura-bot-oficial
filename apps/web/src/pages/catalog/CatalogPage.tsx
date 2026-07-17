@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 
 interface Category {
   id: string
@@ -238,9 +239,10 @@ export function CatalogPage() {
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Categorias</p>
           <button
             onClick={openCreateCat}
-            className="w-full py-2 text-xs font-semibold bg-brand-600 text-white rounded-xl hover:bg-brand-700 transition-colors active:scale-95"
+            className="flex items-center justify-center gap-2 w-full py-2 text-xs font-semibold bg-brand-600 text-white rounded-xl hover:bg-brand-700 transition-colors active:scale-95"
           >
-            + Nova categoria
+            <Plus className="h-4 w-4" />
+            Nova categoria
           </button>
         </div>
 
@@ -323,9 +325,10 @@ export function CatalogPage() {
           </div>
           <button
             onClick={openCreateProd}
-            className="px-4 py-2 bg-brand-600 text-white text-sm font-semibold rounded-xl hover:bg-brand-700 transition-colors active:scale-95"
+            className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-semibold rounded-xl hover:bg-brand-700 transition-colors active:scale-95"
           >
-            + Novo produto
+            <Plus className="h-4 w-4" />
+            Novo produto
           </button>
         </div>
 

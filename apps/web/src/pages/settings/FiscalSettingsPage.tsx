@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { Select } from '@/components/ui/Select'
+import { CheckCircle, AlertCircle, Settings, Upload, Trash2 } from 'lucide-react'
 
 interface FiscalConfig {
   id?: string
@@ -177,36 +178,54 @@ export function FiscalSettingsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Configuração Fiscal</h2>
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-500 uppercase tracking-wider">
+          <Settings className="h-4 w-4" />
+          Configuração Fiscal
+        </h2>
         <div className="flex gap-2">
           <button
             onClick={() => void handleTest()}
             disabled={testing || form.model === 'none'}
-            className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors"
           >
+            <AlertCircle className="h-4 w-4" />
             {testing ? 'Testando...' : 'Testar conexão'}
           </button>
           <button
             onClick={() => saveMutation.mutate(form)}
             disabled={saveMutation.isPending}
-            className="px-4 py-1.5 text-xs font-semibold bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-1.5 text-xs font-semibold bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors"
           >
-            {saveMutation.isPending ? 'Salvando...' : saved ? '✓ Salvo' : 'Salvar'}
+            <CheckCircle className="h-4 w-4" />
+            {saveMutation.isPending ? 'Salvando...' : saved ? 'Salvo' : 'Salvar'}
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>
+        <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          {error}
+        </div>
       )}
 
       {testResult && (
-        <div className={`mb-4 px-4 py-3 rounded-xl text-sm border ${
+        <div className={`mb-4 flex items-center gap-2 px-4 py-3 rounded-xl text-sm border ${
           testResult.ok
             ? 'bg-green-50 border-green-200 text-green-700'
             : 'bg-red-50 border-red-200 text-red-700'
         }`}>
-          {testResult.ok ? '✓ Conexão OK' : `✗ Erro: ${testResult.message}`}
+          {testResult.ok ? (
+            <>
+              <CheckCircle className="h-4 w-4 flex-shrink-0" />
+              Conexão OK
+            </>
+          ) : (
+            <>
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              Erro: {testResult.message}
+            </>
+          )}
         </div>
       )}
 

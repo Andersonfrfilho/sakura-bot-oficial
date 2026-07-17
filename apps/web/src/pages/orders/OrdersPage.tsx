@@ -12,6 +12,7 @@ import {
 } from '@/constants/orderLabels'
 import { CreateOrderModal } from './CreateOrderModal'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { Plus } from 'lucide-react'
 
 interface Order {
   id: string
@@ -181,9 +182,10 @@ export function OrdersPage() {
         <div className="flex gap-2">
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 text-sm font-semibold bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors active:scale-95"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors active:scale-95"
           >
-            + Novo pedido
+            <Plus className="h-4 w-4" />
+            Novo pedido
           </button>
           <button
             onClick={() => { setStatusFilter('active'); setPage(1) }}
