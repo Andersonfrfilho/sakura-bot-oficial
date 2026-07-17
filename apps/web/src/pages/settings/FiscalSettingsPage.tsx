@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
+import { Select } from '@/components/ui/Select'
 
 interface FiscalConfig {
   id?: string
@@ -269,26 +270,26 @@ export function FiscalSettingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Emitir NF quando</label>
-              <select
+              <Select
                 value={form.emitTrigger ?? 'on_payment'}
-                onChange={(e) => setForm((prev) => ({ ...prev, emitTrigger: e.target.value }))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              >
-                <option value="on_payment">Ao registrar pagamento</option>
-                <option value="on_completed">Ao concluir o pedido</option>
-                <option value="manual">Somente manual</option>
-              </select>
+                onChange={(value) => setForm((prev) => ({ ...prev, emitTrigger: value }))}
+                options={[
+                  { value: 'on_payment', label: 'Ao registrar pagamento' },
+                  { value: 'on_completed', label: 'Ao concluir o pedido' },
+                  { value: 'manual', label: 'Somente manual' },
+                ]}
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Provedor de e-mail</label>
-              <select
+              <Select
                 value={form.emailProvider ?? 'resend'}
-                onChange={(e) => setForm((prev) => ({ ...prev, emailProvider: e.target.value }))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              >
-                <option value="resend">Resend</option>
-                <option value="smtp">SMTP</option>
-              </select>
+                onChange={(value) => setForm((prev) => ({ ...prev, emailProvider: value }))}
+                options={[
+                  { value: 'resend', label: 'Resend' },
+                  { value: 'smtp', label: 'SMTP' },
+                ]}
+              />
             </div>
           </div>
 
@@ -319,15 +320,11 @@ export function FiscalSettingsPage() {
             ))}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">CRT</label>
-              <select
+              <Select
                 value={form.crt ?? '1'}
-                onChange={(e) => setForm((prev) => ({ ...prev, crt: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
-              >
-                {CRT_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+                onChange={(value) => setForm((prev) => ({ ...prev, crt: value }))}
+                options={CRT_OPTIONS}
+              />
             </div>
           </div>
 

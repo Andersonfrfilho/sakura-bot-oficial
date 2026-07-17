@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
+import { Select } from '@/components/ui/Select'
 
 interface Category {
   id: string
@@ -545,16 +546,15 @@ export function CatalogPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                    <select
+                    <Select
                       value={prodForm.categoryId}
-                      onChange={(e) => setProdForm((prev) => ({ ...prev, categoryId: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    >
-                      <option value="">Sem categoria</option>
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
+                      onChange={(value) => setProdForm((prev) => ({ ...prev, categoryId: value }))}
+                      options={[
+                        { value: '', label: 'Sem categoria' },
+                        ...categories.map((cat) => ({ value: cat.id, label: cat.name })),
+                      ]}
+                      searchable={categories.length > 6}
+                    />
                   </div>
                 </>
               )}

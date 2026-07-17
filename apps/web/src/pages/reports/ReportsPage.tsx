@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { ORDER_CHANNEL_LABELS, ORDER_TYPE_LABELS, ORDER_STATUS_LABELS } from '@/constants/orderLabels'
+import { Select } from '@/components/ui/Select'
 
 interface DailyBreakdown {
   day: number
@@ -100,24 +101,20 @@ export function ReportsPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <select
-            value={month}
-            onChange={(e) => setMonth(parseInt(e.target.value))}
-            className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-            {months.map((m, i) => (
-              <option key={i + 1} value={i + 1}>{m}</option>
-            ))}
-          </select>
-          <select
-            value={year}
-            onChange={(e) => setYear(parseInt(e.target.value))}
-            className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+          <div className="w-36">
+            <Select
+              value={String(month)}
+              onChange={(value) => setMonth(parseInt(value, 10))}
+              options={months.map((m, i) => ({ value: String(i + 1), label: m }))}
+            />
+          </div>
+          <div className="w-24">
+            <Select
+              value={String(year)}
+              onChange={(value) => setYear(parseInt(value, 10))}
+              options={years.map((y) => ({ value: String(y), label: String(y) }))}
+            />
+          </div>
           <button
             onClick={handleExportCSV}
             className="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition-colors active:scale-95"

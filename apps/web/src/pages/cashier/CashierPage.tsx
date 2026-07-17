@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
+import { Select, type SelectOption } from '@/components/ui/Select'
 
 interface CashMovement {
   id: string
@@ -37,6 +38,20 @@ const MOVEMENT_LABELS = { payment: 'Pagamento', withdrawal: 'Retirada', supply: 
 const PAYMENT_LABELS: Record<string, string> = {
   pix: 'Pix', card_credit: 'Crédito', card_debit: 'Débito', cash: 'Dinheiro', voucher: 'Voucher',
 }
+
+const MOVEMENT_TYPE_OPTIONS: readonly SelectOption<'payment' | 'withdrawal' | 'supply'>[] = [
+  { value: 'payment', label: 'Pagamento' },
+  { value: 'withdrawal', label: 'Retirada' },
+  { value: 'supply', label: 'Suprimento' },
+]
+
+const PAYMENT_METHOD_OPTIONS: readonly SelectOption<'pix' | 'card_credit' | 'card_debit' | 'cash' | 'voucher'>[] = [
+  { value: 'cash', label: 'Dinheiro' },
+  { value: 'pix', label: 'Pix' },
+  { value: 'card_credit', label: 'Crédito' },
+  { value: 'card_debit', label: 'Débito' },
+  { value: 'voucher', label: 'Voucher' },
+]
 
 const HIDDEN_VALUE_PLACEHOLDER = 'R$ ••••••'
 
@@ -181,26 +196,8 @@ export function CashierPage() {
           <div className="bg-white rounded-2xl shadow-sm p-5">
             <h2 className="font-semibold text-gray-900 mb-3">Registrar movimento</h2>
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <select
-                value={movementType}
-                onChange={(e) => setMovementType(e.target.value as typeof movementType)}
-                className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="payment">Pagamento</option>
-                <option value="withdrawal">Retirada</option>
-                <option value="supply">Suprimento</option>
-              </select>
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as typeof paymentMethod)}
-                className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="cash">Dinheiro</option>
-                <option value="pix">Pix</option>
-                <option value="card_credit">Crédito</option>
-                <option value="card_debit">Débito</option>
-                <option value="voucher">Voucher</option>
-              </select>
+              <Select value={movementType} onChange={setMovementType} options={MOVEMENT_TYPE_OPTIONS} />
+              <Select value={paymentMethod} onChange={setPaymentMethod} options={PAYMENT_METHOD_OPTIONS} />
             </div>
             <div className="grid grid-cols-2 gap-3 mb-3">
               <input

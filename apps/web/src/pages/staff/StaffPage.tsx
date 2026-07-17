@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
+import { Select } from '@/components/ui/Select'
 
 interface StaffMember {
   id: string
@@ -303,19 +304,18 @@ export function StaffPage() {
                   )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Cargo</label>
-                    <select
+                    <Select
                       value={form.roleId}
-                      onChange={(e) => setForm((prev) => ({ ...prev, roleId: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    >
-                      <option value="">Selecionar cargo...</option>
-                      {roles.map((role) => (
-                        <option key={role.id} value={role.id}>
-                          {role.name}
-                          {role.description ? ` — ${role.description}` : ''}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) => setForm((prev) => ({ ...prev, roleId: value }))}
+                      options={[
+                        { value: '', label: 'Selecionar cargo...' },
+                        ...roles.map((role) => ({
+                          value: role.id,
+                          label: role.description ? `${role.name} — ${role.description}` : role.name,
+                        })),
+                      ]}
+                      searchable={roles.length > 6}
+                    />
                   </div>
                 </>
               )}
