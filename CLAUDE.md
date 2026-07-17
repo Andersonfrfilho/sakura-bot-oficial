@@ -113,6 +113,14 @@ Ver [SETUP.md](SETUP.md) para passo a passo detalhado.
 - **Providers sem prefixo `I`** — interface: `GeocodingProvider`; implementação: `NominatimProviderImplementation`
 - **Shared first** — types em `src/shared/types/`, constants em `src/shared/constants/`, providers em `src/shared/providers/`
 
+## Protocolo de modelos nas tasks (.specs/)
+
+Os `tasks.md` em `.specs/features/*/` anotam o **modelo recomendado por fase**
+(`haiku` mecânico · `sonnet` execução padrão · `opus`/`fable` 🧠 arquitetura).
+Ao iniciar uma fase/task: se o modelo da sessão divergir do recomendado,
+**pare e peça ao usuário para rodar `/model <modelo>`** antes de codar.
+Regra completa: `~/.claude/rules/rules/model-economy.md`.
+
 ## Lógica do bot (src/)
 
 O nó `Rotear e Responder` do workflow é gerado a partir de módulos em `src/`:
