@@ -1,0 +1,136 @@
+import { db } from '../connection'
+import * as schema from '../schema'
+import { daysAgo, money, randomInt, randomItem } from './helpers/seed-helpers'
+
+function orderId(index: number): string {
+  return `00000000-0000-0000-0007-${String(index).padStart(12, '0')}`
+}
+
+function orderItemId(index: number): string {
+  return `00000000-0000-0000-0008-${String(index).padStart(12, '0')}`
+}
+
+type OrderStatusValue = 'received' | 'in_production' | 'ready' | 'in_delivery' | 'picked_up' | 'completed' | 'cancelled'
+
+type OrderBlueprint = {
+  type: 'delivery' | 'pickup' | 'table'
+  channel: 'whatsapp' | 'ifood' | 'manual'
+  status: OrderStatusValue
+  customerIndex?: number
+  tableIndex?: number
+  daysAgo: number
+}
+
+const BLUEPRINTS: OrderBlueprint[] = [
+  { type: 'delivery', channel: 'whatsapp', status: 'completed', customerIndex: 0, daysAgo: 5 },
+  { type: 'delivery', channel: 'whatsapp', status: 'completed', customerIndex: 1, daysAgo: 4 },
+  { type: 'delivery', channel: 'whatsapp', status: 'in_delivery', customerIndex: 2, daysAgo: 0 },
+  { type: 'delivery', channel: 'whatsapp', status: 'cancelled', customerIndex: 3, daysAgo: 2 },
+  { type: 'pickup', channel: 'whatsapp', status: 'completed', customerIndex: 4, daysAgo: 3 },
+  { type: 'pickup', channel: 'whatsapp', status: 'ready', customerIndex: 5, daysAgo: 0 },
+  { type: 'pickup', channel: 'manual', status: 'completed', customerIndex: 6, daysAgo: 6 },
+  { type: 'table', channel: 'manual', status: 'completed', customerIndex: 7, tableIndex: 0, daysAgo: 1 },
+  { type: 'table', channel: 'manual', status: 'in_production', tableIndex: 2, daysAgo: 0 },
+  { type: 'table', channel: 'manual', status: 'received', tableIndex: 8, daysAgo: 0 },
+  { type: 'delivery', channel: 'ifood', status: 'completed', customerIndex: 0, daysAgo: 7 },
+  { type: 'delivery', channel: 'ifood', status: 'completed', customerIndex: 1, daysAgo: 8 },
+  { type: 'pickup', channel: 'whatsapp', status: 'received', customerIndex: 2, daysAgo: 0 },
+  { type: 'table', channel: 'manual', status: 'ready', tableIndex: 6, daysAgo: 0 },
+  { type: 'delivery', channel: 'whatsapp', status: 'completed', customerIndex: 4, daysAgo: 10 },
+]
+
+function buildLifecycleTimestamps(status: OrderStatusValue, baseDaysAgo: number) {
+  const inProgress: OrderStatusValue[] = ['in_production', 'ready', 'in_delivery', 'picked_up', 'completed']
+  const ready: OrderStatusValue[] = ['ready', 'in_delivery', 'picked_up', 'completed']
+  const finished: OrderStatusValue[] = ['picked_up', 'completed']
+
+  return {
+    receivedAt: daysAgo(baseDaysAgo, 3),
+    productionStartedAt: inProgress.includes(status) ? daysAgo(baseDaysAgo, 2) : null,
+    readyAt: ready.includes(status) ? daysAgo(baseDaysAgo, 1) : null,
+    completedAt: finished.includes(status) ? daysAgo(baseDaysAgo, 0) : null,
+    cancelledAt: status === 'cancelled' ? daysAgo(baseDaysAgo, 1) : null,
+    cancellationReason: status === 'cancelled' ? 'Cliente desistiu do pedido' : null,
+  }
+}
+
+export type SeededOrder = {
+  id: string
+  type: OrderBlueprint['type']
+  status: OrderStatusValue
+  totalAmount: string
+  fiscalEnabled: boolean
+  daysAgo: number
+}
+
+type SeedOrdersParams = {
+  establishmentId: string
+  customerIds: string[]
+  tableIds: string[]
+}
+
+export async function seedOrders({ establishmentId, customerIds, tableIds }: SeedOrdersParams): Promise<SeededOrder[]> {
+  const products = await db.query.products.findMany({
+    where: (product, { eq }) => eq(product.establishmentId, establishmentId),
+  })
+
+  if (products.length === 0) {
+    console.warn('[Seed] No products found — skipping orders/order_items (run `make db-seed` first).')
+    return []
+  }
+
+  const orders: SeededOrder[] = []
+  const orderRows: (typeof schema.orders.$inferInsert)[] = []
+  const orderItems: (typeof schema.orderItems.$inferInsert)[] = []
+  let orderItemIndex = 0
+
+  BLUEPRINTS.forEach((blueprint, index) => {
+    const itemCount = randomInt(2, 3)
+    let totalAmount = 0
+
+    for (let i = 0; i < itemCount; i += 1) {
+      const product = randomItem(products)
+      const quantity = randomInt(1, 3)
+      const totalPrice = Number(product.price) * quantity
+      totalAmount += totalPrice
+
+      orderItems.push({
+        id: orderItemId(orderItemIndex),
+        orderId: orderId(index),
+        productId: product.id,
+        productName: product.name,
+        unitPrice: product.price,
+        quantity,
+        totalPrice: money(totalPrice),
+      })
+      orderItemIndex += 1
+    }
+
+    orders.push({
+      id: orderId(index),
+      type: blueprint.type,
+      status: blueprint.status,
+      totalAmount: money(totalAmount),
+      fiscalEnabled: true,
+      daysAgo: blueprint.daysAgo,
+    })
+
+    orderRows.push({
+      id: orderId(index),
+      establishmentId,
+      customerId: blueprint.customerIndex !== undefined ? (customerIds[blueprint.customerIndex] ?? null) : null,
+      tableId: blueprint.tableIndex !== undefined ? (tableIds[blueprint.tableIndex] ?? null) : null,
+      channel: blueprint.channel,
+      status: blueprint.status,
+      type: blueprint.type,
+      totalAmount: money(totalAmount),
+      fiscalEnabled: true,
+      ...buildLifecycleTimestamps(blueprint.status, blueprint.daysAgo),
+    })
+  })
+
+  await db.insert(schema.orders).values(orderRows).onConflictDoNothing()
+  await db.insert(schema.orderItems).values(orderItems).onConflictDoNothing()
+
+  return orders
+}

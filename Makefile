@@ -7,7 +7,7 @@ PROJECT := $(if $(PROJECT),$(PROJECT),whatsapp-bot)
 
 COMPOSE = docker compose -f infra/docker-compose.yml -p $(PROJECT)
 
-.PHONY: help all setup init up down restart logs ps db-reset db-seed n8n-import directus-init test test-order test-msg evolution-start evolution-stop evolution-logs validate build hub-up hub-down hub-restart hub-logs hub-seed hub-generate hub-wait
+.PHONY: help all setup init up down restart logs ps db-reset db-seed bot-seed n8n-import directus-init test test-order test-msg evolution-start evolution-stop evolution-logs validate build hub-up hub-down hub-restart hub-logs hub-seed hub-generate hub-wait
 
 help:
 	@echo ""
@@ -25,6 +25,7 @@ help:
 	@echo "  make test          Roda testes de parsing + validação do workflow"
 	@echo "  make db-reset      Recria o schema do app no banco (destrói dados)"
 	@echo "  make db-seed       Importa cardapio.csv e faq.csv para o banco"
+	@echo "  make bot-seed      Seed de reservations/order_status_logs/question_logs/promotions (roda após hub-seed)"
 	@echo "  make test-order    Insere pedido de teste completo no banco"
 	@echo "  make test-msg      Simula uma mensagem WhatsApp no n8n (webhook)"
 	@echo ""
@@ -68,7 +69,7 @@ all: setup up
 	@echo ""
 
 # Seed banco + importa workflows + configura Directus + Order Hub
-init: db-seed n8n-import directus-init hub-wait hub-seed
+init: db-seed n8n-import directus-init hub-wait hub-seed bot-seed
 	@echo ""
 	@echo "🚀 Inicialização concluída."
 
@@ -145,6 +146,11 @@ DB_NAME := $(shell grep ^POSTGRES_DB $(ENV_FILE) | cut -d= -f2)
 db-seed:
 	@echo "🌱 Populando banco de dados..."
 	@bash scripts/seed-db.sh
+
+# Seed das tabelas exclusivas do bot que dependem de customers/tables/orders
+# (populados pelo hub-seed) — reservations, order_status_logs, question_logs, promotions
+bot-seed:
+	@bash scripts/seed-bot-tables.sh
 
 # Importa workflows do n8n via REST API (idempotente — pula se já existir)
 N8N_URL      := http://localhost:5678
@@ -266,10 +272,11 @@ hub-logs:
 	$(COMPOSE) logs -f order-hub-api order-hub-web
 
 # Seed: cria roles, permissões e usuário admin padrão (admin@orderhub.io / Admin@123)
+# Container roda em node:22 (não bun) — seed via npm/tsx conforme package.json.
 hub-seed:
 	@echo "🌱 Seed Order Hub..."
-	$(COMPOSE) exec order-hub-api bun run db:seed
+	$(COMPOSE) exec order-hub-api npm run db:seed
 
 # Gera nova migration Drizzle após mudança de schema (persiste em apps/api/drizzle/migrations/)
 hub-generate:
-	$(COMPOSE) exec order-hub-api bun run db:generate
+	$(COMPOSE) exec order-hub-api npm run db:generate
