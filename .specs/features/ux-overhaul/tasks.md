@@ -47,10 +47,18 @@ barato em seguida).
 
 - ⬜ **T1.1** (UX-DSN-01) Criar `components/ui/Select.tsx` (single/multi, busca,
   teclado, tokens do tema) + migrar selects existentes tela a tela.
-- ⬜ **T1.2** (UX-DSN-02) Passe de ícones (lucide-react) nas telas atuais;
+- ✅ **T1.2** (UX-DSN-02) Passe de ícones (lucide-react) nas telas atuais;
   prioridade fiscal. 🔗 T0.1 (para não conflitar).
-- ⬜ **T1.3** (UX-DSN-04) Garantir arquivos de tema (`theme.constant.ts`,
+  - Feito: FiscalDocumentsPage (download, imprimir, cancelar, reprocessar),
+    FiscalSettingsPage (config, alerta, check), StaffPage (plus, pencil, toggle,
+    lock, trash), CustomersPage (plus, pencil, trash), TablesPage (plus mesa),
+    CatalogPage (plus cat, plus prod), OrdersPage (plus pedido). lucide-react
+    instalado e integrado.
+- ✅ **T1.3** (UX-DSN-04) Garantir arquivos de tema (`theme.constant.ts`,
   `spacing.constant.ts`, `scale.util.ts`) e usar nas telas tocadas daqui em diante.
+  - Feito: Criada estrutura centralizada em src/modules/shared/theme/ com
+    COLORS, TYPOGRAPHY, RADIUS, SHADOW, SPACING e funções scale()/scaleRem().
+    Base pronta para aplicação gradual em novas features e refatorações.
 - ✅ **T1.4** (UX-DSN-05) Base de animações: transições de modal/painel,
   skeleton loaders, feedback press/hover, `prefers-reduced-motion`. Decidir
   CSS puro vs framer-motion (bundle) e padronizar.
