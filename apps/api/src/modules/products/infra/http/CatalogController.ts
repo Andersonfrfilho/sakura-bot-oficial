@@ -97,7 +97,7 @@ export class CatalogController {
       .returning()
 
     await this.invalidateCache(establishmentId)
-    response.status(201).json(cat)
+    response.json(cat, 201)
   }
 
   updateCategory: RouteHandler = async (request, response) => {
@@ -167,7 +167,7 @@ export class CatalogController {
       .where(and(eq(schema.categories.id, id), eq(schema.categories.establishmentId, establishmentId)))
 
     await this.invalidateCache(establishmentId)
-    response.status(204).end()
+    response.json({ success: true }, 200)
   }
 
   // ── Products ──────────────────────────────────────────────────────────────
@@ -218,7 +218,7 @@ export class CatalogController {
       .returning()
 
     await this.invalidateCache(establishmentId)
-    response.status(201).json(prod)
+    response.json(prod, 201)
   }
 
   updateProduct: RouteHandler = async (request, response) => {
@@ -311,6 +311,6 @@ export class CatalogController {
       .where(and(eq(schema.products.id, id), eq(schema.products.establishmentId, establishmentId)))
 
     await this.invalidateCache(establishmentId)
-    response.status(204).end()
+    response.json({ success: true }, 200)
   }
 }

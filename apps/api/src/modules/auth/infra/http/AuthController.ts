@@ -75,6 +75,6 @@ export class AuthController {
       newPassword: parsed.data.newPassword,
     })
 
-    response.status(204).end()
+    response.json({ message: 'Senha alterada com sucesso' }, 200)
   }
 }

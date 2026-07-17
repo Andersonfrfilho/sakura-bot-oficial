@@ -60,7 +60,7 @@ export class StaffController {
       ...parsed.data,
     })
 
-    response.status(201).json(staff)
+    response.json(staff, 201)
   }
 
   update: RouteHandler = async (request, response) => {
@@ -109,7 +109,7 @@ export class StaffController {
       parsed.data.password
     )
 
-    response.status(204).end()
+    response.json({ success: true }, 200)
   }
 
   delete: RouteHandler = async (request, response) => {
@@ -117,6 +117,6 @@ export class StaffController {
 
     const id = request.params['id']!
     await this.deleteStaffUseCase.execute(id, request.user.establishmentId, request.user.id)
-    response.status(204).end()
+    response.json({ success: true }, 200)
   }
 }
