@@ -5,7 +5,9 @@ import { authorize } from '@/infra/http/middlewares/authorize'
 
 export function registerStockBatchRoutes(router: Router, controller: StockBatchController) {
   const read = [authenticate, authorize('products', 'read')]
+  const write = [authenticate, authorize('products', 'write')]
 
   router.get('/stock-batches/expiring', ...read, controller.listExpiring)
   router.get('/stock-batches/expiring/count', ...read, controller.countExpiring)
+  router.post('/stock-batches', ...write, controller.create)
 }

@@ -4,13 +4,45 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import type { RouteHandler } from '@/infra/http/router'
 import * as schema from '@/infra/database/schema'
 import { UnauthorizedError, ValidationError } from '@/shared/errors/AppError'
+import type { CreateStockBatchUseCase } from '@/modules/products/application/use-cases/CreateStockBatchUseCase'
 
 type Database = NodePgDatabase<typeof schema>
 
 const DEFAULT_EXPIRY_ALERT_DAYS = 7
 
+const createStockBatchSchema = z.object({
+  ingredientId: z.string().uuid(),
+  batchNumber: z.string().min(1).max(100),
+  quantity: z.number().positive(),
+  costPerUnit: z.number().min(0),
+  expiresAt: z.coerce.date(),
+})
+
 export class StockBatchController {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    private readonly createStockBatchUseCase: CreateStockBatchUseCase
+  ) {}
+
+  create: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const { establishmentId, id: userId } = request.user
+
+    const parsed = createStockBatchSchema.safeParse(request.body)
+    if (!parsed.success) throw new ValidationError('Dados inválidos', parsed.error.flatten())
+
+    const batch = await this.createStockBatchUseCase.execute({
+      establishmentId,
+      ingredientId: parsed.data.ingredientId,
+      batchNumber: parsed.data.batchNumber,
+      quantity: parsed.data.quantity,
+      costPerUnit: parsed.data.costPerUnit,
+      expiresAt: parsed.data.expiresAt,
+      userId,
+    })
+
+    response.json(batch, 201)
+  }
 
   listExpiring: RouteHandler = async (request, response) => {
     if (!request.user) throw new UnauthorizedError()

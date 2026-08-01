@@ -32,6 +32,7 @@ import { CatalogController } from '@/modules/products/infra/http/CatalogControll
 import { SectionController } from '@/modules/products/infra/http/SectionController'
 import { IngredientController } from '@/modules/products/infra/http/IngredientController'
 import { StockBatchController } from '@/modules/products/infra/http/StockBatchController'
+import { CreateStockBatchUseCase } from '@/modules/products/application/use-cases/CreateStockBatchUseCase'
 
 // Tables
 import { DrizzleTableRepository } from '@/modules/tables/infra/repositories/DrizzleTableRepository'
@@ -198,16 +199,17 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const changePasswordUseCase = new ChangePasswordUseCase(userRepository)
   const authController = new AuthController(loginUseCase, refreshTokenUseCase, logoutUseCase, changePasswordUseCase)
 
+  // Shared use cases
+  const findOrCreateCustomerUseCase = new FindOrCreateCustomerUseCase(db)
+  const createAuditLogUseCase = new CreateAuditLogUseCase(db)
+
   // Products / Catalog
   const menuController = new MenuController(db, cache)
   const catalogController = new CatalogController(db, cache)
   const sectionController = new SectionController(db)
   const ingredientController = new IngredientController(db)
-  const stockBatchController = new StockBatchController(db)
-
-  // Shared use cases
-  const findOrCreateCustomerUseCase = new FindOrCreateCustomerUseCase(db)
-  const createAuditLogUseCase = new CreateAuditLogUseCase(db)
+  const createStockBatchUseCase = new CreateStockBatchUseCase(db, createAuditLogUseCase)
+  const stockBatchController = new StockBatchController(db, createStockBatchUseCase)
   const triggerFiscalEmissionUseCase = new TriggerFiscalEmissionUseCase(db, wsHub)
   const updateOrderStatusUseCase = new UpdateOrderStatusUseCase(db, wsHub, triggerFiscalEmissionUseCase)
 

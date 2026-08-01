@@ -169,6 +169,13 @@
       "when": 1783817780685,
       "tag": "0024_add_expenses",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1783817781685,
+      "tag": "0025_fix_stock_batches_columns",
+      "breakpoints": true
     }
   ]
 }
