@@ -10,6 +10,26 @@ import { IngredientManager } from './components/IngredientManager'
 import { RecipeManager, RecipeCostBadge } from './components/RecipeManager'
 import { BarcodeScanner } from './components/BarcodeScanner'
 import { ExpiringBatchBadge } from './components/StockBatchList'
+import {
+  ProductsProvider,
+  PRODUCT_OPTIONAL_FIELD,
+  formatBarcode,
+  formatMoney,
+  type MoneyFormat,
+} from '@adatechnology/products-ui'
+import { productsApiAdapter } from '@/lib/productsApiAdapter'
+
+const MONEY_FORMAT: MoneyFormat = { currency: 'BRL', locale: 'pt-BR' }
+
+// Só os campos que existem no schema do Order Hub. `INVENTORY` e `SYNC_STATUS` ficam de fora:
+// estoque vive em `stock_batches` por ingrediente, não por produto, e não há sincronização externa.
+const PRODUCTS_FIELDS = [
+  PRODUCT_OPTIONAL_FIELD.COST_PRICE,
+  PRODUCT_OPTIONAL_FIELD.UNIT,
+  PRODUCT_OPTIONAL_FIELD.BARCODE,
+  PRODUCT_OPTIONAL_FIELD.SECTION,
+  PRODUCT_OPTIONAL_FIELD.PREPARATION_TIME,
+] as const
 
 interface Category {
   id: string
@@ -77,11 +97,24 @@ type CategoryFormData = {
 const EMPTY_PRODUCT: ProductFormData = { name: '', description: '', price: '', costPrice: '', unit: 'un', barcode: '', categoryId: '', sectionId: '', preparationTimeMinutes: '', preparationInstructions: '', sortOrder: '0' }
 const EMPTY_CATEGORY: CategoryFormData = { name: '', sortOrder: '0', ncmCode: '', cfopCode: '', cstIcms: '' }
 
+// A API guarda o preço como decimal em reais e o SDK formata centavo inteiro. A multiplicação
+// arredondada mora só aqui — ver `productsApiAdapter` para o mesmo contrato do lado das mutações.
 function formatBRL(value: string | number) {
-  return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  return formatMoney(Math.round(Number(value) * 100), MONEY_FORMAT)
 }
 
 export function CatalogPage() {
+  return (
+    <ProductsProvider
+      api={productsApiAdapter}
+      config={{ currency: MONEY_FORMAT.currency, locale: MONEY_FORMAT.locale, fields: PRODUCTS_FIELDS }}
+    >
+      <CatalogPageContent />
+    </ProductsProvider>
+  )
+}
+
+function CatalogPageContent() {
   const accessToken = useAuthStore((state) => state.accessToken)
   const queryClient = useQueryClient()
 
@@ -479,7 +512,9 @@ export function CatalogPage() {
                         <p className="text-xs text-gray-400 truncate mt-0.5">{prod.description}</p>
                       )}
                       {prod.barcode && (
-                        <p className="text-xs text-gray-400 truncate mt-0.5">Cód: {prod.barcode}</p>
+                        <p className="text-xs text-gray-400 truncate mt-0.5">
+                          Cód: {formatBarcode(prod.barcode)}
+                        </p>
                       )}
                     </div>
                     <div className="text-right flex-shrink-0">
