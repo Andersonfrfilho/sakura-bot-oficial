@@ -1,4 +1,4 @@
-CREATE TABLE "expenses" (
+CREATE TABLE IF NOT EXISTS "expenses" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "establishment_id" uuid NOT NULL REFERENCES "establishments"("id") ON DELETE CASCADE,
   "description" varchar(255) NOT NULL,

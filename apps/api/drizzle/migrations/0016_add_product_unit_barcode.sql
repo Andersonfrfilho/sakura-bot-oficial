@@ -1,2 +1,3 @@
-ALTER TABLE "products" ADD COLUMN "unit" varchar(20) DEFAULT 'un';
-ALTER TABLE "products" ADD COLUMN "barcode" varchar(20);
+ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "unit" varchar(20) DEFAULT 'un';
+--> statement-breakpoint
+ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "barcode" varchar(20);

@@ -1,1 +1,1 @@
-ALTER TABLE "customers" ADD COLUMN "rating" integer;
+ALTER TABLE "customers" ADD COLUMN IF NOT EXISTS "rating" integer;

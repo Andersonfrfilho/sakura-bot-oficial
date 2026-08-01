@@ -1,4 +1,4 @@
-CREATE TABLE "product_ingredients" (
+CREATE TABLE IF NOT EXISTS "product_ingredients" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "product_id" uuid NOT NULL REFERENCES "products"("id") ON DELETE CASCADE,
   "ingredient_id" uuid NOT NULL REFERENCES "ingredients"("id") ON DELETE RESTRICT,

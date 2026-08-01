@@ -1,4 +1,4 @@
-CREATE TABLE "ingredients" (
+CREATE TABLE IF NOT EXISTS "ingredients" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "establishment_id" uuid NOT NULL REFERENCES "establishments"("id") ON DELETE CASCADE,
   "name" varchar(255) NOT NULL,

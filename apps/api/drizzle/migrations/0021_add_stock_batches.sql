@@ -1,4 +1,4 @@
-CREATE TABLE "stock_batches" (
+CREATE TABLE IF NOT EXISTS "stock_batches" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "ingredient_id" uuid NOT NULL REFERENCES "ingredients"("id") ON DELETE CASCADE,
   "quantity" numeric(10,4) NOT NULL,
@@ -9,8 +9,8 @@ CREATE TABLE "stock_batches" (
   "notes" text,
   "created_at" timestamptz DEFAULT now() NOT NULL
 );
-
-CREATE TABLE "stock_movements" (
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "stock_movements" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "ingredient_id" uuid NOT NULL REFERENCES "ingredients"("id") ON DELETE CASCADE,
   "batch_id" uuid REFERENCES "stock_batches"("id"),

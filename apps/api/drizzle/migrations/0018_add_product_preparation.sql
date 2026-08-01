@@ -1,2 +1,3 @@
-ALTER TABLE "products" ADD COLUMN "preparation_time_minutes" integer;
-ALTER TABLE "products" ADD COLUMN "preparation_instructions" text;
+ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "preparation_time_minutes" integer;
+--> statement-breakpoint
+ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "preparation_instructions" text;

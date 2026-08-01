@@ -8,11 +8,11 @@ CREATE TABLE IF NOT EXISTS "order_payments" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "orders" ADD COLUMN "scheduled_for" timestamp with time zone;--> statement-breakpoint
-ALTER TABLE "orders" ADD COLUMN "customer_name" varchar(255);--> statement-breakpoint
-ALTER TABLE "orders" ADD COLUMN "customer_document" varchar(20);--> statement-breakpoint
-ALTER TABLE "deliveries" ADD COLUMN "fee_amount" numeric(10, 2) DEFAULT '0.00' NOT NULL;--> statement-breakpoint
-ALTER TABLE "deliveries" ADD COLUMN "distance_km" numeric(6, 2);--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "scheduled_for" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customer_name" varchar(255);--> statement-breakpoint
+ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "customer_document" varchar(20);--> statement-breakpoint
+ALTER TABLE "deliveries" ADD COLUMN IF NOT EXISTS "fee_amount" numeric(10, 2) DEFAULT '0.00' NOT NULL;--> statement-breakpoint
+ALTER TABLE "deliveries" ADD COLUMN IF NOT EXISTS "distance_km" numeric(6, 2);--> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "order_payments" ADD CONSTRAINT "order_payments_order_id_orders_id_fk" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
