@@ -53,12 +53,27 @@ Os atalhos viraram 30/50/60% porque 100% de margem sobre a venda implicaria
 custo zero, e `applyMarginToCost` devolve o custo inalterado nesse caso.
 
 ## Fase 3 — Formulário 🧠
-> 🤖 Modelo: `opus` — decide se o `ProductForm` do SDK substitui o formulário
-> atual ou se o Order Hub mantém o seu.
+> 🤖 Modelo: `opus`
 
-O `ProductForm` do SDK não tem `preparationInstructions`, scanner nem sugestões
-externas. Substituí-lo hoje é regressão. Só entra se o SDK ganhar `slot`
-de campos extras, ou se esses campos migrarem para uma aba separada.
+**Decisão tomada: o SDK é que se completa, não o Order Hub que abre mão.**
+O que faltava não era específico deste negócio — scanner, sugestão de base
+externa e ficha técnica aparecem em qualquer catálogo de varejo ou restaurante.
+Manter um formulário paralelo aqui condenaria todo consumidor futuro a repetir
+as mesmas 800 linhas.
+
+- **T3.1** ✅ (`adatechnology-packages@89bed8b`) `ProductForm` ganha
+  `onScanBarcode` e `onSearchSuggestions` — captura e busca ficam no host, botão
+  e dropdown ficam no pacote — mais o campo `PREPARATION_INSTRUCTIONS`.
+  `Section.catalogId` vira opcional (seção como posto de produção) e o default
+  de `marginShortcutPercents` perde o 100, que era um botão morto.
+- **T3.2** ✅ Adaptador e `fields` da página mapeiam `preparationInstructions`.
+- **T3.3** ⏳ Trocar o formulário local da `CatalogPage` pelo `ProductForm`,
+  ligando `onScanBarcode` no `BarcodeScanner` existente e `onSearchSuggestions`
+  em `/catalog/product-search`. É o passo que de fato apaga código.
+
+Continua fora do `ProductForm`, por não ser dele: fiscal da **categoria**
+(NCM/CFOP/CST), receitas, lotes e ingredientes. Fiscal de catálogo é candidato
+a uma próxima extensão do SDK; o resto é domínio do Order Hub.
 
 ## Fase 4 — Backend faltante
 > 🤖 Modelo: `sonnet`
