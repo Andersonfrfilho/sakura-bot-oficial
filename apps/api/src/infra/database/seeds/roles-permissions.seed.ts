@@ -37,6 +37,10 @@ const ROLE_PERMISSIONS = [
   { roleId: ROLE_IDS.gerente, resource: 'conversations', action: 'read' },
   { roleId: ROLE_IDS.gerente, resource: 'conversations', action: 'write' },
   { roleId: ROLE_IDS.gerente, resource: 'conversations', action: 'manage' },
+  // Novas entradas vão no FIM: o id da permissão vem da posição no array (ver `permissionId`),
+  // e inserir no meio deslocaria o id de todas as seguintes, duplicando-as no próximo seed.
+  { roleId: ROLE_IDS.gerente, resource: 'settings', action: 'read' },
+  { roleId: ROLE_IDS.gerente, resource: 'settings', action: 'write' },
 ]
 
 // Permissions have no unique constraint besides `id`. Assign deterministic ids
