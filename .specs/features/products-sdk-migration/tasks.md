@@ -38,11 +38,19 @@ até `POST /catalog/products/bulk` existir.
   só o que o Order Hub tem.
 
 ## Fase 2 — Componentes de leitura
-> 🤖 Modelo: `sonnet`
+> 🤖 Modelo: `sonnet` (executada em `opus` a pedido do usuário)
 
-- **T2.1** Margem por produto via `formatMarginPercent` (custo já está no schema).
-- **T2.2** `formatBarcode` na exibição do código de barras.
-- **T2.3** Atalhos de margem no formulário via `applyMarginToCost`.
+- **T2.1** ✅ Margem por produto na listagem via `formatMarginPercent`.
+- **T2.2** ✅ `formatBarcode` na exibição do código de barras.
+- **T2.3** ✅ Atalhos de margem no formulário via `applyMarginToCost`, com os
+  percentuais vindo de `marginShortcutPercents` na config do provider.
+
+**Mudança de comportamento visível.** A tela calculava *markup sobre o custo*
+(`preço = custo × (1 + m)`); o SDK usa *margem sobre o preço de venda*
+(`preço = custo ÷ (1 − m)`), que é a definição usada no varejo. O mesmo produto
+que exibia "margem 100%" passa a exibir "50%" — o preço não muda, só a conta.
+Os atalhos viraram 30/50/60% porque 100% de margem sobre a venda implicaria
+custo zero, e `applyMarginToCost` devolve o custo inalterado nesse caso.
 
 ## Fase 3 — Formulário 🧠
 > 🤖 Modelo: `opus` — decide se o `ProductForm` do SDK substitui o formulário

@@ -13,8 +13,11 @@ import { ExpiringBatchBadge } from './components/StockBatchList'
 import {
   ProductsProvider,
   PRODUCT_OPTIONAL_FIELD,
+  applyMarginToCost,
   formatBarcode,
+  formatMarginPercent,
   formatMoney,
+  useProductsConfig,
   type MoneyFormat,
 } from '@adatechnology/products-ui'
 import { productsApiAdapter } from '@/lib/productsApiAdapter'
@@ -30,6 +33,10 @@ const PRODUCTS_FIELDS = [
   PRODUCT_OPTIONAL_FIELD.SECTION,
   PRODUCT_OPTIONAL_FIELD.PREPARATION_TIME,
 ] as const
+
+// Margem sobre o preço de venda, que é a definição do SDK e a usada no varejo. Por isso o teto é
+// abaixo de 100%: uma margem de 100% sobre a venda implicaria custo zero.
+const MARGIN_SHORTCUT_PERCENTS = [30, 50, 60] as const
 
 interface Category {
   id: string
@@ -99,15 +106,28 @@ const EMPTY_CATEGORY: CategoryFormData = { name: '', sortOrder: '0', ncmCode: ''
 
 // A API guarda o preço como decimal em reais e o SDK formata centavo inteiro. A multiplicação
 // arredondada mora só aqui — ver `productsApiAdapter` para o mesmo contrato do lado das mutações.
+function toCents(value: string | number): number {
+  return Math.round(Number(value) * 100)
+}
+
+function fromCents(cents: number): string {
+  return (cents / 100).toFixed(2)
+}
+
 function formatBRL(value: string | number) {
-  return formatMoney(Math.round(Number(value) * 100), MONEY_FORMAT)
+  return formatMoney(toCents(value), MONEY_FORMAT)
 }
 
 export function CatalogPage() {
   return (
     <ProductsProvider
       api={productsApiAdapter}
-      config={{ currency: MONEY_FORMAT.currency, locale: MONEY_FORMAT.locale, fields: PRODUCTS_FIELDS }}
+      config={{
+        currency: MONEY_FORMAT.currency,
+        locale: MONEY_FORMAT.locale,
+        fields: PRODUCTS_FIELDS,
+        marginShortcutPercents: MARGIN_SHORTCUT_PERCENTS,
+      }}
     >
       <CatalogPageContent />
     </ProductsProvider>
@@ -115,6 +135,8 @@ export function CatalogPage() {
 }
 
 function CatalogPageContent() {
+  const { marginShortcutPercents } = useProductsConfig()
+  const marginShortcuts = marginShortcutPercents ?? MARGIN_SHORTCUT_PERCENTS
   const accessToken = useAuthStore((state) => state.accessToken)
   const queryClient = useQueryClient()
 
@@ -526,7 +548,8 @@ function CatalogPageContent() {
                       />
                       {prod.costPrice && (
                         <p className="text-xs text-gray-300 mt-0.5">
-                          Custo cadastrado {formatBRL(prod.costPrice)}
+                          Custo cadastrado {formatBRL(prod.costPrice)} · margem{' '}
+                          {formatMarginPercent(toCents(prod.costPrice), toCents(prod.price))}
                         </p>
                       )}
                     </div>
@@ -737,16 +760,20 @@ function CatalogPageContent() {
 
                   {prodForm.costPrice && Number(prodForm.costPrice) > 0 && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">Margem rápida</label>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        Margem rápida (sobre a venda)
+                      </label>
                       <div className="flex gap-2">
-                        {[30, 50, 100].map((margin) => (
+                        {marginShortcuts.map((margin) => (
                           <button
                             key={margin}
                             type="button"
                             onClick={() =>
                               setProdForm((prev) => ({
                                 ...prev,
-                                price: (Number(prev.costPrice) * (1 + margin / 100)).toFixed(2),
+                                price: fromCents(
+                                  applyMarginToCost(toCents(prev.costPrice), margin)
+                                ),
                               }))
                             }
                             className="flex-1 py-1.5 text-xs font-medium border border-gray-200 rounded-lg hover:bg-brand-50 hover:border-brand-300 transition-colors"
@@ -772,7 +799,7 @@ function CatalogPageContent() {
                       />
                       {prodForm.costPrice && prodForm.price && Number(prodForm.costPrice) > 0 && (
                         <p className="text-xs text-brand-600 mt-1 font-medium">
-                          Margem {(((Number(prodForm.price) - Number(prodForm.costPrice)) / Number(prodForm.costPrice)) * 100).toFixed(0)}%
+                          Margem {formatMarginPercent(toCents(prodForm.costPrice), toCents(prodForm.price))}
                         </p>
                       )}
                     </div>
