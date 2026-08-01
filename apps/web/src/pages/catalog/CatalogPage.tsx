@@ -32,6 +32,7 @@ const PRODUCTS_FIELDS = [
   PRODUCT_OPTIONAL_FIELD.BARCODE,
   PRODUCT_OPTIONAL_FIELD.SECTION,
   PRODUCT_OPTIONAL_FIELD.PREPARATION_TIME,
+  PRODUCT_OPTIONAL_FIELD.PREPARATION_INSTRUCTIONS,
 ] as const
 
 // Margem sobre o preço de venda, que é a definição do SDK e a usada no varejo. Por isso o teto é

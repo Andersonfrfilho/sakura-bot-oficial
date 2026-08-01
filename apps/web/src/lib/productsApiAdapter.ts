@@ -48,6 +48,7 @@ interface OrderHubProduct {
   unit: string | null
   barcode: string | null
   preparationTimeMinutes: number | null
+  preparationInstructions: string | null
   active: boolean
   sortOrder: number
 }
@@ -77,6 +78,7 @@ function toSdkProduct(product: OrderHubProduct): Product {
     barcode: product.barcode,
     sectionId: product.sectionId,
     preparationTimeMinutes: product.preparationTimeMinutes,
+    preparationInstructions: product.preparationInstructions,
   }
 }
 
@@ -111,6 +113,9 @@ function toProductBody(
     ...(input.sectionId !== undefined && { sectionId: input.sectionId }),
     ...(input.preparationTimeMinutes !== undefined && {
       preparationTimeMinutes: input.preparationTimeMinutes,
+    }),
+    ...(input.preparationInstructions !== undefined && {
+      preparationInstructions: input.preparationInstructions,
     }),
     ...('active' in input && input.active !== undefined && { active: input.active }),
     ...('sortOrder' in input && input.sortOrder !== undefined && { sortOrder: input.sortOrder }),
