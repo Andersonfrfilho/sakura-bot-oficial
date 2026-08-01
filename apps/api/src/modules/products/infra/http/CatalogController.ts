@@ -89,7 +89,7 @@ export class CatalogController {
       ),
       columns: { id: true },
     })
-    if (existing) throw new ConflictError('Categoria com esse nome já existe')
+    if (existing) throw new ConflictError('Catálogo com esse nome já existe')
 
     const [cat] = await this.db
       .insert(schema.catalogs)
@@ -123,7 +123,7 @@ export class CatalogController {
         eq(schema.catalogs.establishmentId, establishmentId)
       ),
     })
-    if (!existing) throw new NotFoundError('Categoria')
+    if (!existing) throw new NotFoundError('Catálogo')
 
     const slug = toSlug(parsed.data.name)
 
@@ -135,7 +135,7 @@ export class CatalogController {
         ),
         columns: { id: true },
       })
-      if (conflict) throw new ConflictError('Categoria com esse nome já existe')
+      if (conflict) throw new ConflictError('Catálogo com esse nome já existe')
     }
 
     const [updated] = await this.db
@@ -168,7 +168,7 @@ export class CatalogController {
       ),
       columns: { id: true },
     })
-    if (!existing) throw new NotFoundError('Categoria')
+    if (!existing) throw new NotFoundError('Catálogo')
 
     // Produtos ficam sem catálogo (catalogId → null via ON DELETE SET NULL)
     await this.db

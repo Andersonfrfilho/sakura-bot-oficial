@@ -376,7 +376,7 @@ function CatalogPageContent() {
   const withoutCatalogCount = allProducts.filter((p) => p.catalogId === null).length
 
   const catModalTitle =
-    catModal === 'create' ? 'Nova categoria' : catModal === 'edit' ? `Editar · ${selectedCat?.name}` : 'Excluir categoria'
+    catModal === 'create' ? 'Novo catálogo' : catModal === 'edit' ? `Editar · ${selectedCat?.name}` : 'Excluir catálogo'
   const prodModalTitle =
     prodModal === 'create' ? 'Novo produto' : prodModal === 'edit' ? `Editar · ${selectedProd?.name}` : 'Excluir produto'
 
@@ -385,13 +385,13 @@ function CatalogPageContent() {
       {/* Left panel — catalogs */}
       <div className="w-56 flex-shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col">
         <div className="px-4 py-4 border-b border-gray-200">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Categorias</p>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Catálogos</p>
           <button
             onClick={openCreateCat}
             className="flex items-center justify-center gap-2 w-full py-2 text-xs font-semibold bg-brand-600 text-white rounded-xl hover:bg-brand-700 transition-colors active:scale-95"
           >
             <Plus className="h-4 w-4" />
-            Nova categoria
+            Novo catálogo
           </button>
         </div>
 
@@ -452,7 +452,7 @@ function CatalogPageContent() {
                   : 'text-gray-500 hover:bg-gray-100'
               }`}
             >
-              <span className="italic">Sem categoria</span>
+              <span className="italic">Sem catálogo</span>
               <span className="float-right text-xs text-gray-400">{withoutCatalogCount}</span>
             </button>
           )}
@@ -472,7 +472,7 @@ function CatalogPageContent() {
               {selectedCatId === null
                 ? 'Todos os produtos'
                 : selectedCatId === '__none__'
-                ? 'Sem categoria'
+                ? 'Sem catálogo'
                 : (catalogs.find((c) => c.id === selectedCatId)?.name ?? '')}
             </h1>
             <p className="text-sm text-gray-400">{visibleProducts.length} produto{visibleProducts.length !== 1 ? 's' : ''}</p>
@@ -489,7 +489,7 @@ function CatalogPageContent() {
 
         <div className="flex-1 overflow-y-auto p-6">
           {visibleProducts.length === 0 ? (
-            <p className="text-gray-400 text-center py-16">Nenhum produto nesta categoria</p>
+            <p className="text-gray-400 text-center py-16">Nenhum produto neste catálogo</p>
           ) : (
             <div className="grid gap-3">
               {visibleProducts.map((prod) => {
@@ -574,7 +574,7 @@ function CatalogPageContent() {
             <div className="p-5 space-y-4">
               {catModal === 'delete' ? (
                 <p className="text-sm text-gray-600">
-                  Excluir <strong>{selectedCat?.name}</strong>? Os produtos associados ficam sem categoria.
+                  Excluir <strong>{selectedCat?.name}</strong>? Os produtos associados ficam sem catálogo.
                 </p>
               ) : (
                 <>
