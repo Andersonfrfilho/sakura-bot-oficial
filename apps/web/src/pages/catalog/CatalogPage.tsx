@@ -2,23 +2,23 @@ import { useState, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
-import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
-import { Plus, Pencil, Trash2, ScanLine } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { SectionManager } from './components/SectionManager'
 import { IngredientManager } from './components/IngredientManager'
 import { RecipeManager, RecipeCostBadge } from './components/RecipeManager'
 import { BarcodeScanner } from './components/BarcodeScanner'
 import { ExpiringBatchBadge } from './components/StockBatchList'
 import {
+  ProductForm,
   ProductsProvider,
   PRODUCT_OPTIONAL_FIELD,
-  applyMarginToCost,
   formatBarcode,
   formatMarginPercent,
   formatMoney,
-  useProductsConfig,
+  type CreateProductInput,
   type MoneyFormat,
+  type ProductSuggestion,
 } from '@adatechnology/products-ui'
 import { productsApiAdapter } from '@/lib/productsApiAdapter'
 
@@ -33,7 +33,11 @@ const PRODUCTS_FIELDS = [
   PRODUCT_OPTIONAL_FIELD.SECTION,
   PRODUCT_OPTIONAL_FIELD.PREPARATION_TIME,
   PRODUCT_OPTIONAL_FIELD.PREPARATION_INSTRUCTIONS,
+  PRODUCT_OPTIONAL_FIELD.SORT_ORDER,
 ] as const
+
+// A API valida a unidade com `z.enum` — qualquer opção extra do SDK viraria 400 no salvamento.
+const UNIT_OPTIONS = ['un', 'kg', 'g', 'l', 'ml'] as const
 
 // Margem sobre o preço de venda, que é a definição do SDK e a usada no varejo. Por isso o teto é
 // abaixo de 100%: uma margem de 100% sobre a venda implicaria custo zero.
@@ -72,28 +76,6 @@ interface Product {
   sortOrder: number
 }
 
-type ProductFormData = {
-  name: string
-  description: string
-  price: string
-  costPrice: string
-  unit: string
-  barcode: string
-  categoryId: string
-  sectionId: string
-  preparationTimeMinutes: string
-  preparationInstructions: string
-  sortOrder: string
-}
-
-interface ProductSuggestion {
-  name: string
-  brand?: string
-  barcode?: string
-  imageUrl?: string
-  category?: string
-}
-
 type CategoryFormData = {
   name: string
   sortOrder: string
@@ -102,17 +84,12 @@ type CategoryFormData = {
   cstIcms: string
 }
 
-const EMPTY_PRODUCT: ProductFormData = { name: '', description: '', price: '', costPrice: '', unit: 'un', barcode: '', categoryId: '', sectionId: '', preparationTimeMinutes: '', preparationInstructions: '', sortOrder: '0' }
 const EMPTY_CATEGORY: CategoryFormData = { name: '', sortOrder: '0', ncmCode: '', cfopCode: '', cstIcms: '' }
 
 // A API guarda o preço como decimal em reais e o SDK formata centavo inteiro. A multiplicação
 // arredondada mora só aqui — ver `productsApiAdapter` para o mesmo contrato do lado das mutações.
 function toCents(value: string | number): number {
   return Math.round(Number(value) * 100)
-}
-
-function fromCents(cents: number): string {
-  return (cents / 100).toFixed(2)
 }
 
 function formatBRL(value: string | number) {
@@ -127,6 +104,7 @@ export function CatalogPage() {
         currency: MONEY_FORMAT.currency,
         locale: MONEY_FORMAT.locale,
         fields: PRODUCTS_FIELDS,
+        unitOptions: UNIT_OPTIONS,
         marginShortcutPercents: MARGIN_SHORTCUT_PERCENTS,
       }}
     >
@@ -136,8 +114,6 @@ export function CatalogPage() {
 }
 
 function CatalogPageContent() {
-  const { marginShortcutPercents } = useProductsConfig()
-  const marginShortcuts = marginShortcutPercents ?? MARGIN_SHORTCUT_PERCENTS
   const accessToken = useAuthStore((state) => state.accessToken)
   const queryClient = useQueryClient()
 
@@ -152,16 +128,12 @@ function CatalogPageContent() {
   // Product modal
   const [prodModal, setProdModal] = useState<'create' | 'edit' | 'delete' | null>(null)
   const [selectedProd, setSelectedProd] = useState<Product | null>(null)
-  const [prodForm, setProdForm] = useState<ProductFormData>(EMPTY_PRODUCT)
   const [prodError, setProdError] = useState<string | null>(null)
   const [showScanner, setShowScanner] = useState(false)
 
-  // Product search state
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([])
-  const [searchLoading, setSearchLoading] = useState(false)
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // O `ProductForm` do SDK pede o código de barras por promessa; o `BarcodeScanner` daqui é um
+  // componente com callbacks. O resolver guardado aqui é a ponte entre os dois modelos.
+  const scanResolver = useRef<((suggestion: ProductSuggestion | null) => void) | null>(null)
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['catalog-categories'] })
@@ -278,26 +250,13 @@ function CatalogPageContent() {
   }
 
   function openCreateProd() {
-    setProdForm({ ...EMPTY_PRODUCT, categoryId: selectedCatId ?? '' })
+    setSelectedProd(null)
     setProdError(null)
     setProdModal('create')
   }
 
   function openEditProd(prod: Product) {
     setSelectedProd(prod)
-    setProdForm({
-      name: prod.name,
-      description: prod.description ?? '',
-      price: prod.price,
-      costPrice: prod.costPrice ?? '',
-      unit: prod.unit ?? 'un',
-      barcode: prod.barcode ?? '',
-      categoryId: prod.categoryId ?? '',
-      sectionId: prod.sectionId ?? '',
-      preparationTimeMinutes: prod.preparationTimeMinutes?.toString() ?? '',
-      preparationInstructions: prod.preparationInstructions ?? '',
-      sortOrder: String(prod.sortOrder),
-    })
     setProdError(null)
     setProdModal('edit')
   }
@@ -311,85 +270,108 @@ function CatalogPageContent() {
   function closeProdModal() {
     setProdModal(null)
     setSelectedProd(null)
-    setProdForm(EMPTY_PRODUCT)
     setProdError(null)
   }
 
-  function submitProd() {
-    const body = {
-      name: prodForm.name,
-      description: prodForm.description || undefined,
-      price: parseFloat(prodForm.price),
-      costPrice: prodForm.costPrice ? parseFloat(prodForm.costPrice) : null,
-      unit: prodForm.unit,
-      barcode: prodForm.barcode || null,
-      categoryId: prodForm.categoryId || null,
-      sectionId: prodForm.sectionId || null,
-      preparationTimeMinutes: prodForm.preparationTimeMinutes ? parseInt(prodForm.preparationTimeMinutes) : null,
-      preparationInstructions: prodForm.preparationInstructions || null,
-      sortOrder: parseInt(prodForm.sortOrder) || 0,
-    }
-    if (prodModal === 'create') createProd.mutate(body)
-    else if (prodModal === 'edit' && selectedProd) updateProd.mutate({ id: selectedProd.id, body })
-    else if (prodModal === 'delete' && selectedProd) deleteProd.mutate(selectedProd.id)
+  function deleteSelectedProd() {
+    if (selectedProd) deleteProd.mutate(selectedProd.id)
   }
 
-  const handleSearchInput = useCallback((value: string) => {
-    setSearchQuery(value)
-    if (searchTimer.current) clearTimeout(searchTimer.current)
-    if (value.length < 2) {
-      setSuggestions([])
-      return
-    }
-    searchTimer.current = setTimeout(async () => {
-      setSearchLoading(true)
-      try {
-        const results = await api.get<ProductSuggestion[]>(
-          `/catalog/product-search?q=${encodeURIComponent(value)}`,
-          accessToken ?? undefined
-        )
-        setSuggestions(results)
-      } catch {
-        setSuggestions([])
-      } finally {
-        setSearchLoading(false)
+  // O SDK entrega centavos e vocabulário de catálogo; a API espera reais e vocabulário de categoria.
+  const submitProduct = useCallback(
+    async (data: CreateProductInput & { active?: boolean; sortOrder?: number }) => {
+      setProdError(null)
+      const body = {
+        name: data.name,
+        description: data.description ?? undefined,
+        price: data.priceInCents / 100,
+        costPrice: data.costPriceInCents ? data.costPriceInCents / 100 : null,
+        unit: data.unit ?? 'un',
+        barcode: data.barcode ?? null,
+        categoryId: data.catalogId ?? null,
+        sectionId: data.sectionId ?? null,
+        preparationTimeMinutes: data.preparationTimeMinutes ?? null,
+        preparationInstructions: data.preparationInstructions ?? null,
+        sortOrder: data.sortOrder ?? 0,
+        active: data.active ?? true,
       }
-    }, 400)
-  }, [accessToken])
+      try {
+        if (selectedProd) await updateProd.mutateAsync({ id: selectedProd.id, body })
+        else await createProd.mutateAsync(body)
+      } catch {
+        // `onError` da mutation já preencheu `prodError`; o formulário só precisa parar de salvar.
+      }
+    },
+    [selectedProd, updateProd, createProd]
+  )
 
-  function selectSuggestion(suggestion: ProductSuggestion) {
-    setProdForm((prev) => ({
-      ...prev,
-      name: suggestion.name,
-      barcode: suggestion.barcode ?? prev.barcode,
-    }))
-    setSearchQuery('')
-    setSuggestions([])
-    setSearchOpen(false)
+  const searchSuggestions = useCallback(
+    (query: string) =>
+      api.get<ProductSuggestion[]>(
+        `/catalog/product-search?q=${encodeURIComponent(query)}`,
+        accessToken ?? undefined
+      ),
+    [accessToken]
+  )
+
+  const requestBarcodeScan = useCallback(
+    () =>
+      new Promise<ProductSuggestion | null>((resolve) => {
+        scanResolver.current = resolve
+        setShowScanner(true)
+      }),
+    []
+  )
+
+  function finishBarcodeScan(suggestion: ProductSuggestion | null) {
+    setShowScanner(false)
+    scanResolver.current?.(suggestion)
+    scanResolver.current = null
   }
 
   async function handleBarcodeScan(barcode: string) {
-    setProdForm((prev) => ({ ...prev, barcode }))
-    setShowScanner(false)
     try {
-      const suggestion = await api.get<ProductSuggestion | null>(
+      const found = await api.get<ProductSuggestion | null>(
         `/catalog/product-lookup/${barcode}`,
         accessToken ?? undefined
       )
-      if (suggestion) {
-        setProdForm((prev) => ({
-          ...prev,
-          name: suggestion.name || prev.name,
-          barcode: suggestion.barcode ?? prev.barcode,
-        }))
-      }
+      finishBarcodeScan(found ?? { name: '', barcode })
     } catch {
-      // Product not found — keep barcode in form
+      // Código não está na base externa: vale o número lido, o nome o usuário digita.
+      finishBarcodeScan({ name: '', barcode })
     }
   }
 
   const isCatPending = createCat.isPending || updateCat.isPending || deleteCat.isPending
-  const isProdPending = createProd.isPending || updateProd.isPending || deleteProd.isPending
+
+  const sdkCatalogs = categories.map((cat) => ({
+    id: cat.id,
+    name: cat.name,
+    description: null,
+    active: cat.active,
+  }))
+
+  // Seção aqui é posto de produção (cozinha, bar), válido para todo o catálogo — daí `catalogId`
+  // ausente, que o SDK lê como "não filtrar por categoria".
+  const sdkSections = sections.map((section) => ({ id: section.id, name: section.name }))
+
+  const sdkInitialProduct = selectedProd
+    ? {
+        id: selectedProd.id,
+        name: selectedProd.name,
+        description: selectedProd.description,
+        priceInCents: toCents(selectedProd.price),
+        costPriceInCents: selectedProd.costPrice === null ? null : toCents(selectedProd.costPrice),
+        unit: selectedProd.unit,
+        barcode: selectedProd.barcode,
+        catalogId: selectedProd.categoryId,
+        sectionId: selectedProd.sectionId,
+        preparationTimeMinutes: selectedProd.preparationTimeMinutes,
+        preparationInstructions: selectedProd.preparationInstructions,
+        sortOrder: selectedProd.sortOrder,
+        active: selectedProd.active,
+      }
+    : { catalogId: selectedCatId === '__none__' ? null : selectedCatId }
 
   const uncategorizedCount = allProducts.filter((p) => p.categoryId === null).length
 
@@ -679,247 +661,40 @@ function CatalogPageContent() {
                 </p>
               ) : (
                 <>
-                  <div className="border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => { setSearchOpen(!searchOpen); setSearchQuery(''); setSuggestions([]) }}
-                      className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-                    >
-                      <span className="flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        Buscar produto (Open Food Facts)
-                      </span>
-                      <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 text-gray-400 transition-transform ${searchOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                    {searchOpen && (
-                      <div className="px-4 pb-3 space-y-2 border-t border-gray-100 pt-3">
-                        <input
-                          type="text"
-                          value={searchQuery}
-                          onChange={(e) => handleSearchInput(e.target.value)}
-                          placeholder="Digite o nome de um produto para buscar..."
-                          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                        />
-                        {searchLoading && <p className="text-xs text-gray-400">Buscando...</p>}
-                        {suggestions.length > 0 && (
-                          <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-                            {suggestions.map((suggestion, index) => (
-                              <button
-                                key={suggestion.barcode ?? index}
-                                type="button"
-                                onClick={() => selectSuggestion(suggestion)}
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-brand-50 transition-colors"
-                              >
-                                <p className="font-medium text-gray-900 truncate">{suggestion.name}</p>
-                                <p className="text-xs text-gray-400">
-                                  {[suggestion.brand, suggestion.category].filter(Boolean).join(' · ')}
-                                  {suggestion.barcode && <> · {suggestion.barcode}</>}
-                                </p>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
-                    <input
-                      type="text"
-                      value={prodForm.name}
-                      onChange={(e) => setProdForm((prev) => ({ ...prev, name: e.target.value }))}
-                      placeholder="Ex: Coca-Cola 350ml"
-                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Descrição (opcional)</label>
-                    <textarea
-                      value={prodForm.description}
-                      onChange={(e) => setProdForm((prev) => ({ ...prev, description: e.target.value }))}
-                      placeholder="Detalhes do produto..."
-                      rows={2}
-                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Preço de custo (R$)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={prodForm.costPrice}
-                      onChange={(e) => setProdForm((prev) => ({ ...prev, costPrice: e.target.value }))}
-                      placeholder="0,00"
-                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    />
-                  </div>
-
-                  {prodForm.costPrice && Number(prodForm.costPrice) > 0 && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
-                        Margem rápida (sobre a venda)
-                      </label>
-                      <div className="flex gap-2">
-                        {marginShortcuts.map((margin) => (
-                          <button
-                            key={margin}
-                            type="button"
-                            onClick={() =>
-                              setProdForm((prev) => ({
-                                ...prev,
-                                price: fromCents(
-                                  applyMarginToCost(toCents(prev.costPrice), margin)
-                                ),
-                              }))
-                            }
-                            className="flex-1 py-1.5 text-xs font-medium border border-gray-200 rounded-lg hover:bg-brand-50 hover:border-brand-300 transition-colors"
-                          >
-                            +{margin}%
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Preço de venda (R$)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={prodForm.price}
-                        onChange={(e) => setProdForm((prev) => ({ ...prev, price: e.target.value }))}
-                        placeholder="0,00"
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      />
-                      {prodForm.costPrice && prodForm.price && Number(prodForm.costPrice) > 0 && (
-                        <p className="text-xs text-brand-600 mt-1 font-medium">
-                          Margem {formatMarginPercent(toCents(prodForm.costPrice), toCents(prodForm.price))}
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Ordem</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={prodForm.sortOrder}
-                        onChange={(e) => setProdForm((prev) => ({ ...prev, sortOrder: e.target.value }))}
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
-                      <select
-                        value={prodForm.unit}
-                        onChange={(e) => setProdForm((prev) => ({ ...prev, unit: e.target.value }))}
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      >
-                        <option value="un">Unidade</option>
-                        <option value="kg">Kg</option>
-                        <option value="g">Grama</option>
-                        <option value="l">Litro</option>
-                        <option value="ml">Mililitro</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Código de barras</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={prodForm.barcode}
-                          onChange={(e) => setProdForm((prev) => ({ ...prev, barcode: e.target.value }))}
-                          placeholder="Código de barras (EAN)"
-                          className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowScanner(true)}
-                          className="px-3 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
-                          title="Escanear código de barras"
-                        >
-                          <ScanLine className="h-4 w-4 text-gray-600" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                    <Select
-                      value={prodForm.categoryId}
-                      onChange={(value) => setProdForm((prev) => ({ ...prev, categoryId: value }))}
-                      options={[
-                        { value: '', label: 'Sem categoria' },
-                        ...categories.map((cat) => ({ value: cat.id, label: cat.name })),
-                      ]}
-                      searchable={categories.length > 6}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Seção</label>
-                    <Select
-                      value={prodForm.sectionId}
-                      onChange={(value) => setProdForm((prev) => ({ ...prev, sectionId: value }))}
-                      options={[
-                        { value: '', label: 'Nenhuma' },
-                        ...sections.map((section) => ({ value: section.id, label: section.name })),
-                      ]}
-                      searchable={sections.length > 6}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Tempo de preparo (min)</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={prodForm.preparationTimeMinutes}
-                        onChange={(e) => setProdForm((prev) => ({ ...prev, preparationTimeMinutes: e.target.value }))}
-                        placeholder="Ex: 30"
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Instruções de preparo</label>
-                      <textarea
-                        value={prodForm.preparationInstructions}
-                        onChange={(e) => setProdForm((prev) => ({ ...prev, preparationInstructions: e.target.value }))}
-                        placeholder="Modo de preparo..."
-                        rows={2}
-                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      />
-                    </div>
-                  </div>
+                  <ProductForm
+                    key={selectedProd?.id ?? 'new'}
+                    catalogs={sdkCatalogs}
+                    sections={sdkSections}
+                    initialValues={sdkInitialProduct}
+                    onSubmit={submitProduct}
+                    onScanBarcode={requestBarcodeScan}
+                    onSearchSuggestions={searchSuggestions}
+                  />
                   {prodModal === 'edit' && selectedProd && (
                     <RecipeManager productId={selectedProd.id} />
                   )}
                 </>
               )}
               {prodError && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{prodError}</p>}
-              <div className="flex gap-3 pt-1">
-                <button onClick={closeProdModal} className="flex-1 py-2.5 border border-gray-300 text-sm font-medium text-gray-700 rounded-xl hover:bg-gray-50">Cancelar</button>
-                <button
-                  onClick={submitProd}
-                  disabled={isProdPending}
-                  className={`flex-1 py-2.5 text-sm font-semibold rounded-xl disabled:opacity-50 ${prodModal === 'delete' ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-brand-600 text-white hover:bg-brand-700'}`}
-                >
-                  {isProdPending ? 'Aguarde...' : prodModal === 'delete' ? 'Excluir' : prodModal === 'edit' ? 'Salvar' : 'Criar'}
-                </button>
-              </div>
+              {/* Criar e editar têm o botão de submit dentro do próprio `ProductForm`. */}
+              {prodModal === 'delete' && (
+                <div className="flex gap-3 pt-1">
+                  <button onClick={closeProdModal} className="flex-1 py-2.5 border border-gray-300 text-sm font-medium text-gray-700 rounded-xl hover:bg-gray-50">Cancelar</button>
+                  <button
+                    onClick={deleteSelectedProd}
+                    disabled={deleteProd.isPending}
+                    className="flex-1 py-2.5 text-sm font-semibold rounded-xl disabled:opacity-50 bg-red-600 text-white hover:bg-red-700"
+                  >
+                    {deleteProd.isPending ? 'Aguarde...' : 'Excluir'}
+                  </button>
+                </div>
+              )}
             </div>
       </Modal>
       {showScanner && (
         <BarcodeScanner
           onScan={handleBarcodeScan}
-          onClose={() => setShowScanner(false)}
+          onClose={() => finishBarcodeScan(null)}
         />
       )}
     </div>

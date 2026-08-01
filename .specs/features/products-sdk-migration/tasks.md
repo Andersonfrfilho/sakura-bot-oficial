@@ -67,13 +67,39 @@ as mesmas 800 linhas.
   `Section.catalogId` vira opcional (seção como posto de produção) e o default
   de `marginShortcutPercents` perde o 100, que era um botão morto.
 - **T3.2** ✅ Adaptador e `fields` da página mapeiam `preparationInstructions`.
-- **T3.3** ⏳ Trocar o formulário local da `CatalogPage` pelo `ProductForm`,
-  ligando `onScanBarcode` no `BarcodeScanner` existente e `onSearchSuggestions`
-  em `/catalog/product-search`. É o passo que de fato apaga código.
+- **T3.3** ✅ O formulário local da `CatalogPage` saiu (864 → 702 linhas): entra
+  `ProductForm`, com `onScanBarcode` ligado no `BarcodeScanner` existente e
+  `onSearchSuggestions` em `/catalog/product-search`. Duas correções vieram
+  junto, no SDK:
+  - `SORT_ORDER` vira campo opcional — sem ele a "Ordem" da tela sumiria.
+  - `onScanBarcode` devolve `ProductSuggestion | null`, não `string | null`.
+    O host que consulta `/catalog/product-lookup/:barcode` já tem nome e imagem
+    em mãos; devolver só o número obrigaria a redigitar o que o scanner
+    descobriu.
 
-Continua fora do `ProductForm`, por não ser dele: fiscal da **categoria**
-(NCM/CFOP/CST), receitas, lotes e ingredientes. Fiscal de catálogo é candidato
-a uma próxima extensão do SDK; o resto é domínio do Order Hub.
+  `unitOptions` é fixado em `un/kg/g/l/ml` na config do provider porque a API
+  valida a unidade com `z.enum` — as opções extras do default do SDK (`pc`,
+  `cx`, `dz`) virariam 400 no salvamento.
+
+Continua fora do `ProductForm`, por não ser dele: receitas, lotes e
+ingredientes — domínio do Order Hub.
+
+## Fase 5 — Fiscal no SDK (a especificar)
+> 🤖 Modelo: `opus` 🧠
+
+Direção dada: o fiscal do SDK é focado em **NFC-e** (mercadoria) e ganha
+também uma **área de emissão de NFS-e** (serviço), a implementar.
+
+O que já existe e migra para o SDK: `ncmCode` / `cfopCode` / `cstIcms` moram
+hoje só no `categorySchema` do Order Hub (limites 8 / 4 / 3 caracteres) e o
+`Catalog` do SDK não os conhece. Entram como campos opcionais atrás de flag de
+config, na mesma linha do resto do pacote — vertical que não emite nota não
+desenha campo fiscal.
+
+NFC-e e NFS-e são documentos de naturezas diferentes (mercadoria × serviço,
+estadual × municipal, com lista de serviço e ISS no lugar de NCM e ICMS), então
+não compartilham formulário. Ver `.specs/features/fiscal/` para a estratégia
+por estabelecimento já desenhada.
 
 ## Fase 4 — Backend faltante
 > 🤖 Modelo: `sonnet`
