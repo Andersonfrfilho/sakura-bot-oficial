@@ -1,6 +1,6 @@
 import { pgTable, uuid, varchar, text, numeric, boolean, integer, timestamp } from 'drizzle-orm/pg-core'
 import { establishments } from './establishments'
-import { categories } from './categories'
+import { catalogs } from './catalogs'
 import { sections } from './sections'
 
 export const products = pgTable('products', {
@@ -8,7 +8,7 @@ export const products = pgTable('products', {
   establishmentId: uuid('establishment_id')
     .notNull()
     .references(() => establishments.id, { onDelete: 'cascade' }),
-  categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
+  catalogId: uuid('category_id').references(() => catalogs.id, { onDelete: 'set null' }),
   sectionId: uuid('section_id').references(() => sections.id, { onDelete: 'set null' }),
   name: varchar('name', { length: 255 }).notNull(),
   slug: varchar('slug', { length: 255 }).notNull(),

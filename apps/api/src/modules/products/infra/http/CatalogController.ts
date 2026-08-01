@@ -9,7 +9,7 @@ import { OpenFoodFactsProvider } from '@/shared/providers/OpenFoodFactsProvider'
 
 type Database = NodePgDatabase<typeof schema>
 
-const categorySchema = z.object({
+const catalogSchema = z.object({
   name: z.string().min(1).max(100),
   active: z.boolean().optional(),
   sortOrder: z.number().int().min(0).optional(),
@@ -25,7 +25,7 @@ const productSchema = z.object({
   costPrice: z.number().positive().nullable().optional(),
   unit: z.enum(['un', 'kg', 'g', 'l', 'ml']).optional(),
   barcode: z.string().max(20).nullable().optional(),
-  categoryId: z.string().uuid().nullable().optional(),
+  catalogId: z.string().uuid().nullable().optional(),
   sectionId: z.string().uuid().nullable().optional(),
   preparationTimeMinutes: z.number().int().positive().nullable().optional(),
   preparationInstructions: z.string().nullable().optional(),
@@ -58,41 +58,41 @@ export class CatalogController {
     ])
   }
 
-  // ── Categories ────────────────────────────────────────────────────────────
+  // ── Catalogs ────────────────────────────────────────────────────────────
 
-  listCategories: RouteHandler = async (request, response) => {
+  listCatalogs: RouteHandler = async (request, response) => {
     if (!request.user) throw new UnauthorizedError()
     const { establishmentId } = request.user
 
     const cats = await this.db
       .select()
-      .from(schema.categories)
-      .where(eq(schema.categories.establishmentId, establishmentId))
-      .orderBy(asc(schema.categories.sortOrder), asc(schema.categories.name))
+      .from(schema.catalogs)
+      .where(eq(schema.catalogs.establishmentId, establishmentId))
+      .orderBy(asc(schema.catalogs.sortOrder), asc(schema.catalogs.name))
 
     response.json(cats)
   }
 
-  createCategory: RouteHandler = async (request, response) => {
+  createCatalog: RouteHandler = async (request, response) => {
     if (!request.user) throw new UnauthorizedError()
     const { establishmentId } = request.user
 
-    const parsed = categorySchema.safeParse(request.body)
+    const parsed = catalogSchema.safeParse(request.body)
     if (!parsed.success) throw new ValidationError('Dados inválidos', parsed.error.flatten())
 
     const slug = toSlug(parsed.data.name)
 
-    const existing = await this.db.query.categories.findFirst({
+    const existing = await this.db.query.catalogs.findFirst({
       where: and(
-        eq(schema.categories.establishmentId, establishmentId),
-        eq(schema.categories.slug, slug)
+        eq(schema.catalogs.establishmentId, establishmentId),
+        eq(schema.catalogs.slug, slug)
       ),
       columns: { id: true },
     })
     if (existing) throw new ConflictError('Categoria com esse nome já existe')
 
     const [cat] = await this.db
-      .insert(schema.categories)
+      .insert(schema.catalogs)
       .values({
         establishmentId,
         name: parsed.data.name,
@@ -109,18 +109,18 @@ export class CatalogController {
     response.json(cat, 201)
   }
 
-  updateCategory: RouteHandler = async (request, response) => {
+  updateCatalog: RouteHandler = async (request, response) => {
     if (!request.user) throw new UnauthorizedError()
     const { establishmentId } = request.user
     const id = request.params['id']!
 
-    const parsed = categorySchema.safeParse(request.body)
+    const parsed = catalogSchema.safeParse(request.body)
     if (!parsed.success) throw new ValidationError('Dados inválidos', parsed.error.flatten())
 
-    const existing = await this.db.query.categories.findFirst({
+    const existing = await this.db.query.catalogs.findFirst({
       where: and(
-        eq(schema.categories.id, id),
-        eq(schema.categories.establishmentId, establishmentId)
+        eq(schema.catalogs.id, id),
+        eq(schema.catalogs.establishmentId, establishmentId)
       ),
     })
     if (!existing) throw new NotFoundError('Categoria')
@@ -128,10 +128,10 @@ export class CatalogController {
     const slug = toSlug(parsed.data.name)
 
     if (slug !== existing.slug) {
-      const conflict = await this.db.query.categories.findFirst({
+      const conflict = await this.db.query.catalogs.findFirst({
         where: and(
-          eq(schema.categories.establishmentId, establishmentId),
-          eq(schema.categories.slug, slug)
+          eq(schema.catalogs.establishmentId, establishmentId),
+          eq(schema.catalogs.slug, slug)
         ),
         columns: { id: true },
       })
@@ -139,7 +139,7 @@ export class CatalogController {
     }
 
     const [updated] = await this.db
-      .update(schema.categories)
+      .update(schema.catalogs)
       .set({
         name: parsed.data.name,
         slug,
@@ -149,31 +149,31 @@ export class CatalogController {
         ...(parsed.data.cfopCode !== undefined && { cfopCode: parsed.data.cfopCode }),
         ...(parsed.data.cstIcms !== undefined && { cstIcms: parsed.data.cstIcms }),
       })
-      .where(and(eq(schema.categories.id, id), eq(schema.categories.establishmentId, establishmentId)))
+      .where(and(eq(schema.catalogs.id, id), eq(schema.catalogs.establishmentId, establishmentId)))
       .returning()
 
     await this.invalidateCache(establishmentId)
     response.json(updated)
   }
 
-  deleteCategory: RouteHandler = async (request, response) => {
+  deleteCatalog: RouteHandler = async (request, response) => {
     if (!request.user) throw new UnauthorizedError()
     const { establishmentId } = request.user
     const id = request.params['id']!
 
-    const existing = await this.db.query.categories.findFirst({
+    const existing = await this.db.query.catalogs.findFirst({
       where: and(
-        eq(schema.categories.id, id),
-        eq(schema.categories.establishmentId, establishmentId)
+        eq(schema.catalogs.id, id),
+        eq(schema.catalogs.establishmentId, establishmentId)
       ),
       columns: { id: true },
     })
     if (!existing) throw new NotFoundError('Categoria')
 
-    // Products become uncategorized (categoryId → null via ON DELETE SET NULL)
+    // Produtos ficam sem catálogo (catalogId → null via ON DELETE SET NULL)
     await this.db
-      .delete(schema.categories)
-      .where(and(eq(schema.categories.id, id), eq(schema.categories.establishmentId, establishmentId)))
+      .delete(schema.catalogs)
+      .where(and(eq(schema.catalogs.id, id), eq(schema.catalogs.establishmentId, establishmentId)))
 
     await this.invalidateCache(establishmentId)
     response.json({ success: true }, 200)
@@ -223,7 +223,7 @@ export class CatalogController {
         ...(parsed.data.costPrice !== undefined && { costPrice: parsed.data.costPrice === null ? null : String(parsed.data.costPrice) }),
         ...(parsed.data.unit !== undefined && { unit: parsed.data.unit }),
         ...(parsed.data.barcode !== undefined && { barcode: parsed.data.barcode }),
-        ...(parsed.data.categoryId !== undefined && { categoryId: parsed.data.categoryId }),
+        ...(parsed.data.catalogId !== undefined && { catalogId: parsed.data.catalogId }),
         ...(parsed.data.sectionId !== undefined && { sectionId: parsed.data.sectionId }),
         ...(parsed.data.preparationTimeMinutes !== undefined && { preparationTimeMinutes: parsed.data.preparationTimeMinutes }),
         ...(parsed.data.preparationInstructions !== undefined && { preparationInstructions: parsed.data.preparationInstructions }),
@@ -276,7 +276,7 @@ export class CatalogController {
         ...(parsed.data.costPrice !== undefined && { costPrice: parsed.data.costPrice === null ? null : String(parsed.data.costPrice) }),
         ...(parsed.data.unit !== undefined && { unit: parsed.data.unit }),
         ...(parsed.data.barcode !== undefined && { barcode: parsed.data.barcode }),
-        ...(parsed.data.categoryId !== undefined && { categoryId: parsed.data.categoryId }),
+        ...(parsed.data.catalogId !== undefined && { catalogId: parsed.data.catalogId }),
         ...(parsed.data.sectionId !== undefined && { sectionId: parsed.data.sectionId }),
         ...(parsed.data.preparationTimeMinutes !== undefined && { preparationTimeMinutes: parsed.data.preparationTimeMinutes }),
         ...(parsed.data.preparationInstructions !== undefined && { preparationInstructions: parsed.data.preparationInstructions }),

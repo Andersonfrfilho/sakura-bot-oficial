@@ -27,9 +27,9 @@ export class MenuController {
     const [cats, prods] = await Promise.all([
       this.db
         .select()
-        .from(schema.categories)
-        .where(and(eq(schema.categories.establishmentId, establishmentId), eq(schema.categories.active, true)))
-        .orderBy(asc(schema.categories.sortOrder), asc(schema.categories.name)),
+        .from(schema.catalogs)
+        .where(and(eq(schema.catalogs.establishmentId, establishmentId), eq(schema.catalogs.active, true)))
+        .orderBy(asc(schema.catalogs.sortOrder), asc(schema.catalogs.name)),
       this.db
         .select()
         .from(schema.products)
@@ -37,20 +37,20 @@ export class MenuController {
         .orderBy(asc(schema.products.sortOrder), asc(schema.products.name)),
     ])
 
-    const prodsByCategory: Record<string, typeof prods> = {}
+    const productsByCatalog: Record<string, typeof prods> = {}
     for (const p of prods) {
-      const key = p.categoryId ?? '__none__'
-      if (!prodsByCategory[key]) prodsByCategory[key] = []
-      prodsByCategory[key].push(p)
+      const key = p.catalogId ?? '__none__'
+      if (!productsByCatalog[key]) productsByCatalog[key] = []
+      productsByCatalog[key].push(p)
     }
 
     const menu = {
-      categories: cats.map((c) => ({
+      catalogs: cats.map((c) => ({
         id: c.id,
         name: c.name,
-        products: prodsByCategory[c.id] ?? [],
+        products: productsByCatalog[c.id] ?? [],
       })),
-      uncategorized: prodsByCategory['__none__'] ?? [],
+      withoutCatalog: productsByCatalog['__none__'] ?? [],
     }
 
     await this.cache.set(cacheKey, JSON.stringify(menu), 60)

@@ -2,12 +2,10 @@
  * Adaptador entre as rotas de catálogo do Order Hub e o contrato `ProductsApi` do
  * @adatechnology/products-ui.
  *
- * Duas traduções acontecem aqui e em nenhum outro lugar:
- *
- * 1. **Dinheiro.** A API guarda `numeric(10,2)` e devolve string decimal em reais; o SDK trabalha
- *    em centavo inteiro. A conversão passa por `Math.round` sobre a string multiplicada, nunca por
- *    aritmética de float acumulada — `0.1 + 0.2` não pode virar preço de venda.
- * 2. **Catálogo ≡ categoria.** O que o SDK chama de `Catalog` é a `Category` do Order Hub.
+ * Sobra uma tradução só, depois do alinhamento de vocabulário: **dinheiro**. A API guarda
+ * `numeric(10,2)` e devolve string decimal em reais; o SDK trabalha em centavo inteiro. A conversão
+ * passa por `Math.round` sobre a string multiplicada, nunca por aritmética de float acumulada —
+ * `0.1 + 0.2` não pode virar preço de venda.
  *
  * `uploadImage` e `bulkImportProducts` fazem parte do contrato mas não têm rota na API; lançam erro
  * em vez de falhar em silêncio, porque um upload que "funciona" sem persistir é pior que a ausência
@@ -29,7 +27,7 @@ import { useAuthStore } from '@/stores/authStore'
 
 const CENTS_PER_UNIT = 100
 
-interface OrderHubCategory {
+interface OrderHubCatalog {
   id: string
   name: string
   active: boolean
@@ -43,7 +41,7 @@ interface OrderHubProduct {
   price: string
   costPrice: string | null
   imageUrl: string | null
-  categoryId: string | null
+  catalogId: string | null
   sectionId: string | null
   unit: string | null
   barcode: string | null
@@ -69,7 +67,7 @@ function toSdkProduct(product: OrderHubProduct): Product {
     description: product.description,
     priceInCents: toCents(product.price),
     imageUrl: product.imageUrl,
-    catalogId: product.categoryId,
+    catalogId: product.catalogId,
     active: product.active,
     sortOrder: product.sortOrder,
     availability: product.active ? 'available' : 'unavailable',
@@ -82,12 +80,12 @@ function toSdkProduct(product: OrderHubProduct): Product {
   }
 }
 
-function toSdkCatalog(category: OrderHubCategory): Catalog {
+function toSdkCatalog(catalog: OrderHubCatalog): Catalog {
   return {
-    id: category.id,
-    name: category.name,
+    id: catalog.id,
+    name: catalog.name,
     description: null,
-    active: category.active,
+    active: catalog.active,
   }
 }
 
@@ -97,9 +95,7 @@ function asSinglePage<TItem>(items: readonly TItem[]): PaginatedResponse<TItem> 
   return { data: items, total: items.length, page: 1, pageSize: items.length, totalPages: 1 }
 }
 
-function toProductBody(
-  input: CreateProductInput | UpdateProductInput
-): Record<string, unknown> {
+function toProductBody(input: CreateProductInput | UpdateProductInput): Record<string, unknown> {
   return {
     name: input.name,
     ...(input.description !== undefined && { description: input.description }),
@@ -109,7 +105,7 @@ function toProductBody(
     }),
     ...(input.unit !== undefined && { unit: input.unit }),
     ...(input.barcode !== undefined && { barcode: input.barcode }),
-    ...(input.catalogId !== undefined && { categoryId: input.catalogId }),
+    ...(input.catalogId !== undefined && { catalogId: input.catalogId }),
     ...(input.sectionId !== undefined && { sectionId: input.sectionId }),
     ...(input.preparationTimeMinutes !== undefined && {
       preparationTimeMinutes: input.preparationTimeMinutes,
@@ -131,7 +127,7 @@ export const productsApiAdapter: ProductsApi = {
     const products = await api.get<OrderHubProduct[]>('/catalog/products', token())
     const search = params?.search?.toLowerCase()
     const filtered = products
-      .filter((product) => (params?.catalogId ? product.categoryId === params.catalogId : true))
+      .filter((product) => (params?.catalogId ? product.catalogId === params.catalogId : true))
       .filter((product) => (params?.active === undefined ? true : product.active === params.active))
       .filter((product) => (search ? product.name.toLowerCase().includes(search) : true))
     return asSinglePage(filtered.map(toSdkProduct))
@@ -167,24 +163,24 @@ export const productsApiAdapter: ProductsApi = {
   },
 
   async listCatalogs(params) {
-    const categories = await api.get<OrderHubCategory[]>('/catalog/categories', token())
+    const catalogs = await api.get<OrderHubCatalog[]>('/catalog/catalogs', token())
     const search = params?.search?.toLowerCase()
     const filtered = search
-      ? categories.filter((category) => category.name.toLowerCase().includes(search))
-      : categories
+      ? catalogs.filter((catalog) => catalog.name.toLowerCase().includes(search))
+      : catalogs
     return asSinglePage(filtered.map(toSdkCatalog))
   },
 
   async getCatalog(id) {
-    const categories = await api.get<OrderHubCategory[]>('/catalog/categories', token())
-    const found = categories.find((category) => category.id === id)
-    if (!found) throw new Error('Categoria não encontrada')
+    const catalogs = await api.get<OrderHubCatalog[]>('/catalog/catalogs', token())
+    const found = catalogs.find((catalog) => catalog.id === id)
+    if (!found) throw new Error('Catálogo não encontrado')
     return toSdkCatalog(found)
   },
 
   async createCatalog(data: CreateCatalogInput) {
-    const created = await api.post<OrderHubCategory>(
-      '/catalog/categories',
+    const created = await api.post<OrderHubCatalog>(
+      '/catalog/catalogs',
       { name: data.name },
       token()
     )
@@ -192,8 +188,8 @@ export const productsApiAdapter: ProductsApi = {
   },
 
   async updateCatalog(id, data: UpdateCatalogInput) {
-    const updated = await api.put<OrderHubCategory>(
-      `/catalog/categories/${id}`,
+    const updated = await api.put<OrderHubCatalog>(
+      `/catalog/catalogs/${id}`,
       { name: data.name, ...(data.active !== undefined && { active: data.active }) },
       token()
     )
@@ -201,7 +197,7 @@ export const productsApiAdapter: ProductsApi = {
   },
 
   async deleteCatalog(id) {
-    await api.delete(`/catalog/categories/${id}`, token())
+    await api.delete(`/catalog/catalogs/${id}`, token())
   },
 
   uploadImage() {

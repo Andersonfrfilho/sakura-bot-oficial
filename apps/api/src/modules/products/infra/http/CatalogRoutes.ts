@@ -8,10 +8,10 @@ export function registerCatalogRoutes(router: Router, controller: CatalogControl
   const write = [authenticate, authorize('products', 'write')]
   const del = [authenticate, authorize('products', 'delete')]
 
-  router.get('/catalog/categories', ...read, controller.listCategories)
-  router.post('/catalog/categories', ...write, controller.createCategory)
-  router.put('/catalog/categories/:id', ...write, controller.updateCategory)
-  router.delete('/catalog/categories/:id', ...del, controller.deleteCategory)
+  router.get('/catalog/catalogs', ...read, controller.listCatalogs)
+  router.post('/catalog/catalogs', ...write, controller.createCatalog)
+  router.put('/catalog/catalogs/:id', ...write, controller.updateCatalog)
+  router.delete('/catalog/catalogs/:id', ...del, controller.deleteCatalog)
 
   router.get('/catalog/products', ...read, controller.listProducts)
   router.post('/catalog/products', ...write, controller.createProduct)

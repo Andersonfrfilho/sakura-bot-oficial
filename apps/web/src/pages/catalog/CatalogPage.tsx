@@ -43,7 +43,7 @@ const UNIT_OPTIONS = ['un', 'kg', 'g', 'l', 'ml'] as const
 // abaixo de 100%: uma margem de 100% sobre a venda implicaria custo zero.
 const MARGIN_SHORTCUT_PERCENTS = [30, 50, 60] as const
 
-interface Category {
+interface Catalog {
   id: string
   name: string
   slug: string
@@ -68,7 +68,7 @@ interface Product {
   costPrice: string | null
   unit: string
   barcode: string | null
-  categoryId: string | null
+  catalogId: string | null
   sectionId: string | null
   preparationTimeMinutes: number | null
   preparationInstructions: string | null
@@ -76,7 +76,7 @@ interface Product {
   sortOrder: number
 }
 
-type CategoryFormData = {
+type CatalogFormData = {
   name: string
   sortOrder: string
   ncmCode: string
@@ -84,7 +84,7 @@ type CategoryFormData = {
   cstIcms: string
 }
 
-const EMPTY_CATEGORY: CategoryFormData = { name: '', sortOrder: '0', ncmCode: '', cfopCode: '', cstIcms: '' }
+const EMPTY_CATALOG: CatalogFormData = { name: '', sortOrder: '0', ncmCode: '', cfopCode: '', cstIcms: '' }
 
 // A API guarda o preço como decimal em reais e o SDK formata centavo inteiro. A multiplicação
 // arredondada mora só aqui — ver `productsApiAdapter` para o mesmo contrato do lado das mutações.
@@ -119,10 +119,10 @@ function CatalogPageContent() {
 
   const [selectedCatId, setSelectedCatId] = useState<string | null>(null)
 
-  // Category modal
+  // Modal de catálogo
   const [catModal, setCatModal] = useState<'create' | 'edit' | 'delete' | null>(null)
-  const [selectedCat, setSelectedCat] = useState<Category | null>(null)
-  const [catForm, setCatForm] = useState<CategoryFormData>(EMPTY_CATEGORY)
+  const [selectedCat, setSelectedCat] = useState<Catalog | null>(null)
+  const [catForm, setCatForm] = useState<CatalogFormData>(EMPTY_CATALOG)
   const [catError, setCatError] = useState<string | null>(null)
 
   // Product modal
@@ -136,15 +136,15 @@ function CatalogPageContent() {
   const scanResolver = useRef<((suggestion: ProductSuggestion | null) => void) | null>(null)
 
   const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: ['catalog-categories'] })
+    void queryClient.invalidateQueries({ queryKey: ['catalog-catalogs'] })
     void queryClient.invalidateQueries({ queryKey: ['catalog-products'] })
     void queryClient.invalidateQueries({ queryKey: ['menu'] })
     void queryClient.invalidateQueries({ queryKey: ['sections'] })
   }
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ['catalog-categories'],
-    queryFn: () => api.get<Category[]>('/catalog/categories', accessToken ?? undefined),
+  const { data: catalogs = [] } = useQuery({
+    queryKey: ['catalog-catalogs'],
+    queryFn: () => api.get<Catalog[]>('/catalog/catalogs', accessToken ?? undefined),
   })
 
   const { data: allProducts = [] } = useQuery({
@@ -160,23 +160,23 @@ function CatalogPageContent() {
   const visibleProducts = selectedCatId === null
     ? allProducts
     : selectedCatId === '__none__'
-    ? allProducts.filter((p) => p.categoryId === null)
-    : allProducts.filter((p) => p.categoryId === selectedCatId)
+    ? allProducts.filter((p) => p.catalogId === null)
+    : allProducts.filter((p) => p.catalogId === selectedCatId)
 
-  // Category mutations
+  // Mutations de catálogo
   const createCat = useMutation({
-    mutationFn: (body: unknown) => api.post('/catalog/categories', body, accessToken ?? undefined),
+    mutationFn: (body: unknown) => api.post('/catalog/catalogs', body, accessToken ?? undefined),
     onSuccess: () => { invalidate(); closeCatModal() },
     onError: (e: Error) => setCatError(e.message),
   })
   const updateCat = useMutation({
     mutationFn: ({ id, body }: { id: string; body: unknown }) =>
-      api.put(`/catalog/categories/${id}`, body, accessToken ?? undefined),
+      api.put(`/catalog/catalogs/${id}`, body, accessToken ?? undefined),
     onSuccess: () => { invalidate(); closeCatModal() },
     onError: (e: Error) => setCatError(e.message),
   })
   const deleteCat = useMutation({
-    mutationFn: (id: string) => api.delete(`/catalog/categories/${id}`, accessToken ?? undefined),
+    mutationFn: (id: string) => api.delete(`/catalog/catalogs/${id}`, accessToken ?? undefined),
     onSuccess: () => { invalidate(); closeCatModal(); setSelectedCatId(null) },
     onError: (e: Error) => setCatError(e.message),
   })
@@ -205,12 +205,12 @@ function CatalogPageContent() {
   })
 
   function openCreateCat() {
-    setCatForm(EMPTY_CATEGORY)
+    setCatForm(EMPTY_CATALOG)
     setCatError(null)
     setCatModal('create')
   }
 
-  function openEditCat(cat: Category) {
+  function openEditCat(cat: Catalog) {
     setSelectedCat(cat)
     setCatForm({
       name: cat.name,
@@ -223,7 +223,7 @@ function CatalogPageContent() {
     setCatModal('edit')
   }
 
-  function openDeleteCat(cat: Category) {
+  function openDeleteCat(cat: Catalog) {
     setSelectedCat(cat)
     setCatError(null)
     setCatModal('delete')
@@ -232,7 +232,7 @@ function CatalogPageContent() {
   function closeCatModal() {
     setCatModal(null)
     setSelectedCat(null)
-    setCatForm(EMPTY_CATEGORY)
+    setCatForm(EMPTY_CATALOG)
     setCatError(null)
   }
 
@@ -277,7 +277,7 @@ function CatalogPageContent() {
     if (selectedProd) deleteProd.mutate(selectedProd.id)
   }
 
-  // O SDK entrega centavos e vocabulário de catálogo; a API espera reais e vocabulário de categoria.
+  // O SDK entrega centavos; a API espera reais.
   const submitProduct = useCallback(
     async (data: CreateProductInput & { active?: boolean; sortOrder?: number }) => {
       setProdError(null)
@@ -288,7 +288,7 @@ function CatalogPageContent() {
         costPrice: data.costPriceInCents ? data.costPriceInCents / 100 : null,
         unit: data.unit ?? 'un',
         barcode: data.barcode ?? null,
-        categoryId: data.catalogId ?? null,
+        catalogId: data.catalogId ?? null,
         sectionId: data.sectionId ?? null,
         preparationTimeMinutes: data.preparationTimeMinutes ?? null,
         preparationInstructions: data.preparationInstructions ?? null,
@@ -344,7 +344,7 @@ function CatalogPageContent() {
 
   const isCatPending = createCat.isPending || updateCat.isPending || deleteCat.isPending
 
-  const sdkCatalogs = categories.map((cat) => ({
+  const sdkCatalogs = catalogs.map((cat) => ({
     id: cat.id,
     name: cat.name,
     description: null,
@@ -352,7 +352,7 @@ function CatalogPageContent() {
   }))
 
   // Seção aqui é posto de produção (cozinha, bar), válido para todo o catálogo — daí `catalogId`
-  // ausente, que o SDK lê como "não filtrar por categoria".
+  // ausente, que o SDK lê como "não filtrar por catálogo".
   const sdkSections = sections.map((section) => ({ id: section.id, name: section.name }))
 
   const sdkInitialProduct = selectedProd
@@ -364,7 +364,7 @@ function CatalogPageContent() {
         costPriceInCents: selectedProd.costPrice === null ? null : toCents(selectedProd.costPrice),
         unit: selectedProd.unit,
         barcode: selectedProd.barcode,
-        catalogId: selectedProd.categoryId,
+        catalogId: selectedProd.catalogId,
         sectionId: selectedProd.sectionId,
         preparationTimeMinutes: selectedProd.preparationTimeMinutes,
         preparationInstructions: selectedProd.preparationInstructions,
@@ -373,7 +373,7 @@ function CatalogPageContent() {
       }
     : { catalogId: selectedCatId === '__none__' ? null : selectedCatId }
 
-  const uncategorizedCount = allProducts.filter((p) => p.categoryId === null).length
+  const withoutCatalogCount = allProducts.filter((p) => p.catalogId === null).length
 
   const catModalTitle =
     catModal === 'create' ? 'Nova categoria' : catModal === 'edit' ? `Editar · ${selectedCat?.name}` : 'Excluir categoria'
@@ -382,7 +382,7 @@ function CatalogPageContent() {
 
   return (
     <div className="flex h-full min-h-screen">
-      {/* Left panel — categories */}
+      {/* Left panel — catalogs */}
       <div className="w-56 flex-shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col">
         <div className="px-4 py-4 border-b border-gray-200">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Categorias</p>
@@ -408,8 +408,8 @@ function CatalogPageContent() {
             <span className="float-right text-xs text-gray-400">{allProducts.length}</span>
           </button>
 
-          {categories.map((cat) => {
-            const count = allProducts.filter((p) => p.categoryId === cat.id).length
+          {catalogs.map((cat) => {
+            const count = allProducts.filter((p) => p.catalogId === cat.id).length
             return (
               <div key={cat.id} className="group relative">
                 <button
@@ -443,7 +443,7 @@ function CatalogPageContent() {
             )
           })}
 
-          {uncategorizedCount > 0 && (
+          {withoutCatalogCount > 0 && (
             <button
               onClick={() => setSelectedCatId('__none__')}
               className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
@@ -453,7 +453,7 @@ function CatalogPageContent() {
               }`}
             >
               <span className="italic">Sem categoria</span>
-              <span className="float-right text-xs text-gray-400">{uncategorizedCount}</span>
+              <span className="float-right text-xs text-gray-400">{withoutCatalogCount}</span>
             </button>
           )}
 
@@ -473,7 +473,7 @@ function CatalogPageContent() {
                 ? 'Todos os produtos'
                 : selectedCatId === '__none__'
                 ? 'Sem categoria'
-                : (categories.find((c) => c.id === selectedCatId)?.name ?? '')}
+                : (catalogs.find((c) => c.id === selectedCatId)?.name ?? '')}
             </h1>
             <p className="text-sm text-gray-400">{visibleProducts.length} produto{visibleProducts.length !== 1 ? 's' : ''}</p>
             <ExpiringBatchBadge className="mt-1" />
@@ -493,7 +493,7 @@ function CatalogPageContent() {
           ) : (
             <div className="grid gap-3">
               {visibleProducts.map((prod) => {
-                const cat = categories.find((c) => c.id === prod.categoryId)
+                const cat = catalogs.find((c) => c.id === prod.catalogId)
                 const sec = sections.find((s) => s.id === prod.sectionId)
                 return (
                   <div
@@ -569,7 +569,7 @@ function CatalogPageContent() {
         </div>
       </div>
 
-      {/* Category modal */}
+      {/* Modal de catálogo */}
       <Modal open={catModal !== null} onClose={closeCatModal} title={catModalTitle} size="sm">
             <div className="p-5 space-y-4">
               {catModal === 'delete' ? (

@@ -190,25 +190,25 @@ export class FiscalEmissionService {
       .map((item) => item.productId)
       .filter((id): id is string => id !== null)
 
-    const productCategory = new Map<string, string | null>()
+    const productCatalog = new Map<string, string | null>()
     if (productIds.length > 0) {
       const products = await this.database.query.products.findMany({
         where: inArray(schema.products.id, productIds),
-        columns: { id: true, categoryId: true },
+        columns: { id: true, catalogId: true },
       })
       for (const product of products) {
-        productCategory.set(product.id, product.categoryId)
+        productCatalog.set(product.id, product.catalogId)
       }
     }
 
-    const categoryIds = [...new Set(productCategory.values())].filter((id): id is string => id !== null)
-    const categoryMap = new Map<string, typeof schema.categories.$inferSelect>()
-    if (categoryIds.length > 0) {
-      const categories = await this.database.query.categories.findMany({
-        where: inArray(schema.categories.id, categoryIds),
+    const catalogIds = [...new Set(productCatalog.values())].filter((id): id is string => id !== null)
+    const catalogMap = new Map<string, typeof schema.catalogs.$inferSelect>()
+    if (catalogIds.length > 0) {
+      const catalogs = await this.database.query.catalogs.findMany({
+        where: inArray(schema.catalogs.id, catalogIds),
       })
-      for (const category of categories) {
-        categoryMap.set(category.id, category)
+      for (const catalog of catalogs) {
+        catalogMap.set(catalog.id, catalog)
       }
     }
 
@@ -218,13 +218,13 @@ export class FiscalEmissionService {
       let cst = '400'
 
       if (item.productId) {
-        const categoryId = productCategory.get(item.productId)
-        if (categoryId) {
-          const category = categoryMap.get(categoryId)
-          if (category) {
-            if (category.ncmCode) ncm = category.ncmCode
-            if (category.cfopCode) cfop = category.cfopCode
-            if (category.cstIcms) cst = category.cstIcms
+        const catalogId = productCatalog.get(item.productId)
+        if (catalogId) {
+          const catalog = catalogMap.get(catalogId)
+          if (catalog) {
+            if (catalog.ncmCode) ncm = catalog.ncmCode
+            if (catalog.cfopCode) cfop = catalog.cfopCode
+            if (catalog.cstIcms) cst = catalog.cstIcms
           }
         }
       }

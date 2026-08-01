@@ -5,7 +5,7 @@ import { permissions } from './permissions'
 import { users } from './users'
 import { customers } from './customers'
 import { addresses } from './addresses'
-import { categories } from './categories'
+import { catalogs } from './catalogs'
 import { products } from './products'
 import { restaurantTables } from './tables'
 import { comandas } from './comandas'
@@ -29,7 +29,7 @@ export const establishmentsRelations = relations(establishments, ({ many }) => (
   roles: many(roles),
   users: many(users),
   customers: many(customers),
-  categories: many(categories),
+  catalogs: many(catalogs),
   products: many(products),
   restaurantTables: many(restaurantTables),
   comandas: many(comandas),
@@ -83,9 +83,9 @@ export const addressesRelations = relations(addresses, ({ one }) => ({
   }),
 }))
 
-export const categoriesRelations = relations(categories, ({ one, many }) => ({
+export const catalogsRelations = relations(catalogs, ({ one, many }) => ({
   establishment: one(establishments, {
-    fields: [categories.establishmentId],
+    fields: [catalogs.establishmentId],
     references: [establishments.id],
   }),
   products: many(products),
@@ -96,9 +96,9 @@ export const productsRelations = relations(products, ({ one, many }) => ({
     fields: [products.establishmentId],
     references: [establishments.id],
   }),
-  category: one(categories, {
-    fields: [products.categoryId],
-    references: [categories.id],
+  catalog: one(catalogs, {
+    fields: [products.catalogId],
+    references: [catalogs.id],
   }),
   section: one(sections, {
     fields: [products.sectionId],

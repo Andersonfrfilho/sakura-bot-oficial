@@ -9,7 +9,7 @@ cobre continua sendo código do Order Hub.
 
 | SDK | Order Hub | Observação |
 |---|---|---|
-| `Catalog` | `Category` (`/catalog/categories`) | mesmo conceito, nome diferente |
+| `Catalog` | `Catalog` (`/catalog/catalogs`) | ~~era `Category`~~ — o Order Hub adotou o nome do SDK em código e rotas. A tabela física continua `categories` e a coluna `category_id`, mapeadas no `pgTable`: zero migration. |
 | `priceInCents: number` | `price: string` (decimal em reais) | centavo inteiro ↔ string decimal |
 | `costPriceInCents` | `costPrice: string \| null` | idem |
 | `PaginatedResponse<T>` | array puro | a rota não pagina; envelopar |

@@ -10,18 +10,18 @@ interface Product {
   name: string
   description: string | null
   price: string
-  categoryId: string | null
+  catalogId: string | null
 }
 
-interface Category {
+interface Catalog {
   id: string
   name: string
   products: Product[]
 }
 
 interface Menu {
-  categories: Category[]
-  uncategorized: Product[]
+  catalogs: Catalog[]
+  withoutCatalog: Product[]
 }
 
 interface TableWithComanda {
@@ -108,17 +108,17 @@ export function CreateOrderModal({ onClose }: { onClose: () => void }) {
 
   const total = cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0)
 
-  const allCategories = menu?.categories ?? []
-  const filteredCategories = search
-    ? allCategories.map((c) => ({
+  const allCatalogs = menu?.catalogs ?? []
+  const filteredCatalogs = search
+    ? allCatalogs.map((c) => ({
         ...c,
         products: c.products.filter((p) =>
           p.name.toLowerCase().includes(search.toLowerCase())
         ),
       })).filter((c) => c.products.length > 0)
     : activeCat
-    ? allCategories.filter((c) => c.id === activeCat)
-    : allCategories
+    ? allCatalogs.filter((c) => c.id === activeCat)
+    : allCatalogs
 
   function handleSubmit() {
     const notes = globalNotes || undefined
@@ -232,7 +232,7 @@ export function CreateOrderModal({ onClose }: { onClose: () => void }) {
           <div className="flex flex-1 min-h-0">
             {/* Products */}
             <div className="flex-1 flex flex-col min-w-0 border-r border-gray-100">
-              {/* Search + category tabs */}
+              {/* Search + catalog tabs */}
               <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
                 <input
                   type="search"
@@ -251,7 +251,7 @@ export function CreateOrderModal({ onClose }: { onClose: () => void }) {
                     >
                       Todos
                     </button>
-                    {allCategories.map((c) => (
+                    {allCatalogs.map((c) => (
                       <button
                         key={c.id}
                         onClick={() => setActiveCat(c.id)}
@@ -268,10 +268,10 @@ export function CreateOrderModal({ onClose }: { onClose: () => void }) {
 
               {/* Product list */}
               <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-                {filteredCategories.length === 0 && (
+                {filteredCatalogs.length === 0 && (
                   <p className="text-gray-400 text-sm text-center py-8">Nenhum item encontrado</p>
                 )}
-                {filteredCategories.map((cat) => (
+                {filteredCatalogs.map((cat) => (
                   <div key={cat.id}>
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{cat.name}</p>
                     <div className="space-y-1">
@@ -317,11 +317,11 @@ export function CreateOrderModal({ onClose }: { onClose: () => void }) {
                     </div>
                   </div>
                 ))}
-                {menu && menu.uncategorized.length > 0 && !activeCat && (
+                {menu && menu.withoutCatalog.length > 0 && !activeCat && (
                   <div>
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Outros</p>
                     <div className="space-y-1">
-                      {menu.uncategorized.filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase())).map((p) => {
+                      {menu.withoutCatalog.filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase())).map((p) => {
                         const inCart = cart.find((i) => i.productId === p.id)
                         return (
                           <div key={p.id} className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-gray-50">

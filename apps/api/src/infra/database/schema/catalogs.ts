@@ -1,7 +1,10 @@
 import { pgTable, uuid, varchar, boolean, integer, timestamp } from 'drizzle-orm/pg-core'
 import { establishments } from './establishments'
 
-export const categories = pgTable('categories', {
+// A tabela física continua `categories`: renomeá-la não muda comportamento e custaria uma migration
+// destrutiva em dado vivo, além de Directus, seeds e workflows n8n no mesmo deploy. O nome do
+// código é o que precisa bater com o do SDK.
+export const catalogs = pgTable('categories', {
   id: uuid('id').primaryKey().defaultRandom(),
   establishmentId: uuid('establishment_id')
     .notNull()
@@ -16,5 +19,5 @@ export const categories = pgTable('categories', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
-export type Category = typeof categories.$inferSelect
-export type NewCategory = typeof categories.$inferInsert
+export type Catalog = typeof catalogs.$inferSelect
+export type NewCatalog = typeof catalogs.$inferInsert
