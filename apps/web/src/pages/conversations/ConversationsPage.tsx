@@ -1,650 +1,402 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useAuthStore } from '@/stores/authStore'
-import { useWebSocket } from '@/hooks/useWebSocket'
-import { api, ApiError } from '@/lib/api'
-import { ConversationListItem } from './components/ConversationListItem'
-import { MessageBubble } from './components/MessageBubble'
-import { MessageComposer } from './components/MessageComposer'
-import { Modal } from '@/components/ui/Modal'
+/**
+ * Inbox de atendimento sobre a camada headless do @adatechnology/conversations-ui. Toda a
+ * tradução para as rotas do Order Hub vive no adapter (`lib/conversationsSdkApi.ts`) e o estado da
+ * listagem no `useConversationsInbox`; aqui só se monta a tela.
+ */
 
-interface ConversationMessage {
-  id: string
-  establishmentId: string
-  whatsappNumber: string
-  direction: 'inbound' | 'outbound'
-  sender: 'customer' | 'bot' | 'agent'
-  agentUserId: string | null
-  type: string
-  content: string | null
-  payload: Record<string, unknown>
-  waMessageId: string | null
-  status: string
-  readAt: string | null
-  createdAt: string
+import { useState, type RefObject } from 'react'
+import '@adatechnology/conversations-ui/styles.css'
+import {
+  CHANNEL_FILTER_ALL,
+  ChannelIcon,
+  ConversationContextPanel,
+  ConversationHeader,
+  ConversationRow,
+  ConversationsProvider,
+  ConversationWallpaper,
+  DateDivider,
+  isWindowBlocking,
+  MessageBubble,
+  MessageComposer,
+  useConversationContext,
+  useConversationMessages,
+  useConversationRealtime,
+  useScrollToLatestMessage,
+  WINDOW_FILTERS,
+  WindowExpiredNotice,
+  windowOf,
+  type ConversationSummary,
+} from '@adatechnology/conversations-ui'
+
+import { conversationsSdkApi } from '@/lib/conversationsSdkApi'
+import { conversationsSdkRealtime } from '@/lib/conversationsSdkRealtime'
+import { fileToAttachment } from '@/lib/fileToAttachment'
+import { stateLabel, toContextEntries } from './conversationContext'
+import { downloadConversation } from './conversationsExport'
+import { CONVERSATION_QUICK_REPLIES, quickReplyVariablesFor } from './quickReplies'
+import { useConversationsInbox } from './useConversationsInbox.hook'
+
+interface ConversationPaneProps {
+  conversation: ConversationSummary
+  now: number
+  busy: boolean
+  onTakeover: () => void
+  onReturnToBot: () => void
+  onFinish: () => void
+  onBack: () => void
 }
 
-interface ConversationSession {
-  id: string
-  establishmentId: string
-  whatsappNumber: string
-  currentState: string
-  context: Record<string, unknown>
-  mode: 'bot' | 'human'
-  assignedUserId: string | null
-  humanRequestedAt: string | null
-  lastInboundAt: string | null
-  lastAgentReadAt: string | null
-  lastActivity: string
-  createdAt: string
-  updatedAt: string
-}
+function ConversationPane({
+  conversation,
+  now,
+  busy,
+  onTakeover,
+  onReturnToBot,
+  onFinish,
+  onBack,
+}: ConversationPaneProps) {
+  const { messages, refetch, sendMessage, sendMedia, sendTemplate } = useConversationMessages(conversation.id)
+  const { context } = useConversationContext(conversation.id)
+  const [sendFailure, setSendFailure] = useState<string | undefined>(undefined)
 
-interface ConversationSummary extends ConversationSession {
-  lastMessage: Pick<ConversationMessage, 'content' | 'type' | 'direction' | 'createdAt'> | null
-  unreadCount: number
-}
+  // Abrir no topo do histórico obrigava a rolar semanas até a última mensagem — que é sempre o
+  // que interessa. O hook salta ao trocar de conversa e acompanha mensagem nova sem arrastar
+  // quem estiver lendo o histórico.
+  const scroll = useScrollToLatestMessage({ conversationId: conversation.id, messageCount: messages.length })
 
-interface ListConversationsResult {
-  data: ConversationSummary[]
-  total: number
-  page: number
-  pageSize: number
-  totalPages: number
-}
-
-interface ListMessagesResult {
-  data: ConversationMessage[]
-  hasMore: boolean
-}
-
-interface ConversationContextResult {
-  currentState: string
-  context: Record<string, unknown>
-}
-
-interface FetchMediaResult {
-  base64: string
-  mimeType: string
-}
-
-type WindowStatus = 'active' | 'expiring' | 'expired' | 'none'
-
-const STATE_LABELS: Record<string, string> = {
-  start: 'Início',
-  awaiting_name: 'Aguardando nome',
-  browsing_cat: 'Vendo cardápio',
-  ordering_items: 'Montando pedido',
-  awaiting_qty: 'Aguardando quantidade',
-  more: 'Perguntando se quer mais',
-  awaiting_type: 'Escolhendo entrega/retirada',
-  awaiting_address: 'Aguardando endereço',
-  awaiting_complement: 'Aguardando complemento',
-  offer_pickup: 'Oferecendo retirada',
-  awaiting_payment: 'Aguardando forma de pagamento',
-  awaiting_change: 'Aguardando troco',
-  awaiting_split: 'Dividindo conta',
-  awaiting_mixed: 'Pagamento misto',
-  reserving: 'Fazendo reserva',
-  confirming_reservation: 'Confirmando reserva',
-  human_handoff: 'Transferido para atendente',
-  order_detail: 'Vendo detalhes do pedido',
-}
-
-const QUICK_MESSAGES = [
-  { label: 'A caminho', text: 'Seu pedido está a caminho! 🛵' },
-  { label: 'Pronto', text: 'Seu pedido está pronto! 🎉' },
-  { label: 'Endereço', text: 'Qual o endereço completo para entrega?' },
-  { label: 'Pagamento', text: 'Aceitamos Pix, cartão e dinheiro. Qual a forma de pagamento?' },
-  { label: 'Obrigado', text: 'Obrigado pela preferência! Até a próxima 😊' },
-]
-
-function getWindowStatus(session: ConversationSummary | undefined): WindowStatus {
-  if (!session?.lastInboundAt) return 'none'
-  const hours = (Date.now() - new Date(session.lastInboundAt).getTime()) / 3_600_000
-  if (hours >= 24) return 'expired'
-  if (hours >= 22) return 'expiring'
-  return 'active'
-}
-
-function formatPhone(number: string) {
-  const digits = number.replace(/\D/g, '')
-  if (digits.length === 13) return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`
-  return number
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve((reader.result as string).split(',')[1] ?? '')
-    reader.onerror = reject
-    reader.readAsDataURL(file)
+  // O evento traz só o essencial; quem tem o conteúdo é a query.
+  useConversationRealtime(conversation.id, () => {
+    void refetch()
   })
-}
 
-function renderContextEntries(context: Record<string, unknown>): Array<[string, string]> {
-  const entries: Array<[string, string]> = []
-  for (const [key, value] of Object.entries(context)) {
-    if (key === 'cart' || value === null || value === undefined) continue
-    if (typeof value === 'object') continue
-    entries.push([key, String(value)])
+  const blocked = isWindowBlocking(
+    windowOf({ lastInboundAt: conversation.lastInboundAt, now, channel: conversation.channel })
+  )
+  const isHuman = conversation.mode === 'human'
+  // O nome vem do contexto do fluxo (o bot pergunta antes de anotar o pedido), não da listagem.
+  const clientName = typeof context?.['name'] === 'string' ? context['name'] : undefined
+
+  /**
+   * Falha vira aviso na tela em vez de exceção engolida: o atendente escreveu, achou que mandou,
+   * e sem retorno não teria como saber que o cliente não recebeu nada.
+   */
+  async function runSend(action: () => Promise<unknown>, fallbackMessage: string): Promise<void> {
+    setSendFailure(undefined)
+    try {
+      await action()
+    } catch (error: unknown) {
+      setSendFailure(error instanceof Error ? error.message : fallbackMessage)
+    }
   }
-  return entries
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <ConversationHeader
+        conversation={conversation}
+        busy={busy}
+        onTakeover={onTakeover}
+        onReturnToBot={onReturnToBot}
+        onFinish={onFinish}
+        onDownload={() =>
+          void downloadConversation({
+            conversationId: conversation.id,
+            whatsappNumber: conversation.whatsappNumber,
+            clientName,
+          })
+        }
+        onBack={onBack}
+      />
+
+      <ConversationContextPanel
+        entries={toContextEntries(context)}
+        flowLabel={stateLabel(conversation.currentState)}
+      />
+
+      <ConversationWallpaper
+        // O pacote é tipado com React 19, onde `RefObject<T>` já inclui `null`; aqui é React 18.
+        // A referência é a mesma em runtime — só a assinatura do tipo mudou entre as versões.
+        ref={scroll.containerRef as RefObject<HTMLDivElement>}
+        onScroll={scroll.handleScroll}
+        className="relative min-h-0 flex-1 overflow-y-auto px-4 py-3"
+      >
+        {messages.map((message, index) => {
+          const previous = index > 0 ? messages[index - 1] : undefined
+          const startsNewDay =
+            !previous || new Date(message.timestamp).toDateString() !== new Date(previous.timestamp).toDateString()
+
+          return (
+            <div key={message.id}>
+              {startsNewDay ? <DateDivider iso={message.timestamp} /> : null}
+              <MessageBubble
+                message={message}
+                isMine={message.direction === 'outbound'}
+                isFirstInGroup={!previous || previous.sender !== message.sender}
+              />
+            </div>
+          )
+        })}
+      </ConversationWallpaper>
+
+      {sendFailure ? (
+        <p role="alert" className="border-t bg-red-50 px-4 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+          {sendFailure}
+        </p>
+      ) : null}
+
+      {blocked ? (
+        <WindowExpiredNotice
+          disabled={busy}
+          onSendTemplate={() => void runSend(() => sendTemplate({}), 'Erro ao enviar o template de reabertura.')}
+        />
+      ) : !isHuman ? (
+        <p className="border-t bg-gray-100 px-4 py-3 text-center text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+          Assuma o atendimento para responder diretamente ao cliente.
+        </p>
+      ) : (
+        <MessageComposer
+          onSend={(text) => void runSend(() => sendMessage(text), 'Erro ao enviar a mensagem.')}
+          // Habilita clipe E microfone: o composer desenha o gravador sozinho quando existe um
+          // jeito de entregar arquivo, porque áudio gravado é um anexo como qualquer outro.
+          onAttach={(file) =>
+            void runSend(async () => sendMedia(await fileToAttachment(file)), 'Erro ao enviar o arquivo.')
+          }
+          placeholder="Responder como atendente…"
+          quickReplies={CONVERSATION_QUICK_REPLIES}
+          quickReplyVariables={quickReplyVariablesFor(clientName)}
+        />
+      )}
+    </div>
+  )
 }
 
-interface CartItem {
-  name?: string
-  quantity?: number
-  price?: number
-}
+function Inbox() {
+  const inbox = useConversationsInbox()
+  const selectedConversation = inbox.selectedConversation
 
-function extractCart(context: Record<string, unknown>): CartItem[] {
-  const cart = context['cart']
-  if (!Array.isArray(cart)) return []
-  return cart as CartItem[]
+  return (
+    <div className="flex h-[calc(100vh-3.5rem)] min-h-0 flex-col md:h-screen">
+      {/* Cabeçalho denso em tela estreita: ícone + número. O rótulo escrito ("conversas",
+          "não lidas") ocupava três linhas em 375px e empurrava a lista para fora da tela. */}
+      <header className="flex items-center justify-between gap-2 border-b px-4 py-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-semibold lg:text-xl">Conversas</h1>
+          <p className="flex flex-wrap items-center gap-x-3 text-sm text-gray-500">
+            <span title="Conversas">
+              💬 {inbox.totalCount}
+              <span className="cv-only-wide"> conversas</span>
+            </span>
+            <span title="Aguardando atendimento" className="text-amber-600 dark:text-amber-400">
+              ⏳ {inbox.waitingCount}
+              <span className="cv-only-wide"> aguardando</span>
+            </span>
+            <span title="Não lidas">
+              ✉️ {inbox.unreadCount}
+              <span className="cv-only-wide"> não lidas</span>
+            </span>
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => inbox.setWaitingOnly(!inbox.waitingOnly)}
+            aria-pressed={inbox.waitingOnly}
+            title="Só aguardando atendimento"
+            className={`rounded-md border px-3 py-2 text-sm ${inbox.waitingOnly ? 'bg-brand-600 text-white' : ''}`}
+          >
+            ⏳<span className="cv-only-wide"> Aguardando atendimento</span>
+          </button>
+          {/* O contador só aparece quando há seleção: " (0)" era texto morto ao lado do ícone. */}
+          <button
+            type="button"
+            onClick={() => void inbox.markSelectedAsRead()}
+            disabled={inbox.selectedIds.size === 0 || inbox.busy}
+            title="Marcar selecionadas como lidas"
+            aria-label="Marcar selecionadas como lidas"
+            className="rounded-md border px-3 py-2 text-sm disabled:opacity-50"
+          >
+            ✓<span className="cv-only-wide"> Marcar selecionadas como lidas</span>
+            {inbox.selectedIds.size > 0 ? ` (${inbox.selectedIds.size})` : ''}
+          </button>
+        </div>
+      </header>
+
+      {/* Silêncio aqui foi o que fez "não existe nenhuma conversa" parecer perda de dados: sem
+          sessão a API responde 401, a lista vem vazia e a tela não dizia nada. */}
+      {inbox.loadFailure ? (
+        <p
+          role="alert"
+          className="border-b bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+        >
+          {inbox.loadFailure}
+        </p>
+      ) : null}
+
+      {/* Master/detail: abaixo de `lg` a lista e a conversa dividiriam a mesma altura fixa e cada
+          uma viraria uma fatia inútil — ali mostra uma ou outra. */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 bg-gray-100 p-3 lg:grid-cols-[360px_minmax(0,1fr)] dark:bg-gray-900">
+        <aside
+          className={`flex min-h-0 flex-col overflow-hidden rounded-xl border bg-white dark:bg-gray-800 ${
+            selectedConversation ? 'hidden lg:flex' : 'flex'
+          }`}
+        >
+          <div className="space-y-2 border-b p-3">
+            <input
+              type="search"
+              value={inbox.search}
+              onChange={(event) => inbox.setSearch(event.target.value)}
+              placeholder="Buscar conversa..."
+              className="w-full rounded-md border px-3 py-2 text-sm"
+            />
+
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-gray-500">Janela:</span>
+              {WINDOW_FILTERS.map((filter) => (
+                <button
+                  key={filter.value}
+                  type="button"
+                  onClick={() => inbox.setWindowFilter(filter.value)}
+                  className={`flex items-center gap-1 rounded-md px-2 py-1 ${
+                    inbox.windowFilter === filter.value ? 'bg-gray-200 dark:bg-gray-700' : ''
+                  }`}
+                >
+                  {filter.dotClass ? <span className={`h-2 w-2 rounded-full ${filter.dotClass}`} /> : null}
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+
+            {/* A barra sai da própria listagem e some quando há um canal só — o SDK devolve lista
+                vazia nesse caso, porque filtro de opção única não filtra nada. */}
+            {inbox.channelFilters.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-gray-500">Canal:</span>
+                {inbox.channelFilters.map((filter) => (
+                  <button
+                    key={filter.value}
+                    type="button"
+                    onClick={() => inbox.setChannelFilter(filter.value)}
+                    className={`flex items-center gap-1 rounded-md px-2 py-1 ${
+                      inbox.channelFilter === filter.value ? 'bg-gray-200 dark:bg-gray-700' : ''
+                    }`}
+                  >
+                    {filter.value === CHANNEL_FILTER_ALL ? null : <ChannelIcon channel={filter.value} />}
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={
+                  inbox.pageConversations.length > 0 &&
+                  inbox.pageConversations.every((conversation) => inbox.selectedIds.has(conversation.id))
+                }
+                onChange={inbox.toggleSelectAllOnPage}
+              />
+              Selecionar todas
+            </label>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {inbox.pageConversations.map((conversation) => (
+              <ConversationRow
+                key={conversation.id}
+                conversation={conversation}
+                active={conversation.id === inbox.selectedId}
+                selected={inbox.selectedIds.has(conversation.id)}
+                now={inbox.now}
+                busy={inbox.busy}
+                onOpen={() => inbox.selectConversation(conversation.id)}
+                onToggleSelected={() => inbox.toggleSelected(conversation.id)}
+                onTakeover={() => void inbox.takeover(conversation.id)}
+              />
+            ))}
+            {!inbox.loading && inbox.filteredCount === 0 ? (
+              <p className="p-4 text-sm text-gray-500">Nenhuma conversa encontrada.</p>
+            ) : null}
+          </div>
+
+          <div className="flex items-center justify-between border-t px-3 py-2 text-xs">
+            <span className="text-gray-500">
+              {inbox.filteredCount === 0 ? '0' : `${inbox.firstOnPage}–${inbox.lastOnPage}`} de {inbox.totalCount}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => inbox.goToPage(1)}
+                disabled={inbox.page === 1}
+                aria-label="Primeira página"
+                className="px-2 disabled:opacity-40"
+              >
+                «
+              </button>
+              <button
+                type="button"
+                onClick={() => inbox.goToPage(inbox.page - 1)}
+                disabled={inbox.page === 1}
+                aria-label="Página anterior"
+                className="px-2 disabled:opacity-40"
+              >
+                ‹
+              </button>
+              <span>
+                {inbox.page} / {inbox.pageCount}
+              </span>
+              <button
+                type="button"
+                onClick={() => inbox.goToPage(inbox.page + 1)}
+                disabled={inbox.page === inbox.pageCount}
+                aria-label="Próxima página"
+                className="px-2 disabled:opacity-40"
+              >
+                ›
+              </button>
+              <button
+                type="button"
+                onClick={() => inbox.goToPage(inbox.pageCount)}
+                disabled={inbox.page === inbox.pageCount}
+                aria-label="Última página"
+                className="px-2 disabled:opacity-40"
+              >
+                »
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        {/* `min-w-0` junto do `min-h-0`: em grid o padrão é não encolher abaixo do conteúdo, e é
+            por aí que uma bolha larga vaza para fora da coluna. */}
+        <section
+          className={`min-h-0 min-w-0 overflow-hidden rounded-xl border bg-white dark:bg-gray-800 ${
+            selectedConversation ? 'flex flex-col' : 'hidden lg:block'
+          }`}
+        >
+          {selectedConversation ? (
+            <ConversationPane
+              conversation={selectedConversation}
+              now={inbox.now}
+              busy={inbox.busy}
+              onTakeover={() => void inbox.takeover(selectedConversation.id)}
+              onReturnToBot={() => void inbox.releaseToBot(selectedConversation.id)}
+              onFinish={() => void inbox.finalize(selectedConversation.id)}
+              onBack={inbox.clearSelection}
+            />
+          ) : (
+            <p className="p-6 text-sm text-gray-500">Selecione uma conversa.</p>
+          )}
+        </section>
+      </div>
+    </div>
+  )
 }
 
 export function ConversationsPage() {
-  const accessToken = useAuthStore((state) => state.accessToken)
-  const currentUser = useAuthStore((state) => state.user)
-  const queryClient = useQueryClient()
-
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [waitingHumanFilter, setWaitingHumanFilter] = useState(false)
-  const [hasUnreadFilter, setHasUnreadFilter] = useState(false)
-  const [page, setPage] = useState(1)
-  const [selectedWhatsapp, setSelectedWhatsapp] = useState<string | null>(null)
-  const [messages, setMessages] = useState<ConversationMessage[]>([])
-  const [hasMoreHistory, setHasMoreHistory] = useState(false)
-  const [loadingOlder, setLoadingOlder] = useState(false)
-  const [composerValue, setComposerValue] = useState('')
-  const [attachedFile, setAttachedFile] = useState<{ file: File; previewUrl: string | null } | null>(null)
-  const [sending, setSending] = useState(false)
-  const [sendError, setSendError] = useState<string | null>(null)
-  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set())
-  const [mediaPreview, setMediaPreview] = useState<{ mimeType: string; base64: string } | null>(null)
-
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const messagesScrollRef = useRef<HTMLDivElement>(null)
-  const pageSize = 20
-
-  const handleSearch = useCallback((value: string) => {
-    setSearch(value)
-    if (debounceTimer.current) clearTimeout(debounceTimer.current)
-    debounceTimer.current = setTimeout(() => {
-      setDebouncedSearch(value)
-      setPage(1)
-    }, 300)
-  }, [])
-
-  const { data: conversationsData, isLoading: conversationsLoading } = useQuery({
-    queryKey: ['conversations', page, waitingHumanFilter, hasUnreadFilter, debouncedSearch],
-    queryFn: () => {
-      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
-      if (waitingHumanFilter) params.set('waitingHuman', 'true')
-      if (hasUnreadFilter) params.set('hasUnread', 'true')
-      if (debouncedSearch) params.set('search', debouncedSearch)
-      return api.get<ListConversationsResult>(`/conversations?${params}`, accessToken ?? undefined)
-    },
-    refetchInterval: 15_000,
-  })
-
-  const selectedSummary = conversationsData?.data.find((item) => item.whatsappNumber === selectedWhatsapp)
-
-  const { data: contextData } = useQuery({
-    queryKey: ['conversation-context', selectedWhatsapp],
-    queryFn: () => api.get<ConversationContextResult>(`/conversations/${selectedWhatsapp}/context`, accessToken ?? undefined),
-    enabled: !!selectedWhatsapp,
-  })
-
-  const loadMessages = useCallback(
-    async (whatsappNumber: string, before?: string) => {
-      const params = new URLSearchParams({ limit: '30' })
-      if (before) params.set('before', before)
-      const result = await api.get<ListMessagesResult>(`/conversations/${whatsappNumber}/messages?${params}`, accessToken ?? undefined)
-      return result
-    },
-    [accessToken]
-  )
-
-  useEffect(() => {
-    if (!selectedWhatsapp) {
-      setMessages([])
-      return
-    }
-    setMessages([])
-    setHasMoreHistory(false)
-    void loadMessages(selectedWhatsapp).then((result) => {
-      setMessages([...result.data].reverse())
-      setHasMoreHistory(result.hasMore)
-    })
-    void api.post(`/conversations/${selectedWhatsapp}/read`, {}, accessToken ?? undefined).then(() => {
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] })
-    })
-  }, [selectedWhatsapp, loadMessages, accessToken, queryClient])
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length])
-
-  async function handleLoadOlder() {
-    if (!selectedWhatsapp || messages.length === 0 || loadingOlder) return
-    setLoadingOlder(true)
-    try {
-      const oldest = messages[0]
-      const result = await loadMessages(selectedWhatsapp, oldest?.createdAt)
-      setMessages((current) => [...[...result.data].reverse(), ...current])
-      setHasMoreHistory(result.hasMore)
-    } finally {
-      setLoadingOlder(false)
-    }
-  }
-
-  function handleScroll() {
-    const container = messagesScrollRef.current
-    if (container && container.scrollTop < 80 && hasMoreHistory && !loadingOlder) {
-      void handleLoadOlder()
-    }
-  }
-
-  useWebSocket((message) => {
-    if (!message.type.startsWith('conversation:')) return
-    void queryClient.invalidateQueries({ queryKey: ['conversations'] })
-
-    if (message.type === 'conversation:message') {
-      const incoming = message.payload as ConversationMessage
-      if (incoming.whatsappNumber === selectedWhatsapp) {
-        setMessages((current) => (current.some((item) => item.id === incoming.id) ? current : [...current, incoming]))
-      }
-    }
-    if (message.type === 'conversation:session' && selectedWhatsapp) {
-      void queryClient.invalidateQueries({ queryKey: ['conversation-context', selectedWhatsapp] })
-    }
-  })
-
-  async function handleSend() {
-    if (!selectedWhatsapp || sending) return
-    setSending(true)
-    setSendError(null)
-    try {
-      if (attachedFile) {
-        const base64Data = await fileToBase64(attachedFile.file)
-        const message = await api.post<ConversationMessage>(
-          `/conversations/${selectedWhatsapp}/send-media`,
-          {
-            base64Data,
-            mimeType: attachedFile.file.type || 'application/octet-stream',
-            filename: attachedFile.file.name,
-            caption: composerValue.trim() || undefined,
-          },
-          accessToken ?? undefined
-        )
-        setMessages((current) => [...current, message])
-        setAttachedFile(null)
-        setComposerValue('')
-      } else {
-        const message = await api.post<ConversationMessage>(
-          `/conversations/${selectedWhatsapp}/send`,
-          { body: composerValue.trim() },
-          accessToken ?? undefined
-        )
-        setMessages((current) => [...current, message])
-        setComposerValue('')
-      }
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] })
-    } catch (error: unknown) {
-      const message = error instanceof ApiError ? error.message : 'Erro ao enviar mensagem'
-      setSendError(message)
-    } finally {
-      setSending(false)
-    }
-  }
-
-  async function handleSendTemplate(templateName: string) {
-    if (!selectedWhatsapp) return
-    setSending(true)
-    setSendError(null)
-    try {
-      const message = await api.post<ConversationMessage>(
-        `/conversations/${selectedWhatsapp}/send-template`,
-        { templateName, languageCode: 'pt_BR' },
-        accessToken ?? undefined
-      )
-      setMessages((current) => [...current, message])
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] })
-    } catch (error: unknown) {
-      const message = error instanceof ApiError ? error.message : 'Erro ao enviar template'
-      setSendError(message)
-    } finally {
-      setSending(false)
-    }
-  }
-
-  function handleAttach(file: File) {
-    const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : null
-    setAttachedFile({ file, previewUrl })
-  }
-
-  async function handleTakeover() {
-    if (!selectedWhatsapp) return
-    await api.post(`/conversations/${selectedWhatsapp}/takeover`, {}, accessToken ?? undefined)
-    void queryClient.invalidateQueries({ queryKey: ['conversations'] })
-  }
-
-  async function handleRelease() {
-    if (!selectedWhatsapp) return
-    await api.post(`/conversations/${selectedWhatsapp}/release`, {}, accessToken ?? undefined)
-    void queryClient.invalidateQueries({ queryKey: ['conversations'] })
-  }
-
-  async function handleFinalize() {
-    if (!selectedWhatsapp) return
-    await api.post(`/conversations/${selectedWhatsapp}/finalize`, {}, accessToken ?? undefined)
-    void queryClient.invalidateQueries({ queryKey: ['conversations'] })
-  }
-
-  async function handleViewMedia(message: ConversationMessage) {
-    const mediaId = typeof message.payload['mediaId'] === 'string' ? (message.payload['mediaId'] as string) : message.waMessageId
-    if (!mediaId) return
-    const result = await api.get<FetchMediaResult>(`/conversations/media/${mediaId}`, accessToken ?? undefined)
-    setMediaPreview(result)
-  }
-
-  function toggleMessageSelection(id: string) {
-    setSelectedMessageIds((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  function handleCopySelected() {
-    const selected = messages.filter((message) => selectedMessageIds.has(message.id))
-    const text = selected.map((message) => `[${message.sender}] ${message.content ?? ''}`).join('\n')
-    void navigator.clipboard.writeText(text)
-    setSelectedMessageIds(new Set())
-  }
-
-  async function handleExport() {
-    if (!selectedWhatsapp) return
-    const exported = await api.get<ConversationMessage[]>(`/conversations/${selectedWhatsapp}/export`, accessToken ?? undefined)
-    const text = exported.map((message) => `[${message.createdAt}] [${message.sender}] ${message.content ?? `(${message.type})`}`).join('\n')
-    const blob = new Blob([text], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `conversa-${selectedWhatsapp}.txt`
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const windowStatus = getWindowStatus(selectedSummary)
-  const isHuman = selectedSummary?.mode === 'human'
-  const isAssignedToMe = selectedSummary?.assignedUserId === currentUser?.id
-  const cart = contextData ? extractCart(contextData.context) : []
-  const cartTotal = cart.reduce((sum, item) => sum + (item.price ?? 0) * (item.quantity ?? 1), 0)
-
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] md:h-screen">
-      {/* Lista de conversas */}
-      <div className={`w-full md:w-80 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col ${selectedWhatsapp ? 'hidden md:flex' : 'flex'}`}>
-        <div className="p-3 border-b border-gray-200 space-y-2">
-          <h1 className="text-lg font-bold text-gray-900">Conversas</h1>
-          <input
-            type="search"
-            placeholder="Buscar por número..."
-            value={search}
-            onChange={(event) => handleSearch(event.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={() => setWaitingHumanFilter((value) => !value)}
-              className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
-                waitingHumanFilter ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              Aguardando humano
-            </button>
-            <button
-              onClick={() => setHasUnreadFilter((value) => !value)}
-              className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
-                hasUnreadFilter ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              Não lidas
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {conversationsLoading ? (
-            <p className="text-center text-gray-400 text-sm py-10">Carregando...</p>
-          ) : conversationsData?.data.length === 0 ? (
-            <p className="text-center text-gray-400 text-sm py-10">Nenhuma conversa encontrada</p>
-          ) : (
-            conversationsData?.data.map((conversation) => (
-              <ConversationListItem
-                key={conversation.whatsappNumber}
-                conversation={conversation}
-                selected={conversation.whatsappNumber === selectedWhatsapp}
-                onSelect={setSelectedWhatsapp}
-              />
-            ))
-          )}
-        </div>
-
-        {conversationsData && conversationsData.totalPages > 1 && (
-          <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-gray-200 bg-gray-50">
-            <button
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
-              disabled={page === 1}
-              className="px-3 py-1 text-xs border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-100"
-            >
-              Anterior
-            </button>
-            <span className="text-xs text-gray-500">{conversationsData.page}/{conversationsData.totalPages}</span>
-            <button
-              onClick={() => setPage((current) => Math.min(conversationsData.totalPages, current + 1))}
-              disabled={page === conversationsData.totalPages}
-              className="px-3 py-1 text-xs border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-100"
-            >
-              Próxima
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Painel da conversa */}
-      {!selectedWhatsapp ? (
-        <div className="hidden md:flex flex-1 items-center justify-center text-gray-400 text-sm">
-          Selecione uma conversa para começar
-        </div>
-      ) : (
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 bg-white">
-            <div className="flex items-center gap-2 min-w-0">
-              <button onClick={() => setSelectedWhatsapp(null)} className="md:hidden text-gray-400 hover:text-gray-600 text-lg">←</button>
-              <div className="min-w-0">
-                <p className="font-semibold text-gray-900 truncate">{formatPhone(selectedWhatsapp)}</p>
-                <p className="text-xs text-gray-400">
-                  {STATE_LABELS[contextData?.currentState ?? ''] ?? contextData?.currentState ?? '—'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {selectedMessageIds.size > 0 && (
-                <button onClick={handleCopySelected} className="px-2.5 py-1 text-xs border border-gray-300 rounded-lg hover:bg-gray-50">
-                  Copiar ({selectedMessageIds.size})
-                </button>
-              )}
-              <button onClick={() => void handleExport()} className="px-2.5 py-1 text-xs border border-gray-300 rounded-lg hover:bg-gray-50">
-                Exportar
-              </button>
-              {!isHuman ? (
-                <button
-                  onClick={() => void handleTakeover()}
-                  className="px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700 active:scale-95"
-                >
-                  Assumir
-                </button>
-              ) : (
-                <>
-                  <button onClick={() => void handleRelease()} className="px-2.5 py-1 text-xs border border-gray-300 rounded-lg hover:bg-gray-50">
-                    Liberar p/ bot
-                  </button>
-                  <button
-                    onClick={() => void handleFinalize()}
-                    className="px-2.5 py-1 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
-                  >
-                    Finalizar
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-1 min-h-0">
-            <div className="flex-1 flex flex-col min-w-0">
-              <div ref={messagesScrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50">
-                {loadingOlder && <p className="text-center text-xs text-gray-400">Carregando mensagens anteriores...</p>}
-                {messages.map((message) => (
-                  <MessageBubble
-                    key={message.id}
-                    message={message}
-                    selected={selectedMessageIds.has(message.id)}
-                    selectable={selectedMessageIds.size > 0}
-                    onToggleSelect={toggleMessageSelection}
-                    onViewMedia={() => void handleViewMedia(message)}
-                  />
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {sendError && (
-                <p className="px-4 py-1.5 text-xs text-red-600 bg-red-50 border-t border-red-100">{sendError}</p>
-              )}
-
-              {windowStatus === 'expired' || windowStatus === 'none' ? (
-                <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 flex items-center justify-between gap-2">
-                  <p className="text-xs text-amber-800">
-                    {windowStatus === 'none'
-                      ? 'Este contato ainda não enviou mensagem — só é possível iniciar com um template aprovado.'
-                      : 'Janela de 24h encerrada — reabra a conversa com um template aprovado antes de enviar texto livre.'}
-                  </p>
-                  <button
-                    onClick={() => void handleSendTemplate('atendimento_reabertura')}
-                    className="px-2.5 py-1 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 flex-shrink-0"
-                  >
-                    Enviar template
-                  </button>
-                </div>
-              ) : windowStatus === 'expiring' ? (
-                <div className="px-4 py-1.5 bg-amber-50 border-t border-amber-200">
-                  <p className="text-xs text-amber-700">Janela de 24h expira em breve.</p>
-                </div>
-              ) : null}
-
-              {!isHuman ? (
-                <div className="px-4 py-3 bg-gray-100 border-t border-gray-200 text-center">
-                  <p className="text-sm text-gray-500">Assuma o atendimento para responder diretamente ao cliente.</p>
-                </div>
-              ) : (
-                <MessageComposer
-                  value={composerValue}
-                  onChange={setComposerValue}
-                  onSend={() => void handleSend()}
-                  onAttach={handleAttach}
-                  attachedFile={attachedFile}
-                  onRemoveAttachment={() => setAttachedFile(null)}
-                  disabled={windowStatus === 'expired' || windowStatus === 'none'}
-                  sending={sending}
-                  quickMessages={QUICK_MESSAGES}
-                />
-              )}
-            </div>
-
-            {/* Painel de contexto */}
-            <div className="hidden lg:block w-72 flex-shrink-0 border-l border-gray-200 bg-white overflow-y-auto p-4 space-y-4">
-              <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Estado do fluxo</h3>
-                <p className="text-sm text-gray-900">
-                  {STATE_LABELS[contextData?.currentState ?? ''] ?? contextData?.currentState ?? '—'}
-                </p>
-                {isAssignedToMe && (
-                  <span className="inline-flex mt-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-100 text-brand-700">
-                    Atribuído a você
-                  </span>
-                )}
-              </div>
-
-              {cart.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Pedido em andamento</h3>
-                  <div className="space-y-1.5">
-                    {cart.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-700 truncate">{item.quantity ?? 1}x {item.name ?? 'Item'}</span>
-                        {typeof item.price === 'number' && (
-                          <span className="text-gray-500 flex-shrink-0 ml-2">
-                            {(item.price * (item.quantity ?? 1)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  {cartTotal > 0 && (
-                    <div className="flex items-center justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-100">
-                      <span>Total</span>
-                      <span>{cartTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {contextData && renderContextEntries(contextData.context).length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Dados coletados</h3>
-                  <div className="space-y-1.5">
-                    {renderContextEntries(contextData.context).map(([key, value]) => (
-                      <div key={key} className="text-xs">
-                        <span className="text-gray-400">{key}: </span>
-                        <span className="text-gray-700">{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <Modal open={mediaPreview !== null} onClose={() => setMediaPreview(null)} size="lg">
-        <div className="p-4">
-          <div className="flex justify-end mb-2">
-            <button onClick={() => setMediaPreview(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
-          </div>
-          {mediaPreview?.mimeType.startsWith('image/') ? (
-            <img src={`data:${mediaPreview.mimeType};base64,${mediaPreview.base64}`} alt="" className="max-w-full max-h-[70vh] mx-auto rounded-lg" />
-          ) : mediaPreview?.mimeType.startsWith('audio/') ? (
-            <audio controls src={`data:${mediaPreview.mimeType};base64,${mediaPreview.base64}`} className="w-full" />
-          ) : mediaPreview?.mimeType.startsWith('video/') ? (
-            <video controls src={`data:${mediaPreview.mimeType};base64,${mediaPreview.base64}`} className="max-w-full max-h-[70vh] mx-auto rounded-lg" />
-          ) : mediaPreview ? (
-            <a
-              href={`data:${mediaPreview.mimeType};base64,${mediaPreview.base64}`}
-              download
-              className="text-brand-600 underline text-sm"
-            >
-              Baixar arquivo
-            </a>
-          ) : null}
-        </div>
-      </Modal>
-    </div>
+    <ConversationsProvider api={conversationsSdkApi} sse={conversationsSdkRealtime}>
+      <Inbox />
+    </ConversationsProvider>
   )
 }

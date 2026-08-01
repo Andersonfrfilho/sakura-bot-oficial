@@ -1,7 +1,16 @@
 import type { Config } from 'tailwindcss'
 
 export default {
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  // O `dist` do pacote entra no scan: as classes das bolhas, do composer e das linhas da inbox só
+  // existem lá, e sem isto o Tailwind não gera nenhuma delas. Os dois caminhos porque o `file:`
+  // resolve na raiz do monorepo ou aqui, conforme quem instalou.
+  content: [
+    './index.html',
+    './src/**/*.{ts,tsx}',
+    './node_modules/@adatechnology/conversations-ui/dist/**/*.js',
+    '../../node_modules/@adatechnology/conversations-ui/dist/**/*.js',
+  ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {

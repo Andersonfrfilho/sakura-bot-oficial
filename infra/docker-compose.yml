@@ -165,16 +165,15 @@ services:
   order-hub-api:
     image: node:22
     container_name: order_hub_api
-    # monorepo irmão adatechnology-packages montado à parte — apps/api referencia
-    # @adatechnology/fiscal-provider e @adatechnology/whatsapp-provider via
-    # "file:../../../adatechnology-packages/...", caminho que só resolve dentro do
-    # container se esse repo também estiver montado.
-    # ATENÇÃO: isso só funciona em dev local (bind mount). Deploy (Railway) não tem
-    # acesso a esse diretório irmão — publicar o pacote ou vendorizar antes de subir prod.
+    # @adatechnology/fiscal-provider ainda vem por "file:" do monorepo irmão, que por isso
+    # precisa estar montado aqui dentro. Já o meta-whatsapp-provider vem do registry, como no
+    # quickcart: ele passou a depender de outro pacote por "workspace:*" (pnpm), e `npm install`
+    # dentro do diretório fonte não sabe resolver esse protocolo.
+    # ATENÇÃO: o bind do repo irmão só funciona em dev local. Deploy (Railway) não tem acesso a
+    # esse diretório — publicar o fiscal-provider ou vendorizar antes de subir prod.
     working_dir: /workspace/apps/api
     command: >
       sh -c "cd /adatechnology-packages/packages/backend/fiscal-provider && npm install && npm run build &&
-             cd /adatechnology-packages/packages/backend/whatsapp-provider && npm install && npm run build &&
              cd /workspace && npm install --workspaces --include-workspace-root &&
              cd apps/api && npx drizzle-kit generate && npx tsx watch src/index.ts"
     volumes:
@@ -182,7 +181,6 @@ services:
       - ../../adatechnology-packages:/adatechnology-packages
       - api_node_modules:/workspace/apps/api/node_modules
       - fiscal_node_modules:/adatechnology-packages/packages/backend/fiscal-provider/node_modules
-      - whatsapp_node_modules:/adatechnology-packages/packages/backend/whatsapp-provider/node_modules
     environment:
       - PORT=3333
       - NODE_ENV=development
@@ -197,6 +195,9 @@ services:
       - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN}
       - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID}
       - WHATSAPP_API_VERSION=${WHATSAPP_API_VERSION:-v21.0}
+      - WHATSAPP_BUSINESS_ACCOUNT_ID=${WHATSAPP_BUSINESS_ACCOUNT_ID}
+      - WHATSAPP_WEBHOOK_VERIFY_TOKEN=${WHATSAPP_WEBHOOK_VERIFY_TOKEN}
+      - WHATSAPP_APP_SECRET=${WHATSAPP_APP_SECRET}
       - ALLOWED_ORIGINS=http://localhost:4000
       - LOG_LEVEL=info
     ports:
@@ -218,6 +219,10 @@ services:
     volumes:
       - ../apps/web:/app
       - web_node_modules:/app/node_modules
+      # @adatechnology/conversations-ui e products-ui entram por "file:" do monorepo irmão: o
+      # symlink em node_modules aponta para fora de /app e sem este bind o Vite não resolve o
+      # import. Mesmo caminho que o symlink espera resolver a partir de /app/node_modules.
+      - ../../adatechnology-packages:/adatechnology-packages
     environment:
       # URLs como vistas pelo BROWSER (host), não pelo Docker network
       - VITE_API_URL=http://localhost:3333
@@ -275,7 +280,6 @@ volumes:
   api_node_modules:
   web_node_modules:
   fiscal_node_modules:
-  whatsapp_node_modules:
 
 networks:
   sakura_net:

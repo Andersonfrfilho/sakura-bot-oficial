@@ -24,13 +24,16 @@ export interface CreateCustomerInput {
   phone?: string
   document?: string
   birthDate?: string
+  rating?: number | null
 }
 
 export interface UpdateCustomerInput {
   name?: string
-  phone?: string
-  document?: string
+  whatsappNumber?: string
+  phone?: string | null
+  document?: string | null
   birthDate?: string | null
+  rating?: number | null
 }
 
 export type CustomerSortField = 'name' | 'orderCount' | 'totalSpent' | 'createdAt'

@@ -232,7 +232,7 @@ ON CONFLICT (status) DO NOTHING;
 -- ============================================
 CREATE TABLE IF NOT EXISTS order_status_logs (
   id         SERIAL PRIMARY KEY,
-  order_id   UUID REFERENCES orders(id),
+  order_id   UUID,  -- FK validated at app level (Drizzle owns orders)
   status     TEXT NOT NULL,
   note       TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -246,8 +246,8 @@ CREATE TABLE IF NOT EXISTS order_status_logs (
 CREATE TABLE IF NOT EXISTS reservations (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code           TEXT UNIQUE NOT NULL,
-  customer_id    UUID NOT NULL REFERENCES customers(id),
-  table_id       UUID REFERENCES tables(id),
+  customer_id    UUID NOT NULL,  -- FK validated at app level (Drizzle owns customers)
+  table_id       UUID,  -- FK validated at app level (Drizzle owns tables)
   date           DATE NOT NULL,
   time           TIME NOT NULL,
   party_size     INT NOT NULL,

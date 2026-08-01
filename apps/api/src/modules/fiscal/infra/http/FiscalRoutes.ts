@@ -55,12 +55,12 @@ export function registerFiscalRoutes(router: Router, controller: FiscalControlle
     controller.downloadXml
   )
 
-  // Get PDF URL
+  // Download PDF (generated on-demand from xmlAutorizado)
   router.get(
     '/fiscal-documents/:id/pdf',
     authenticate,
     authorize('orders', 'read'),
-    controller.getPdfUrl
+    controller.downloadPdf
   )
 
   // Get fiscal config

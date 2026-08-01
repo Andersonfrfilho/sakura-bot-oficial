@@ -21,6 +21,7 @@ interface FiscalDoc {
   errorCode: string | null
   errorMessage: string | null
   danfePdfUrl: string | null
+  xmlAutorizado: string | null
   authorizedAt: string | null
   createdAt: string
 }
@@ -109,6 +110,23 @@ export function FiscalDocumentsPage() {
     const anchor = document.createElement('a')
     anchor.href = objectUrl
     anchor.download = `nota-${documentId}.xml`
+    anchor.click()
+    URL.revokeObjectURL(objectUrl)
+  }
+
+  async function handleDownloadPdf(documentId: string) {
+    const response = await fetch(`${API_URL}/fiscal-documents/${documentId}/pdf`, {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    })
+    if (!response.ok) {
+      window.alert('Não foi possível gerar o PDF.')
+      return
+    }
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = objectUrl
+    anchor.download = `danfe-${documentId}.pdf`
     anchor.click()
     URL.revokeObjectURL(objectUrl)
   }
@@ -251,8 +269,17 @@ export function FiscalDocumentsPage() {
                               <FileDown className="h-4 w-4" />
                               PDF
                             </a>
+                          ) : doc.xmlAutorizado ? (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadPdf(doc.id)}
+                              className="flex items-center gap-1 text-blue-600 hover:underline"
+                            >
+                              <FileDown className="h-4 w-4" />
+                              PDF
+                            </button>
                           ) : (
-                            <span className="flex items-center gap-1 text-gray-300" title="Geração de PDF ainda não disponível para este documento">
+                            <span className="flex items-center gap-1 text-gray-300" title="PDF não disponível para este documento">
                               <FileDown className="h-4 w-4" />
                               PDF
                             </span>

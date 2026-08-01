@@ -24,12 +24,13 @@ export function Sidebar() {
             to={item.to}
             end={item.to === '/'}
             className={({ isActive }) =>
-              `block px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 isActive ? 'bg-brand-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
               }`
             }
           >
-            {item.label}
+            {item.icon && <item.icon className="h-4 w-4 flex-shrink-0" />}
+            <span>{item.label}</span>
           </NavLink>
         ))}
       </nav>

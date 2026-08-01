@@ -6,6 +6,7 @@ import type { UpdateOrderNotesUseCase } from '../../application/use-cases/Update
 import type { GetOrderUseCase } from '../../application/use-cases/GetOrderUseCase'
 import type { ListOrdersUseCase } from '../../application/use-cases/ListOrdersUseCase'
 import { ValidationError, UnauthorizedError } from '@/shared/errors/AppError'
+import { IfoodProvider } from '@/shared/providers/IfoodProvider'
 
 const orderItemSchema = z.object({
   productId: z.string().uuid().optional(),
@@ -34,6 +35,42 @@ const updateStatusSchema = z.object({
 const updateNotesSchema = z.object({
   notes: z.string().max(1000).nullable(),
 })
+
+const ifoodRejectSchema = z.object({
+  reason: z.string().min(1).max(500),
+})
+
+interface IfoodOrderMetadata {
+  ifoodOrderId: string
+  ifoodDisplayId: string
+  paymentMethod: string
+  deliveryAddress: {
+    street: string
+    number: string
+    neighborhood: string
+    city: string
+    state: string
+    zip: string
+  } | null
+}
+
+function extractIfoodOrderId(notes: string | null): string | null {
+  if (!notes) return null
+  try {
+    const parsed = JSON.parse(notes) as IfoodOrderMetadata
+    return parsed.ifoodOrderId ?? null
+  } catch {
+    return null
+  }
+}
+
+function buildIfoodProvider(): IfoodProvider | null {
+  const clientId = process.env.IFOOD_CLIENT_ID
+  const clientSecret = process.env.IFOOD_CLIENT_SECRET
+  const merchantId = process.env.IFOOD_MERCHANT_ID
+  if (!clientId || !clientSecret || !merchantId) return null
+  return new IfoodProvider({ clientId, clientSecret, merchantId })
+}
 
 export class OrderController {
   constructor(
@@ -105,5 +142,77 @@ export class OrderController {
       notes: parsed.data.notes,
     })
     response.json(order)
+  }
+
+  ifoodAccept: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+
+    const order = await this.getOrderUseCase.execute(
+      request.params['id']!,
+      request.user.establishmentId
+    )
+
+    if (order.channel !== 'ifood') {
+      throw new ValidationError('Order is not from iFood')
+    }
+
+    const ifoodOrderId = extractIfoodOrderId(order.notes)
+    if (!ifoodOrderId) {
+      throw new ValidationError('Could not extract iFood order ID from order notes')
+    }
+
+    const provider = buildIfoodProvider()
+    if (!provider) {
+      throw new ValidationError('iFood integration is not configured')
+    }
+
+    await provider.acceptOrder(ifoodOrderId)
+
+    const updated = await this.updateStatusUseCase.execute({
+      orderId: order.id,
+      establishmentId: request.user.establishmentId,
+      newStatus: 'in_production',
+    })
+
+    response.json(updated)
+  }
+
+  ifoodReject: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+
+    const parsed = ifoodRejectSchema.safeParse(request.body)
+    if (!parsed.success) {
+      throw new ValidationError('Validation failed', parsed.error.flatten().fieldErrors)
+    }
+
+    const order = await this.getOrderUseCase.execute(
+      request.params['id']!,
+      request.user.establishmentId
+    )
+
+    if (order.channel !== 'ifood') {
+      throw new ValidationError('Order is not from iFood')
+    }
+
+    const ifoodOrderId = extractIfoodOrderId(order.notes)
+    if (!ifoodOrderId) {
+      throw new ValidationError('Could not extract iFood order ID from order notes')
+    }
+
+    const provider = buildIfoodProvider()
+    if (!provider) {
+      throw new ValidationError('iFood integration is not configured')
+    }
+
+    await provider.rejectOrder(ifoodOrderId, parsed.data.reason)
+
+    const updated = await this.updateStatusUseCase.execute({
+      orderId: order.id,
+      establishmentId: request.user.establishmentId,
+      newStatus: 'cancelled',
+      cancellationReason: `iFood: ${parsed.data.reason}`,
+    })
+
+    response.json(updated)
   }
 }

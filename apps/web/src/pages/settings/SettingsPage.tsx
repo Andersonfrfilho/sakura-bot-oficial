@@ -1,28 +1,68 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { FiscalSettingsPage } from './FiscalSettingsPage'
+import { DeliveryFeeManager } from './components/DeliveryFeeManager'
+import { Upload, Image, X } from 'lucide-react'
 
-const KNOWN_SETTINGS: Array<{ key: string; label: string; type: 'text' | 'number' | 'boolean'; description?: string }> = [
-  { key: 'business_name', label: 'Nome do estabelecimento', type: 'text' },
-  { key: 'whatsapp_number', label: 'Número WhatsApp', type: 'text', description: 'Formato: 5511999999999' },
-  { key: 'delivery_fee', label: 'Taxa de entrega (R$)', type: 'number' },
-  { key: 'min_order_amount', label: 'Pedido mínimo (R$)', type: 'number' },
-  { key: 'estimated_delivery_time', label: 'Tempo estimado de entrega (min)', type: 'number' },
-  { key: 'estimated_pickup_time', label: 'Tempo estimado de retirada (min)', type: 'number' },
-  { key: 'accept_orders', label: 'Aceitar pedidos', type: 'boolean' },
-  { key: 'accept_delivery', label: 'Aceitar entregas', type: 'boolean' },
-  { key: 'accept_pickup', label: 'Aceitar retirada', type: 'boolean' },
-  { key: 'accept_table', label: 'Aceitar pedidos na mesa', type: 'boolean' },
+interface SettingDef {
+  key: string
+  label: string
+  type: 'text' | 'number' | 'boolean'
+  description?: string
+  section: 'estabelecimento' | 'operacao' | 'estoque' | 'impressao' | 'funcionalidades' | 'gerais'
+}
+
+const KNOWN_SETTINGS: SettingDef[] = [
+  { key: 'establishment_name', label: 'Nome do estabelecimento', type: 'text', section: 'estabelecimento' },
+  { key: 'whatsapp_number', label: 'Número WhatsApp', type: 'text', description: 'Formato: 5511999999999', section: 'estabelecimento' },
+  { key: 'establishment_address', label: 'Endereço completo', type: 'text', section: 'estabelecimento' },
+
+  { key: 'opening_hours', label: 'Horários de funcionamento', type: 'text', description: 'JSON: {"mon":"08:00-22:00","tue":"08:00-22:00", ...}', section: 'operacao' },
+  { key: 'default_preparation_time', label: 'Tempo de preparo padrão (min)', type: 'number', section: 'operacao' },
+  { key: 'minimum_delivery_order', label: 'Pedido mínimo para delivery (R$)', type: 'number', section: 'operacao' },
+  { key: 'currency', label: 'Moeda', type: 'text', section: 'operacao' },
+  { key: 'timezone', label: 'Fuso horário', type: 'text', section: 'operacao' },
+
+  { key: 'expiry_alert_days', label: 'Dias de alerta de validade', type: 'number', section: 'estoque' },
+
+  { key: 'default_printer', label: 'Impressora padrão', type: 'text', section: 'impressao' },
+
+  { key: 'delivery_fee', label: 'Taxa de entrega (R$)', type: 'number', section: 'gerais' },
+  { key: 'min_order_amount', label: 'Pedido mínimo (R$)', type: 'number', section: 'gerais' },
+  { key: 'estimated_delivery_time', label: 'Tempo estimado de entrega (min)', type: 'number', section: 'gerais' },
+  { key: 'estimated_pickup_time', label: 'Tempo estimado de retirada (min)', type: 'number', section: 'gerais' },
+  { key: 'logo_url', label: 'URL do logo', type: 'text', section: 'estabelecimento' },
+
+  { key: 'accept_orders', label: 'Aceitar pedidos', type: 'boolean', section: 'funcionalidades' },
+  { key: 'accept_delivery', label: 'Aceitar entregas', type: 'boolean', section: 'funcionalidades' },
+  { key: 'accept_pickup', label: 'Aceitar retirada', type: 'boolean', section: 'funcionalidades' },
+  { key: 'accept_table', label: 'Aceitar pedidos na mesa', type: 'boolean', section: 'funcionalidades' },
 ]
+
+interface SectionConfig {
+  key: string
+  title: string
+}
+
+const SECTIONS: SectionConfig[] = [
+  { key: 'estabelecimento', title: 'Estabelecimento' },
+  { key: 'operacao', title: 'Operação' },
+  { key: 'estoque', title: 'Estoque' },
+  { key: 'impressao', title: 'Impressão' },
+  { key: 'gerais', title: 'Informações gerais' },
+  { key: 'funcionalidades', title: 'Funcionalidades' },
+]
+
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3333'
 
 function toString(value: unknown): string {
   if (value === null || value === undefined) return ''
   return String(value)
 }
 
-type Tab = 'gerais' | 'fiscal'
+type Tab = 'gerais' | 'fiscal' | 'delivery-fee'
 
 export function SettingsPage() {
   const accessToken = useAuthStore((state) => state.accessToken)
@@ -32,6 +72,10 @@ export function SettingsPage() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [uploadLoading, setUploadLoading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
 
   const { data: settings = {}, isLoading } = useQuery({
     queryKey: ['settings'],
@@ -87,8 +131,89 @@ export function SettingsPage() {
     setSaved(false)
   }
 
-  const textFields = KNOWN_SETTINGS.filter((s) => s.type === 'text' || s.type === 'number')
-  const boolFields = KNOWN_SETTINGS.filter((s) => s.type === 'boolean')
+  async function handleLogoUpload(file: File) {
+    setUploadLoading(true)
+    setUploadError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch(`${API_URL}/uploads`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken ?? ''}`,
+        },
+        body: formData,
+      })
+
+      const data: { url?: string; message?: string } = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message ?? 'Falha no upload')
+      }
+
+      if (!data.url) {
+        throw new Error('Resposta inválida do servidor: URL não encontrada')
+      }
+
+      setValue('logo_url', data.url)
+      await saveMutation.mutateAsync({ key: 'logo_url', value: data.url })
+      void queryClient.invalidateQueries({ queryKey: ['settings'] })
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : 'Erro ao fazer upload')
+    } finally {
+      setUploadLoading(false)
+    }
+  }
+
+  function handleLogoRemove() {
+    setValue('logo_url', '')
+    void saveMutation.mutateAsync({ key: 'logo_url', value: null })
+  }
+
+  const logoUrl = getValue('logo_url', 'text')
+
+  const fieldsBySection = new Map<string, SettingDef[]>()
+  for (const def of KNOWN_SETTINGS) {
+    const list = fieldsBySection.get(def.section) ?? []
+    list.push(def)
+    fieldsBySection.set(def.section, list)
+  }
+
+  const renderTextField = (def: SettingDef) => (
+    <div key={def.key}>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{def.label}</label>
+      <input
+        type={def.type === 'number' ? 'number' : 'text'}
+        value={getValue(def.key, def.type)}
+        onChange={(e) => setValue(def.key, e.target.value)}
+        step={def.type === 'number' ? '0.01' : undefined}
+        min={def.type === 'number' ? '0' : undefined}
+        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+      />
+      {def.description && (
+        <p className="text-xs text-gray-400 mt-1">{def.description}</p>
+      )}
+    </div>
+  )
+
+  const renderBoolField = (def: SettingDef) => {
+    const isOn = getValue(def.key, 'boolean') === 'true'
+    return (
+      <div key={def.key} className="flex items-center justify-between py-1">
+        <span className="text-sm text-gray-700">{def.label}</span>
+        <button
+          onClick={() => setValue(def.key, isOn ? 'false' : 'true')}
+          className={`relative w-11 h-6 rounded-full transition-colors ${isOn ? 'bg-brand-600' : 'bg-gray-200'}`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isOn ? 'translate-x-5' : 'translate-x-0'}`}
+          />
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
@@ -110,6 +235,7 @@ export function SettingsPage() {
         {([
           { key: 'gerais', label: 'Gerais' },
           { key: 'fiscal', label: 'Fiscal' },
+          { key: 'delivery-fee', label: 'Entregas' },
         ] as const).map((t) => (
           <button
             key={t.key}
@@ -135,46 +261,89 @@ export function SettingsPage() {
             <p className="text-gray-400 text-center py-16">Carregando...</p>
           ) : (
             <>
-              {/* Text / number fields */}
-              <div className="bg-white rounded-2xl shadow-sm p-5 mb-4 space-y-4">
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Informações gerais</h2>
-                {textFields.map((def) => (
-                  <div key={def.key}>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{def.label}</label>
-                    <input
-                      type={def.type === 'number' ? 'number' : 'text'}
-                      value={getValue(def.key, def.type)}
-                      onChange={(e) => setValue(def.key, e.target.value)}
-                      step={def.type === 'number' ? '0.01' : undefined}
-                      min={def.type === 'number' ? '0' : undefined}
-                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    />
-                    {def.description && (
-                      <p className="text-xs text-gray-400 mt-1">{def.description}</p>
+              {/* Logo upload section (T8.1) */}
+              <div className="bg-white rounded-2xl shadow-sm p-5 mb-4">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Logo</h2>
+                <div className="flex items-start gap-4">
+                  <div className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {logoUrl ? (
+                      <div className="relative w-full h-full group">
+                        <img
+                          src={logoUrl}
+                          alt="Logo do estabelecimento"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none'
+                            ;(e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex'
+                          }}
+                        />
+                        <div className="hidden absolute inset-0 bg-black/50 group-hover:flex items-center justify-center" />
+                      </div>
+                    ) : (
+                      <Image className="h-8 w-8 text-gray-300" />
                     )}
                   </div>
-                ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <button
+                        onClick={() => logoInputRef.current?.click()}
+                        disabled={uploadLoading}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        {uploadLoading ? 'Enviando...' : 'Fazer upload'}
+                      </button>
+                      {logoUrl && (
+                        <button
+                          onClick={handleLogoRemove}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Remover
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      Formatos aceitos: PNG, JPG, GIF. Tamanho recomendado: 500x500px.
+                    </p>
+                    {uploadError && (
+                      <p className="mt-1 text-xs text-red-500">{uploadError}</p>
+                    )}
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        void handleLogoUpload(file)
+                        if (logoInputRef.current) logoInputRef.current.value = ''
+                      }}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
               </div>
+
+              {/* Sections with text/number fields */}
+              {SECTIONS.filter((s) => s.key !== 'funcionalidades').map((section) => {
+                const fields = fieldsBySection.get(section.key) ?? []
+                if (fields.length === 0) return null
+                const nonBoolFields = fields.filter((f) => f.type !== 'boolean')
+                if (nonBoolFields.length === 0) return null
+
+                return (
+                  <div key={section.key} className="bg-white rounded-2xl shadow-sm p-5 mb-4 space-y-4">
+                    <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{section.title}</h2>
+                    {nonBoolFields.map(renderTextField)}
+                  </div>
+                )
+              })}
 
               {/* Boolean toggles */}
               <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Funcionalidades</h2>
-                {boolFields.map((def) => {
-                  const isOn = getValue(def.key, 'boolean') === 'true'
-                  return (
-                    <div key={def.key} className="flex items-center justify-between py-1">
-                      <span className="text-sm text-gray-700">{def.label}</span>
-                      <button
-                        onClick={() => setValue(def.key, isOn ? 'false' : 'true')}
-                        className={`relative w-11 h-6 rounded-full transition-colors ${isOn ? 'bg-brand-600' : 'bg-gray-200'}`}
-                      >
-                        <span
-                          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isOn ? 'translate-x-5' : 'translate-x-0'}`}
-                        />
-                      </button>
-                    </div>
-                  )
-                })}
+                {(fieldsBySection.get('funcionalidades') ?? []).map(renderBoolField)}
               </div>
 
               {/* Change password link */}
@@ -195,6 +364,12 @@ export function SettingsPage() {
       {tab === 'fiscal' && (
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <FiscalSettingsPage />
+        </div>
+      )}
+
+      {tab === 'delivery-fee' && (
+        <div className="bg-white rounded-2xl shadow-sm p-5">
+          <DeliveryFeeManager />
         </div>
       )}
     </div>

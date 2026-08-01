@@ -5,6 +5,7 @@ import type { RouteHandler } from '@/infra/http/router'
 import * as schema from '@/infra/database/schema'
 import { UnauthorizedError, ValidationError, NotFoundError, ConflictError } from '@/shared/errors/AppError'
 import type { CacheProvider } from '@/shared/providers/CacheProvider'
+import { OpenFoodFactsProvider } from '@/shared/providers/OpenFoodFactsProvider'
 
 type Database = NodePgDatabase<typeof schema>
 
@@ -21,7 +22,13 @@ const productSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   price: z.number().positive(),
+  costPrice: z.number().positive().nullable().optional(),
+  unit: z.enum(['un', 'kg', 'g', 'l', 'ml']).optional(),
+  barcode: z.string().max(20).nullable().optional(),
   categoryId: z.string().uuid().nullable().optional(),
+  sectionId: z.string().uuid().nullable().optional(),
+  preparationTimeMinutes: z.number().int().positive().nullable().optional(),
+  preparationInstructions: z.string().nullable().optional(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().min(0).optional(),
 })
@@ -36,6 +43,8 @@ function toSlug(name: string): string {
 }
 
 export class CatalogController {
+  private readonly openFoodFacts = new OpenFoodFactsProvider()
+
   constructor(
     private readonly db: Database,
     private readonly cache: CacheProvider
@@ -211,7 +220,13 @@ export class CatalogController {
         slug,
         price: String(parsed.data.price),
         ...(parsed.data.description !== undefined && { description: parsed.data.description }),
+        ...(parsed.data.costPrice !== undefined && { costPrice: parsed.data.costPrice === null ? null : String(parsed.data.costPrice) }),
+        ...(parsed.data.unit !== undefined && { unit: parsed.data.unit }),
+        ...(parsed.data.barcode !== undefined && { barcode: parsed.data.barcode }),
         ...(parsed.data.categoryId !== undefined && { categoryId: parsed.data.categoryId }),
+        ...(parsed.data.sectionId !== undefined && { sectionId: parsed.data.sectionId }),
+        ...(parsed.data.preparationTimeMinutes !== undefined && { preparationTimeMinutes: parsed.data.preparationTimeMinutes }),
+        ...(parsed.data.preparationInstructions !== undefined && { preparationInstructions: parsed.data.preparationInstructions }),
         ...(parsed.data.active !== undefined && { active: parsed.data.active }),
         ...(parsed.data.sortOrder !== undefined && { sortOrder: parsed.data.sortOrder }),
       })
@@ -258,7 +273,13 @@ export class CatalogController {
         price: String(parsed.data.price),
         updatedAt: new Date(),
         ...(parsed.data.description !== undefined && { description: parsed.data.description }),
+        ...(parsed.data.costPrice !== undefined && { costPrice: parsed.data.costPrice === null ? null : String(parsed.data.costPrice) }),
+        ...(parsed.data.unit !== undefined && { unit: parsed.data.unit }),
+        ...(parsed.data.barcode !== undefined && { barcode: parsed.data.barcode }),
         ...(parsed.data.categoryId !== undefined && { categoryId: parsed.data.categoryId }),
+        ...(parsed.data.sectionId !== undefined && { sectionId: parsed.data.sectionId }),
+        ...(parsed.data.preparationTimeMinutes !== undefined && { preparationTimeMinutes: parsed.data.preparationTimeMinutes }),
+        ...(parsed.data.preparationInstructions !== undefined && { preparationInstructions: parsed.data.preparationInstructions }),
         ...(parsed.data.active !== undefined && { active: parsed.data.active }),
         ...(parsed.data.sortOrder !== undefined && { sortOrder: parsed.data.sortOrder }),
       })
@@ -312,5 +333,24 @@ export class CatalogController {
 
     await this.invalidateCache(establishmentId)
     response.json({ success: true }, 200)
+  }
+
+  productSearch: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const query = request.query['q'] ?? ''
+    if (query.length < 2) {
+      response.json([])
+      return
+    }
+    const suggestions = await this.openFoodFacts.search(query)
+    response.json(suggestions)
+  }
+
+  productLookup: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const barcode = request.params['barcode']!
+    const suggestion = await this.openFoodFacts.getByBarcode(barcode)
+    if (!suggestion) throw new NotFoundError('Produto')
+    response.json(suggestion)
   }
 }

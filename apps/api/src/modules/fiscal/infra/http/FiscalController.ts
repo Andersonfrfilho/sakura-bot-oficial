@@ -7,6 +7,7 @@ import type { UpsertFiscalConfigUseCase } from '../../application/use-cases/Upse
 import type { TestFiscalConnectionUseCase } from '../../application/use-cases/TestFiscalConnectionUseCase'
 import type { RetryFiscalDocumentUseCase } from '../../application/use-cases/RetryFiscalDocumentUseCase'
 import type { PrintFiscalCupomUseCase } from '../../application/use-cases/PrintFiscalCupomUseCase'
+import type { GenerateFiscalPdfUseCase } from '../../application/use-cases/GenerateFiscalPdfUseCase'
 import { buildFiscalConfigFromDb } from '../../application/use-cases/TestFiscalConnectionUseCase'
 import { verifyFiscalPublicToken } from '../../application/FiscalPublicToken'
 import { ValidationError, UnauthorizedError, UnprocessableError, NotFoundError } from '@/shared/errors/AppError'
@@ -62,7 +63,8 @@ export class FiscalController {
     private readonly configUseCase: UpsertFiscalConfigUseCase,
     private readonly testConnectionUseCase: TestFiscalConnectionUseCase,
     private readonly retryUseCase: RetryFiscalDocumentUseCase,
-    private readonly printUseCase: PrintFiscalCupomUseCase
+    private readonly printUseCase: PrintFiscalCupomUseCase,
+    private readonly pdfUseCase: GenerateFiscalPdfUseCase
   ) {}
 
   printCupom: RouteHandler = async (request, response) => {
@@ -161,14 +163,11 @@ export class FiscalController {
     response.json(docs)
   }
 
-  getPdfUrl: RouteHandler = async (request, response) => {
+  downloadPdf: RouteHandler = async (request, response) => {
     if (!request.user) throw new UnauthorizedError()
     const documentId = request.params['id']!
-    const doc = await this.getUseCase.findById(documentId, request.user.establishmentId)
-    if (!doc.danfePdfUrl) {
-      throw new UnprocessableError('PDF not available for this document')
-    }
-    response.json({ url: doc.danfePdfUrl })
+    const pdf = await this.pdfUseCase.execute(documentId, request.user.establishmentId)
+    response.binary(pdf.buffer, pdf.mimeType, pdf.fileName)
   }
 
   getConfig: RouteHandler = async (request, response) => {

@@ -1,3 +1,6 @@
+import type { ComponentType } from 'react'
+import { Shield, Banknote } from 'lucide-react'
+
 export const ROLES = {
   ADMIN: 'Administrador',
   MANAGER: 'Gerente',
@@ -13,6 +16,7 @@ interface NavItem {
   to: string
   label: string
   roles?: Role[]
+  icon?: ComponentType<{ className?: string }>
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -23,9 +27,12 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/fiscal', label: 'Notas Fiscais', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.CASHIER] },
   { to: '/orders', label: 'Pedidos', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.ATTENDANT] },
   { to: '/conversations', label: 'Conversas', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.ATTENDANT] },
+  { to: '/messages', label: 'Mensagens', roles: [ROLES.ADMIN, ROLES.MANAGER] },
   { to: '/tables', label: 'Mesas', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.ATTENDANT] },
   { to: '/customers', label: 'Clientes', roles: [ROLES.ADMIN, ROLES.MANAGER] },
+  { to: '/finance', label: 'Financeiro', roles: [ROLES.ADMIN, ROLES.MANAGER], icon: Banknote },
   { to: '/staff', label: 'Funcionários', roles: [ROLES.ADMIN, ROLES.MANAGER] },
+  { to: '/roles', label: 'Cargos', roles: [ROLES.ADMIN, ROLES.MANAGER], icon: Shield },
   { to: '/catalog', label: 'Cardápio', roles: [ROLES.ADMIN, ROLES.MANAGER] },
   { to: '/reports', label: 'Relatórios', roles: [ROLES.ADMIN, ROLES.MANAGER] },
   { to: '/settings', label: 'Configurações', roles: [ROLES.ADMIN, ROLES.MANAGER] },

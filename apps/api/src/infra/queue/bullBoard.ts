@@ -4,6 +4,9 @@ import { BullMQAdapter } from '@bull-board/api/bullMQAdapter'
 import { ExpressAdapter } from '@bull-board/express'
 import type { Queue } from 'bullmq'
 import { fiscalQueue } from './fiscalQueue'
+import { stockExpiryQueue } from './stockQueue'
+import { financeDueQueue } from './financeQueue'
+import { ifoodPollingQueue } from './ifoodQueue'
 
 const BULLBOARD_PORT = Number(process.env.BULLBOARD_PORT ?? 4200)
 const BULLBOARD_USER = process.env.BULLBOARD_USER ?? 'admin'
@@ -36,7 +39,12 @@ export function startBullBoard(): void {
   const serverAdapter = new ExpressAdapter()
   serverAdapter.setBasePath('/')
   createBullBoard({
-    queues: [new BullMQAdapter(fiscalQueue as unknown as Queue)],
+    queues: [
+      new BullMQAdapter(fiscalQueue as unknown as Queue),
+      new BullMQAdapter(stockExpiryQueue as unknown as Queue),
+      new BullMQAdapter(financeDueQueue as unknown as Queue),
+      new BullMQAdapter(ifoodPollingQueue as unknown as Queue),
+    ],
     serverAdapter,
   })
 

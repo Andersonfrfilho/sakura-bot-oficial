@@ -1,40 +1,39 @@
-import type { RouteHandler } from '@/infra/http/router'
-import type { ReceiveWhatsAppWebhookUseCase } from '../../application/use-cases/ReceiveWhatsAppWebhookUseCase'
-import { UnauthorizedError, ValidationError } from '@/shared/errors/AppError'
-import { randomUUID } from 'crypto'
+/**
+ * Webhook da Meta Cloud API servido pelo @adatechnology/meta-whatsapp-module.
+ *
+ * A verificação de assinatura e a guarda de replay são do pacote: ele confere o HMAC contra o
+ * **app secret** (não o access token) e reivindica a entrega num nonce store atômico, sem a janela
+ * de corrida do `exists`-depois-`set` que existia aqui antes.
+ */
 
-const VERIFY_TOKEN = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN ?? 'change-verify-token'
+import type { RouteHandler } from '@/infra/http/router'
+import { ValidationError } from '@/shared/errors/AppError'
+import type { MetaWhatsAppModuleRegistry } from '@/modules/conversations/infra/whatsapp/metaWhatsAppModule'
 
 export class WebhookController {
-  constructor(private readonly receiveWebhookUseCase: ReceiveWhatsAppWebhookUseCase) {}
+  constructor(private readonly modules: MetaWhatsAppModuleRegistry) {}
 
-  // GET /webhook — Meta hub.challenge verification
+  // GET /webhook — hub.challenge da Meta
   verify: RouteHandler = async (request, response) => {
-    const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = request.query
-
-    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-      response.json(parseInt(challenge ?? '0'))
-    } else {
-      throw new UnauthorizedError('invalid_verify_token')
-    }
+    const challenge = this.modules.verifyChallenge({
+      mode: request.query['hub.mode'] ?? null,
+      token: request.query['hub.verify_token'] ?? null,
+      challenge: request.query['hub.challenge'] ?? null,
+    })
+    response.json(challenge)
   }
 
-  // POST /webhook/:establishmentId — incoming WhatsApp messages
+  // POST /webhook/:establishmentId — mensagens e status recebidos
   receive: RouteHandler = async (request, response) => {
     const establishmentId = request.params['establishmentId']
     if (!establishmentId) throw new ValidationError('establishmentId is required')
 
-    const signature = request.headers['x-hub-signature-256'] ?? ''
-    const nonce = request.headers['x-webhook-nonce'] ?? randomUUID()
-
-    await this.receiveWebhookUseCase.execute({
-      establishmentId,
+    const result = await this.modules.forEstablishment(establishmentId).webhook.receive.execute({
+      companyId: establishmentId,
       rawBody: request.rawBody,
-      signature,
-      nonce,
-      payload: request.body as never,
+      signatureHeader: request.headers['x-hub-signature-256'],
     })
 
-    response.json({ status: 'ok' })
+    response.json({ status: 'ok', ...result })
   }
 }

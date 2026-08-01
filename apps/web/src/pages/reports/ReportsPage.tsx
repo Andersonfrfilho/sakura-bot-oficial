@@ -28,6 +28,112 @@ interface MonthlyReport {
   dailyBreakdown: DailyBreakdown[]
 }
 
+interface FunnelStage {
+  stage: string
+  averageMinutes: string
+  orderCount: number
+  label: string
+}
+
+interface FunnelTypeGroup {
+  orderType: string
+  label: string
+  stages: FunnelStage[]
+  bottleneck: string | null
+}
+
+interface FunnelAnalysis {
+  periodDays: number
+  overall: { slowestStage: string | null; slowestStageMins: string }
+  byType: FunnelTypeGroup[]
+}
+
+interface TableBreakdown {
+  tableId: string
+  tableNumber: number
+  comandaCount: number
+  avgTimeMinutes: string
+  totalRevenue: string
+  avgSpendPerComanda: string
+}
+
+interface TableMetrics {
+  periodDays: number
+  averageTimeAtTableMinutes: string
+  averageSpendPerComanda: string
+  averageSpendPerTable: string
+  occupancyRatePercent: string
+  totalTables: number
+  totalComandasClosed: number
+  tables: TableBreakdown[]
+}
+
+interface IngredientRankingItem {
+  ingredientId: string
+  ingredientName: string
+  totalQuantityUsed: string
+  movementCount: number
+}
+
+interface ProductProfitItem {
+  productId: string
+  productName: string
+  price: string
+  costPrice: string
+  margin: string
+  quantitySold: number
+  totalRevenue: string
+  totalProfit: string
+}
+
+interface IngredientsRanking {
+  periodDays: number
+  topIngredients: IngredientRankingItem[]
+  topProfitableProducts: ProductProfitItem[]
+  summary: {
+    bestMargin: ProductProfitItem | null
+    bestSeller: ProductProfitItem | null
+    bestCombo: ProductProfitItem | null
+  }
+}
+
+interface ProductProfitReport {
+  periodDays: number
+  bestMargin: ProductProfitEntry[]
+  bestSellers: ProductProfitEntry[]
+  bestCombo: ProductProfitEntry[]
+}
+
+interface ProductProfitEntry {
+  productId: string
+  productName: string
+  price: string
+  costPrice: string
+  marginPerUnit: string
+  marginPercent: string
+  quantitySold: number
+  totalRevenue: string
+  totalProfit: string
+  ordersCount: number
+}
+
+interface PreparationTimeComparison {
+  productId: string
+  productName: string
+  cadastradoMinutes: number
+  realAverageMinutes: string
+  differenceMinutes: string
+  differencePercent: string
+  sampleSize: number
+}
+
+interface PreparationTimeReport {
+  periodDays: number
+  products: PreparationTimeComparison[]
+  overallAccuracy: string
+  totalProductsCompared: number
+}
+
 const PAYMENT_LABELS: Record<string, string> = {
   pix: 'Pix',
   card_credit: 'Crédito',
@@ -51,12 +157,61 @@ export function ReportsPage() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
+  const [funnelDays, setFunnelDays] = useState(30)
+  const [tableDays, setTableDays] = useState(30)
+  const [ingredientsDays, setIngredientsDays] = useState(30)
+  const [prepTimeDays, setPrepTimeDays] = useState(30)
 
   const { data: report, isLoading, isError } = useQuery({
     queryKey: ['monthly-report', year, month],
     queryFn: () =>
       api.get<MonthlyReport>(
         `/reports/monthly?year=${year}&month=${month}`,
+        accessToken ?? undefined
+      ),
+  })
+
+  const { data: funnel, isLoading: funnelLoading } = useQuery({
+    queryKey: ['funnel-analysis', funnelDays],
+    queryFn: () =>
+      api.get<FunnelAnalysis>(
+        `/reports/funnel?days=${funnelDays}`,
+        accessToken ?? undefined
+      ),
+  })
+
+  const { data: tableMetrics, isLoading: tableLoading } = useQuery({
+    queryKey: ['table-metrics', tableDays],
+    queryFn: () =>
+      api.get<TableMetrics>(
+        `/reports/table-metrics?days=${tableDays}`,
+        accessToken ?? undefined
+      ),
+  })
+
+  const { data: ingredientsRanking, isLoading: ingredientsLoading } = useQuery({
+    queryKey: ['ingredients-ranking', ingredientsDays],
+    queryFn: () =>
+      api.get<IngredientsRanking>(
+        `/reports/ingredients-ranking?days=${ingredientsDays}`,
+        accessToken ?? undefined
+      ),
+  })
+
+  const { data: productProfit, isLoading: productProfitLoading } = useQuery({
+    queryKey: ['product-profit', ingredientsDays],
+    queryFn: () =>
+      api.get<ProductProfitReport>(
+        `/reports/product-profit?days=${ingredientsDays}`,
+        accessToken ?? undefined
+      ),
+  })
+
+  const { data: prepTimeReport, isLoading: prepTimeLoading } = useQuery({
+    queryKey: ['prep-time-comparison', prepTimeDays],
+    queryFn: () =>
+      api.get<PreparationTimeReport>(
+        `/reports/preparation-time-comparison?days=${prepTimeDays}`,
         accessToken ?? undefined
       ),
   })
@@ -296,6 +451,402 @@ export function ReportsPage() {
           </div>
         </div>
       )}
+
+      {/* Funnel Analysis */}
+      <div className="mt-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h2 className="text-lg font-bold text-gray-900">Análise de Funil</h2>
+          <div className="flex items-center gap-2">
+            <Select
+              value={String(funnelDays)}
+              onChange={(value) => setFunnelDays(parseInt(value, 10))}
+              options={[
+                { value: '7', label: '7 dias' },
+                { value: '15', label: '15 dias' },
+                { value: '30', label: '30 dias' },
+                { value: '60', label: '60 dias' },
+                { value: '90', label: '90 dias' },
+              ]}
+            />
+          </div>
+        </div>
+
+        {funnelLoading && (
+          <p className="text-gray-400 text-center py-8">Carregando funil...</p>
+        )}
+
+        {funnel && (
+          <div className="space-y-4">
+            {funnel.overall.slowestStage && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                <p className="text-xs text-red-500 mb-1">Gargalo identificado</p>
+                <p className="text-sm font-semibold text-red-700">
+                  {funnel.overall.slowestStage} ({funnel.overall.slowestStageMins} min em média)
+                </p>
+              </div>
+            )}
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {funnel.byType.map((group) => (
+                <div key={group.orderType} className="bg-white rounded-2xl p-5 shadow-sm">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">{group.label}</h3>
+                  <div className="space-y-2">
+                    {group.stages.map((stage) => {
+                      const isBottleneck = group.bottleneck === stage.label
+                      return (
+                        <div
+                          key={stage.stage}
+                          className={`flex items-center justify-between text-sm rounded-lg px-3 py-2 ${
+                            isBottleneck ? 'bg-red-50 border border-red-200' : 'bg-gray-50'
+                          }`}
+                        >
+                          <span className={`${isBottleneck ? 'text-red-700 font-medium' : 'text-gray-600'}`}>
+                            {stage.label}
+                          </span>
+                          <span className={`font-bold ${isBottleneck ? 'text-red-700' : 'text-gray-900'}`}>
+                            {stage.averageMinutes} min
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-3">
+                    {funnel.byType.find((g) => g.orderType === group.orderType)?.stages[0]?.orderCount ?? 0} pedidos
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Table Metrics */}
+      <div className="mt-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h2 className="text-lg font-bold text-gray-900">Métricas de Mesa</h2>
+          <div className="flex items-center gap-2">
+            <Select
+              value={String(tableDays)}
+              onChange={(value) => setTableDays(parseInt(value, 10))}
+              options={[
+                { value: '7', label: '7 dias' },
+                { value: '15', label: '15 dias' },
+                { value: '30', label: '30 dias' },
+                { value: '60', label: '60 dias' },
+                { value: '90', label: '90 dias' },
+              ]}
+            />
+          </div>
+        </div>
+
+        {tableLoading && (
+          <p className="text-gray-400 text-center py-8">Carregando métricas...</p>
+        )}
+
+        {tableMetrics && (
+          <div className="space-y-6">
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <p className="text-xs text-gray-400 mb-1">Tempo médio na mesa</p>
+                <p className="text-xl font-bold text-gray-900">{tableMetrics.averageTimeAtTableMinutes} min</p>
+              </div>
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <p className="text-xs text-gray-400 mb-1">Ticket médio por comanda</p>
+                <p className="text-xl font-bold text-gray-900">{formatBRL(tableMetrics.averageSpendPerComanda)}</p>
+              </div>
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <p className="text-xs text-gray-400 mb-1">Taxa de ocupação</p>
+                <p className="text-xl font-bold text-gray-900">{tableMetrics.occupancyRatePercent}%</p>
+              </div>
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <p className="text-xs text-gray-400 mb-1">Comandas fechadas</p>
+                <p className="text-xl font-bold text-gray-900">{tableMetrics.totalComandasClosed}</p>
+                <p className="text-xs text-gray-400">{tableMetrics.totalTables} mesas</p>
+              </div>
+            </div>
+
+            {/* Table breakdown */}
+            {tableMetrics.tables.length > 0 && (
+              <div className="bg-white rounded-2xl p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">Detalhamento por mesa</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                        <th className="pb-2 font-medium">Mesa</th>
+                        <th className="pb-2 font-medium text-right">Comandas</th>
+                        <th className="pb-2 font-medium text-right">Tempo médio</th>
+                        <th className="pb-2 font-medium text-right">Receita total</th>
+                        <th className="pb-2 font-medium text-right">Ticket/comanda</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tableMetrics.tables.map((t) => (
+                        <tr key={t.tableId} className="border-b border-gray-50">
+                          <td className="py-2 font-medium text-gray-800">Mesa {t.tableNumber}</td>
+                          <td className="py-2 text-right text-gray-600">{t.comandaCount}</td>
+                          <td className="py-2 text-right text-gray-600">{t.avgTimeMinutes} min</td>
+                          <td className="py-2 text-right text-gray-900 font-medium">{formatBRL(t.totalRevenue)}</td>
+                          <td className="py-2 text-right text-gray-600">{formatBRL(t.avgSpendPerComanda)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Ingredients Ranking & Product Profit */}
+      <div className="mt-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h2 className="text-lg font-bold text-gray-900">Ingredientes & Lucro</h2>
+          <div className="flex items-center gap-2">
+            <Select
+              value={String(ingredientsDays)}
+              onChange={(value) => setIngredientsDays(parseInt(value, 10))}
+              options={[
+                { value: '7', label: '7 dias' },
+                { value: '15', label: '15 dias' },
+                { value: '30', label: '30 dias' },
+                { value: '60', label: '60 dias' },
+                { value: '90', label: '90 dias' },
+              ]}
+            />
+          </div>
+        </div>
+
+        {ingredientsLoading && (
+          <p className="text-gray-400 text-center py-8">Carregando ranking de ingredientes...</p>
+        )}
+
+        {ingredientsRanking && (
+          <div className="space-y-6">
+            {/* Summary cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {ingredientsRanking.summary.bestMargin && (
+                <div className="bg-white rounded-2xl p-4 shadow-sm">
+                  <p className="text-xs text-gray-400 mb-1">Melhor Margem</p>
+                  <p className="text-lg font-bold text-gray-900 truncate">
+                    {ingredientsRanking.summary.bestMargin.productName}
+                  </p>
+                  <p className="text-sm text-green-600">
+                    {formatBRL(ingredientsRanking.summary.bestMargin.margin)} por unidade
+                  </p>
+                </div>
+              )}
+              {ingredientsRanking.summary.bestSeller && (
+                <div className="bg-white rounded-2xl p-4 shadow-sm">
+                  <p className="text-xs text-gray-400 mb-1">Mais Vendido</p>
+                  <p className="text-lg font-bold text-gray-900 truncate">
+                    {ingredientsRanking.summary.bestSeller.productName}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {ingredientsRanking.summary.bestSeller.quantitySold} unidades
+                  </p>
+                </div>
+              )}
+              {ingredientsRanking.summary.bestCombo && (
+                <div className="bg-white rounded-2xl p-4 shadow-sm">
+                  <p className="text-xs text-gray-400 mb-1">Melhor Combo</p>
+                  <p className="text-lg font-bold text-gray-900 truncate">
+                    {ingredientsRanking.summary.bestCombo.productName}
+                  </p>
+                  <p className="text-sm text-green-600">
+                    {formatBRL(ingredientsRanking.summary.bestCombo.totalProfit)} lucro
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Top Ingredients */}
+            {ingredientsRanking.topIngredients.length > 0 && (
+              <div className="bg-white rounded-2xl p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">Ingredientes mais utilizados</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                        <th className="pb-2 font-medium">#</th>
+                        <th className="pb-2 font-medium">Ingrediente</th>
+                        <th className="pb-2 font-medium text-right">Qtd consumida</th>
+                        <th className="pb-2 font-medium text-right">Movimentações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ingredientsRanking.topIngredients.map((item, idx) => (
+                        <tr key={item.ingredientId} className="border-b border-gray-50">
+                          <td className="py-2 text-gray-400 text-xs">{idx + 1}</td>
+                          <td className="py-2 font-medium text-gray-800">{item.ingredientName}</td>
+                          <td className="py-2 text-right text-gray-900 font-medium">{item.totalQuantityUsed}</td>
+                          <td className="py-2 text-right text-gray-600">{item.movementCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Top Profitable Products */}
+            {ingredientsRanking.topProfitableProducts.length > 0 && (
+              <div className="bg-white rounded-2xl p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">Pratos mais lucrativos</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                        <th className="pb-2 font-medium">#</th>
+                        <th className="pb-2 font-medium">Prato</th>
+                        <th className="pb-2 font-medium text-right">Preço</th>
+                        <th className="pb-2 font-medium text-right">Custo</th>
+                        <th className="pb-2 font-medium text-right">Margem</th>
+                        <th className="pb-2 font-medium text-right">Vendidos</th>
+                        <th className="pb-2 font-medium text-right">Lucro total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ingredientsRanking.topProfitableProducts.map((prod, idx) => (
+                        <tr key={prod.productId} className="border-b border-gray-50">
+                          <td className="py-2 text-gray-400 text-xs">{idx + 1}</td>
+                          <td className="py-2 font-medium text-gray-800 truncate max-w-[150px]">{prod.productName}</td>
+                          <td className="py-2 text-right text-gray-600">{formatBRL(prod.price)}</td>
+                          <td className="py-2 text-right text-gray-600">{formatBRL(prod.costPrice)}</td>
+                          <td className="py-2 text-right text-green-600 font-medium">{formatBRL(prod.margin)}</td>
+                          <td className="py-2 text-right text-gray-900">{prod.quantitySold}</td>
+                          <td className="py-2 text-right text-green-700 font-semibold">{formatBRL(prod.totalProfit)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {productProfitLoading && (
+          <p className="text-gray-400 text-center py-8 mt-4">Carregando análise de lucro...</p>
+        )}
+
+        {productProfit && (
+          <div className="space-y-4 mt-4">
+            {productProfit.bestCombo.length > 0 && (
+              <div className="bg-white rounded-2xl p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">Melhor Combo (Margem x Volume)</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                        <th className="pb-2 font-medium">Prato</th>
+                        <th className="pb-2 font-medium text-right">Margem %</th>
+                        <th className="pb-2 font-medium text-right">Vendidos</th>
+                        <th className="pb-2 font-medium text-right">Lucro total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productProfit.bestCombo.map((prod) => (
+                        <tr key={prod.productId} className="border-b border-gray-50">
+                          <td className="py-2 font-medium text-gray-800 truncate max-w-[200px]">{prod.productName}</td>
+                          <td className="py-2 text-right text-green-600">{prod.marginPercent}%</td>
+                          <td className="py-2 text-right text-gray-900">{prod.quantitySold}</td>
+                          <td className="py-2 text-right text-green-700 font-semibold">{formatBRL(prod.totalProfit)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Preparation Time Comparison */}
+      <div className="mt-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h2 className="text-lg font-bold text-gray-900">Tempo de Preparo</h2>
+          <div className="flex items-center gap-2">
+            <Select
+              value={String(prepTimeDays)}
+              onChange={(value) => setPrepTimeDays(parseInt(value, 10))}
+              options={[
+                { value: '7', label: '7 dias' },
+                { value: '15', label: '15 dias' },
+                { value: '30', label: '30 dias' },
+                { value: '60', label: '60 dias' },
+                { value: '90', label: '90 dias' },
+              ]}
+            />
+          </div>
+        </div>
+
+        {prepTimeLoading && (
+          <p className="text-gray-400 text-center py-8">Carregando comparativo de tempo...</p>
+        )}
+
+        {prepTimeReport && (
+          <div className="space-y-6">
+            {/* Accuracy card */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm inline-block min-w-[180px]">
+              <p className="text-xs text-gray-400 mb-1">Acurácia média</p>
+              <p className={`text-xl font-bold ${Number(prepTimeReport.overallAccuracy) >= 80 ? 'text-green-600' : Number(prepTimeReport.overallAccuracy) >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                {prepTimeReport.overallAccuracy}%
+              </p>
+              <p className="text-xs text-gray-400">{prepTimeReport.totalProductsCompared} produtos comparados</p>
+            </div>
+
+            {prepTimeReport.products.length > 0 && (
+              <div className="bg-white rounded-2xl p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">
+                  Tempo Cadastrado vs Real (in_production → ready)
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                        <th className="pb-2 font-medium">Produto</th>
+                        <th className="pb-2 font-medium text-right">Tempo cadastrado</th>
+                        <th className="pb-2 font-medium text-right">Tempo real médio</th>
+                        <th className="pb-2 font-medium text-right">Diferença</th>
+                        <th className="pb-2 font-medium text-right">Amostras</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {prepTimeReport.products.map((prod) => {
+                        const isWorse = Number(prod.differenceMinutes) > 0
+                        return (
+                          <tr
+                            key={prod.productId}
+                            className={`border-b border-gray-50 ${isWorse ? 'bg-red-50' : ''}`}
+                          >
+                            <td className={`py-2 font-medium ${isWorse ? 'text-red-800' : 'text-gray-800'}`}>
+                              {prod.productName}
+                            </td>
+                            <td className="py-2 text-right text-gray-600">{prod.cadastradoMinutes} min</td>
+                            <td className="py-2 text-right text-gray-900 font-medium">{prod.realAverageMinutes} min</td>
+                            <td className={`py-2 text-right font-medium ${isWorse ? 'text-red-600' : 'text-green-600'}`}>
+                              {isWorse ? '+' : ''}{prod.differenceMinutes} min ({isWorse ? '+' : ''}{prod.differencePercent}%)
+                            </td>
+                            <td className="py-2 text-right text-gray-500">{prod.sampleSize}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {prepTimeReport.products.length === 0 && (
+              <p className="text-gray-400 text-center py-8">Sem dados suficientes para comparar.</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
     </div>
   )
 }

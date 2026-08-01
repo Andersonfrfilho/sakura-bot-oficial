@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, boolean, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, boolean, timestamp, doublePrecision } from 'drizzle-orm/pg-core'
 import { customers } from './customers'
 
 export const addresses = pgTable('addresses', {
@@ -13,6 +13,9 @@ export const addresses = pgTable('addresses', {
   city: varchar('city', { length: 100 }).notNull(),
   state: varchar('state', { length: 2 }).notNull(),
   zip: varchar('zip', { length: 10 }),
+  label: varchar('label', { length: 50 }),
+  lat: doublePrecision('lat'),
+  lng: doublePrecision('lng'),
   isDefault: boolean('is_default').default(false).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })

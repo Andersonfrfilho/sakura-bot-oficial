@@ -17,13 +17,16 @@ const createSchema = z.object({
   phone: z.string().max(20).optional(),
   document: z.string().max(20).optional(),
   birthDate: z.string().regex(ISO_DATE, 'Use o formato AAAA-MM-DD').optional(),
+  rating: z.number().int().min(1).max(5).nullable().optional(),
 })
 
 const updateSchema = z.object({
   name: z.string().min(2).max(255).optional(),
+  whatsappNumber: z.string().min(10).max(20).optional(),
   phone: z.string().max(20).nullable().optional(),
   document: z.string().max(20).nullable().optional(),
   birthDate: z.string().regex(ISO_DATE, 'Use o formato AAAA-MM-DD').nullable().optional(),
+  rating: z.number().int().min(1).max(5).nullable().optional(),
 })
 
 export class CustomerController {
@@ -71,6 +74,7 @@ export class CustomerController {
       ...(parsed.data.phone !== undefined && { phone: parsed.data.phone }),
       ...(parsed.data.document !== undefined && { document: parsed.data.document }),
       ...(parsed.data.birthDate !== undefined && { birthDate: parsed.data.birthDate }),
+      ...(parsed.data.rating !== undefined && { rating: parsed.data.rating }),
     })
     response.json(customer, 201)
   }
@@ -84,9 +88,11 @@ export class CustomerController {
       request.user.establishmentId,
       {
         ...(parsed.data.name !== undefined && { name: parsed.data.name }),
+        ...(parsed.data.whatsappNumber !== undefined && { whatsappNumber: parsed.data.whatsappNumber }),
         ...(parsed.data.phone !== undefined && { phone: parsed.data.phone }),
         ...(parsed.data.document !== undefined && { document: parsed.data.document }),
         ...(parsed.data.birthDate !== undefined && { birthDate: parsed.data.birthDate }),
+        ...(parsed.data.rating !== undefined && { rating: parsed.data.rating }),
       }
     )
     response.json(customer)

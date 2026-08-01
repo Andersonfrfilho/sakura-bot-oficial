@@ -6,6 +6,9 @@ import type {
   CreateStaffInput,
   UpdateStaffInput,
   StaffRole,
+  Role,
+  Permission,
+  AssignPermissionInput,
 } from '../../domain/repositories/StaffRepository'
 import * as schema from '@/infra/database/schema'
 
@@ -146,5 +149,100 @@ export class DrizzleStaffRepository implements StaffRepository {
       name: row.name,
       description: row.description,
     }))
+  }
+
+  async createRole(establishmentId: string, name: string, description?: string): Promise<Role> {
+    const [row] = await this.db
+      .insert(schema.roles)
+      .values({ establishmentId, name, description: description ?? null })
+      .returning()
+
+    if (!row) throw new Error('Failed to create role')
+
+    return row
+  }
+
+  async updateRole(
+    id: string,
+    establishmentId: string,
+    name: string,
+    description?: string
+  ): Promise<Role> {
+    const [row] = await this.db
+      .update(schema.roles)
+      .set({ name, description: description ?? null })
+      .where(and(eq(schema.roles.id, id), eq(schema.roles.establishmentId, establishmentId)))
+      .returning()
+
+    if (!row) throw new Error('Role not found')
+
+    return row
+  }
+
+  async deleteRole(id: string, establishmentId: string): Promise<void> {
+    await this.db
+      .delete(schema.roles)
+      .where(and(eq(schema.roles.id, id), eq(schema.roles.establishmentId, establishmentId)))
+  }
+
+  async getRoleWithPermissions(
+    id: string,
+    establishmentId: string
+  ): Promise<{ role: Role; permissions: Permission[] } | null> {
+    const role = await this.db.query.roles.findFirst({
+      where: and(eq(schema.roles.id, id), eq(schema.roles.establishmentId, establishmentId)),
+      with: { permissions: true },
+    })
+
+    if (!role) return null
+
+    return {
+      role: {
+        id: role.id,
+        establishmentId: role.establishmentId,
+        name: role.name,
+        description: role.description,
+      },
+      permissions: role.permissions,
+    }
+  }
+
+  async listRolesWithPermissions(
+    establishmentId: string
+  ): Promise<Array<{ role: Role; permissions: Permission[] }>> {
+    const rows = await this.db.query.roles.findMany({
+      where: eq(schema.roles.establishmentId, establishmentId),
+      with: { permissions: true },
+      orderBy: schema.roles.name,
+    })
+
+    return rows.map((row) => ({
+      role: {
+        id: row.id,
+        establishmentId: row.establishmentId,
+        name: row.name,
+        description: row.description,
+      },
+      permissions: row.permissions,
+    }))
+  }
+
+  async assignPermissions(
+    roleId: string,
+    permissions: AssignPermissionInput[]
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await tx.delete(schema.permissions).where(eq(schema.permissions.roleId, roleId))
+
+      if (permissions.length > 0) {
+        await tx.insert(schema.permissions).values(
+          permissions.map((permission) => ({
+            roleId,
+            resource: permission.resource,
+            action: permission.action,
+          }))
+        )
+      }
+    })
   }
 }

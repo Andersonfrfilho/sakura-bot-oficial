@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { sql } from 'drizzle-orm'
+import { runMetaWhatsAppMigrations } from '@adatechnology/meta-whatsapp-module'
 import { Pool } from 'pg'
 import path from 'path'
 import * as schema from './schema'
@@ -22,6 +23,10 @@ export async function runMigrations(): Promise<void> {
   // dev: cwd = apps/api/   production: WORKDIR /app — both have drizzle/ at root
   const migrationsFolder = process.env.MIGRATIONS_PATH ?? path.join(process.cwd(), 'drizzle/migrations')
   await migrate(db, { migrationsFolder })
+
+  // O módulo traz o próprio schema (`meta_whatsapp`) e o próprio journal — o drizzle-kit deste
+  // repo não enxerga essas migrations. O migrator é injetado porque o driver é escolha do host.
+  await runMetaWhatsAppMigrations({ db, migrate })
 
   // Triggers não podem ser expressos em schema Drizzle — aplicados aqui (idempotente)
   await db.execute(sql`

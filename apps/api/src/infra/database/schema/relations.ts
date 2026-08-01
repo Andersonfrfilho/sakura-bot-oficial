@@ -16,8 +16,14 @@ import { cashRegisters } from './cash-registers'
 import { cashMovements } from './cash-movements'
 import { settings } from './settings'
 import { auditLogs } from './audit-logs'
-import { conversationSessions } from './conversation-sessions'
-import { conversationMessages } from './conversation-messages'
+import { ingredients } from './ingredients'
+import { productIngredients } from './product-ingredients'
+import { stockBatches } from './stock-batches'
+import { stockMovements } from './stock-movements'
+import { expenses } from './expenses'
+import { sections } from './sections'
+import { deliveryFeeRules } from './delivery-fee-rules'
+import { deliveryFeeZones } from './delivery-fee-zones'
 
 export const establishmentsRelations = relations(establishments, ({ many }) => ({
   roles: many(roles),
@@ -31,8 +37,10 @@ export const establishmentsRelations = relations(establishments, ({ many }) => (
   cashRegisters: many(cashRegisters),
   settings: many(settings),
   auditLogs: many(auditLogs),
-  conversationSessions: many(conversationSessions),
-  conversationMessages: many(conversationMessages),
+  ingredients: many(ingredients),
+  stockBatches: many(stockBatches),
+  stockMovements: many(stockMovements),
+  deliveryFeeRules: many(deliveryFeeRules),
 }))
 
 export const rolesRelations = relations(roles, ({ one, many }) => ({
@@ -92,7 +100,12 @@ export const productsRelations = relations(products, ({ one, many }) => ({
     fields: [products.categoryId],
     references: [categories.id],
   }),
+  section: one(sections, {
+    fields: [products.sectionId],
+    references: [sections.id],
+  }),
   orderItems: many(orderItems),
+  productIngredients: many(productIngredients),
 }))
 
 export const restaurantTablesRelations = relations(restaurantTables, ({ one, many }) => ({
@@ -189,25 +202,80 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   user: one(users, { fields: [auditLogs.userId], references: [users.id] }),
 }))
 
-export const conversationSessionsRelations = relations(conversationSessions, ({ one, many }) => ({
+export const ingredientsRelations = relations(ingredients, ({ one, many }) => ({
   establishment: one(establishments, {
-    fields: [conversationSessions.establishmentId],
+    fields: [ingredients.establishmentId],
     references: [establishments.id],
   }),
-  assignedUser: one(users, {
-    fields: [conversationSessions.assignedUserId],
-    references: [users.id],
+  section: one(sections, {
+    fields: [ingredients.sectionId],
+    references: [sections.id],
   }),
-  messages: many(conversationMessages),
+  productIngredients: many(productIngredients),
+  stockBatches: many(stockBatches),
+  stockMovements: many(stockMovements),
 }))
 
-export const conversationMessagesRelations = relations(conversationMessages, ({ one }) => ({
+export const productIngredientsRelations = relations(productIngredients, ({ one }) => ({
+  product: one(products, {
+    fields: [productIngredients.productId],
+    references: [products.id],
+  }),
+  ingredient: one(ingredients, {
+    fields: [productIngredients.ingredientId],
+    references: [ingredients.id],
+  }),
+}))
+
+export const stockBatchesRelations = relations(stockBatches, ({ one, many }) => ({
+  ingredient: one(ingredients, {
+    fields: [stockBatches.ingredientId],
+    references: [ingredients.id],
+  }),
+  stockMovements: many(stockMovements),
+}))
+
+export const deliveryFeeRulesRelations = relations(deliveryFeeRules, ({ one, many }) => ({
   establishment: one(establishments, {
-    fields: [conversationMessages.establishmentId],
+    fields: [deliveryFeeRules.establishmentId],
     references: [establishments.id],
   }),
-  agentUser: one(users, {
-    fields: [conversationMessages.agentUserId],
+  zones: many(deliveryFeeZones),
+}))
+
+export const expensesRelations = relations(expenses, ({ one }) => ({
+  establishment: one(establishments, {
+    fields: [expenses.establishmentId],
+    references: [establishments.id],
+  }),
+}))
+
+export const deliveryFeeZonesRelations = relations(deliveryFeeZones, ({ one }) => ({
+  rule: one(deliveryFeeRules, {
+    fields: [deliveryFeeZones.deliveryFeeRuleId],
+    references: [deliveryFeeRules.id],
+  }),
+  establishment: one(establishments, {
+    fields: [deliveryFeeZones.establishmentId],
+    references: [establishments.id],
+  }),
+}))
+
+export const stockMovementsRelations = relations(stockMovements, ({ one }) => ({
+  ingredient: one(ingredients, {
+    fields: [stockMovements.ingredientId],
+    references: [ingredients.id],
+  }),
+  batch: one(stockBatches, {
+    fields: [stockMovements.batchId],
+    references: [stockBatches.id],
+  }),
+  order: one(orders, {
+    fields: [stockMovements.orderId],
+    references: [orders.id],
+  }),
+  user: one(users, {
+    fields: [stockMovements.userId],
     references: [users.id],
   }),
 }))

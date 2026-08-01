@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import type { TemplatedApp, HttpResponse, HttpRequest } from 'uWebSockets.js'
 import type { AuthenticatedUser } from '@/shared/types'
+import { MetaWhatsAppError } from '@adatechnology/meta-whatsapp-contracts'
 import { AppError } from '@/shared/errors/AppError'
 
 export interface ParsedRequest {
@@ -18,6 +19,7 @@ export interface ParsedRequest {
 export interface ResponseHelper {
   json(data: unknown, statusCode?: number): void
   error(code: string, message: string, statusCode?: number, details?: unknown): void
+  binary(body: Buffer, contentType: string, fileName?: string, statusCode?: number): void
   readonly sent: boolean
   readonly requestId: string
 }
@@ -156,6 +158,26 @@ function buildResponseHelper(
         uwsResponse.end(body)
       })
     },
+
+    binary(body: Buffer, contentType: string, fileName?: string, statusCode = 200): void {
+      if (sent || isAborted()) return
+      sent = true
+      uwsResponse.cork(() => {
+        uwsResponse.writeStatus(HTTP_STATUS[statusCode] ?? String(statusCode))
+        uwsResponse.writeHeader('Content-Type', contentType)
+        if (fileName) {
+          uwsResponse.writeHeader('Content-Disposition', `attachment; filename="${fileName}"`)
+        }
+        uwsResponse.writeHeader('X-Request-Id', reqId)
+        if (ALLOWED_ORIGINS.includes(origin)) {
+          uwsResponse.writeHeader('Access-Control-Allow-Origin', origin)
+        }
+        for (const [name, value] of SECURITY_HEADERS) {
+          uwsResponse.writeHeader(name, value)
+        }
+        uwsResponse.end(body)
+      })
+    },
   }
 }
 
@@ -246,6 +268,10 @@ export class Router {
           runMiddlewareChain(middlewares, handler, request, response).catch((error: unknown) => {
             if (response.sent || isAborted()) return
             if (error instanceof AppError) {
+              response.error(error.code, error.message, error.statusCode, error.details)
+            } else if (error instanceof MetaWhatsAppError) {
+              // O módulo tem a própria hierarquia e já carrega status e código estáveis; sem esta
+              // ponte, assinatura inválida e janela de 24h expirada viravam 500 `internal_error`.
               response.error(error.code, error.message, error.statusCode, error.details)
             } else {
               const message =

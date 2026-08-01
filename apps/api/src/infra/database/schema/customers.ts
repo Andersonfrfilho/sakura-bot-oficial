@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, date } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, timestamp, date, integer } from 'drizzle-orm/pg-core'
 import { establishments } from './establishments'
 
 export const customers = pgTable('customers', {
@@ -12,6 +12,7 @@ export const customers = pgTable('customers', {
   email: varchar('email', { length: 255 }),
   document: varchar('document', { length: 20 }),
   birthDate: date('birth_date'),
+  rating: integer('rating'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })

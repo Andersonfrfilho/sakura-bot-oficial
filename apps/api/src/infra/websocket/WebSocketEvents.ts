@@ -29,10 +29,11 @@ export const WS_EVENTS = {
   CASHIER_REGISTER_CLOSED: 'cashier:register_closed',
   CASHIER_PAYMENT_RECEIVED: 'cashier:payment_received',
 
-  // Conversations
+  // Conversations — o sufixo espelha o vocabulário de eventos do meta-whatsapp-module
   CONVERSATION_MESSAGE: 'conversation:message',
   CONVERSATION_MESSAGE_STATUS: 'conversation:message-status',
-  CONVERSATION_SESSION: 'conversation:session',
+  CONVERSATION_MODE_CHANGED: 'conversation:mode-changed',
+  CONVERSATION_DATA_CHANGED: 'conversation:data-changed',
 
   // Fiscal
   FISCAL_EMITTING: 'fiscal:emitting',

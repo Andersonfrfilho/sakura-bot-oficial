@@ -1,10 +1,15 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, ScanLine } from 'lucide-react'
+import { SectionManager } from './components/SectionManager'
+import { IngredientManager } from './components/IngredientManager'
+import { RecipeManager, RecipeCostBadge } from './components/RecipeManager'
+import { BarcodeScanner } from './components/BarcodeScanner'
+import { ExpiringBatchBadge } from './components/StockBatchList'
 
 interface Category {
   id: string
@@ -17,12 +22,24 @@ interface Category {
   cstIcms?: string
 }
 
+interface Section {
+  id: string
+  name: string
+  description: string | null
+}
+
 interface Product {
   id: string
   name: string
   description: string | null
   price: string
+  costPrice: string | null
+  unit: string
+  barcode: string | null
   categoryId: string | null
+  sectionId: string | null
+  preparationTimeMinutes: number | null
+  preparationInstructions: string | null
   active: boolean
   sortOrder: number
 }
@@ -31,8 +48,22 @@ type ProductFormData = {
   name: string
   description: string
   price: string
+  costPrice: string
+  unit: string
+  barcode: string
   categoryId: string
+  sectionId: string
+  preparationTimeMinutes: string
+  preparationInstructions: string
   sortOrder: string
+}
+
+interface ProductSuggestion {
+  name: string
+  brand?: string
+  barcode?: string
+  imageUrl?: string
+  category?: string
 }
 
 type CategoryFormData = {
@@ -43,7 +74,7 @@ type CategoryFormData = {
   cstIcms: string
 }
 
-const EMPTY_PRODUCT: ProductFormData = { name: '', description: '', price: '', categoryId: '', sortOrder: '0' }
+const EMPTY_PRODUCT: ProductFormData = { name: '', description: '', price: '', costPrice: '', unit: 'un', barcode: '', categoryId: '', sectionId: '', preparationTimeMinutes: '', preparationInstructions: '', sortOrder: '0' }
 const EMPTY_CATEGORY: CategoryFormData = { name: '', sortOrder: '0', ncmCode: '', cfopCode: '', cstIcms: '' }
 
 function formatBRL(value: string | number) {
@@ -67,11 +98,20 @@ export function CatalogPage() {
   const [selectedProd, setSelectedProd] = useState<Product | null>(null)
   const [prodForm, setProdForm] = useState<ProductFormData>(EMPTY_PRODUCT)
   const [prodError, setProdError] = useState<string | null>(null)
+  const [showScanner, setShowScanner] = useState(false)
+
+  // Product search state
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['catalog-categories'] })
     void queryClient.invalidateQueries({ queryKey: ['catalog-products'] })
     void queryClient.invalidateQueries({ queryKey: ['menu'] })
+    void queryClient.invalidateQueries({ queryKey: ['sections'] })
   }
 
   const { data: categories = [] } = useQuery({
@@ -82,6 +122,11 @@ export function CatalogPage() {
   const { data: allProducts = [] } = useQuery({
     queryKey: ['catalog-products'],
     queryFn: () => api.get<Product[]>('/catalog/products', accessToken ?? undefined),
+  })
+
+  const { data: sections = [] } = useQuery({
+    queryKey: ['sections'],
+    queryFn: () => api.get('/sections', accessToken ?? undefined) as Promise<Section[]>,
   })
 
   const visibleProducts = selectedCatId === null
@@ -188,7 +233,13 @@ export function CatalogPage() {
       name: prod.name,
       description: prod.description ?? '',
       price: prod.price,
+      costPrice: prod.costPrice ?? '',
+      unit: prod.unit ?? 'un',
+      barcode: prod.barcode ?? '',
       categoryId: prod.categoryId ?? '',
+      sectionId: prod.sectionId ?? '',
+      preparationTimeMinutes: prod.preparationTimeMinutes?.toString() ?? '',
+      preparationInstructions: prod.preparationInstructions ?? '',
       sortOrder: String(prod.sortOrder),
     })
     setProdError(null)
@@ -213,12 +264,72 @@ export function CatalogPage() {
       name: prodForm.name,
       description: prodForm.description || undefined,
       price: parseFloat(prodForm.price),
+      costPrice: prodForm.costPrice ? parseFloat(prodForm.costPrice) : null,
+      unit: prodForm.unit,
+      barcode: prodForm.barcode || null,
       categoryId: prodForm.categoryId || null,
+      sectionId: prodForm.sectionId || null,
+      preparationTimeMinutes: prodForm.preparationTimeMinutes ? parseInt(prodForm.preparationTimeMinutes) : null,
+      preparationInstructions: prodForm.preparationInstructions || null,
       sortOrder: parseInt(prodForm.sortOrder) || 0,
     }
     if (prodModal === 'create') createProd.mutate(body)
     else if (prodModal === 'edit' && selectedProd) updateProd.mutate({ id: selectedProd.id, body })
     else if (prodModal === 'delete' && selectedProd) deleteProd.mutate(selectedProd.id)
+  }
+
+  const handleSearchInput = useCallback((value: string) => {
+    setSearchQuery(value)
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    if (value.length < 2) {
+      setSuggestions([])
+      return
+    }
+    searchTimer.current = setTimeout(async () => {
+      setSearchLoading(true)
+      try {
+        const results = await api.get<ProductSuggestion[]>(
+          `/catalog/product-search?q=${encodeURIComponent(value)}`,
+          accessToken ?? undefined
+        )
+        setSuggestions(results)
+      } catch {
+        setSuggestions([])
+      } finally {
+        setSearchLoading(false)
+      }
+    }, 400)
+  }, [accessToken])
+
+  function selectSuggestion(suggestion: ProductSuggestion) {
+    setProdForm((prev) => ({
+      ...prev,
+      name: suggestion.name,
+      barcode: suggestion.barcode ?? prev.barcode,
+    }))
+    setSearchQuery('')
+    setSuggestions([])
+    setSearchOpen(false)
+  }
+
+  async function handleBarcodeScan(barcode: string) {
+    setProdForm((prev) => ({ ...prev, barcode }))
+    setShowScanner(false)
+    try {
+      const suggestion = await api.get<ProductSuggestion | null>(
+        `/catalog/product-lookup/${barcode}`,
+        accessToken ?? undefined
+      )
+      if (suggestion) {
+        setProdForm((prev) => ({
+          ...prev,
+          name: suggestion.name || prev.name,
+          barcode: suggestion.barcode ?? prev.barcode,
+        }))
+      }
+    } catch {
+      // Product not found — keep barcode in form
+    }
   }
 
   const isCatPending = createCat.isPending || updateCat.isPending || deleteCat.isPending
@@ -307,6 +418,11 @@ export function CatalogPage() {
               <span className="float-right text-xs text-gray-400">{uncategorizedCount}</span>
             </button>
           )}
+
+          <div className="px-4">
+            <SectionManager />
+            <IngredientManager />
+          </div>
         </div>
       </div>
 
@@ -322,6 +438,7 @@ export function CatalogPage() {
                 : (categories.find((c) => c.id === selectedCatId)?.name ?? '')}
             </h1>
             <p className="text-sm text-gray-400">{visibleProducts.length} produto{visibleProducts.length !== 1 ? 's' : ''}</p>
+            <ExpiringBatchBadge className="mt-1" />
           </div>
           <button
             onClick={openCreateProd}
@@ -339,6 +456,7 @@ export function CatalogPage() {
             <div className="grid gap-3">
               {visibleProducts.map((prod) => {
                 const cat = categories.find((c) => c.id === prod.categoryId)
+                const sec = sections.find((s) => s.id === prod.sectionId)
                 return (
                   <div
                     key={prod.id}
@@ -353,14 +471,29 @@ export function CatalogPage() {
                         {cat && (
                           <span className="text-xs px-2 py-0.5 bg-brand-50 text-brand-600 rounded-full">{cat.name}</span>
                         )}
+                        {sec && (
+                          <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full">{sec.name}</span>
+                        )}
                       </div>
                       {prod.description && (
                         <p className="text-xs text-gray-400 truncate mt-0.5">{prod.description}</p>
                       )}
+                      {prod.barcode && (
+                        <p className="text-xs text-gray-400 truncate mt-0.5">Cód: {prod.barcode}</p>
+                      )}
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="font-bold text-gray-900">{formatBRL(prod.price)}</p>
-                      <p className="text-xs text-gray-400">ord {prod.sortOrder}</p>
+                      <RecipeCostBadge
+                        productId={prod.id}
+                        productPrice={prod.price}
+                        costPrice={prod.costPrice}
+                      />
+                      {prod.costPrice && (
+                        <p className="text-xs text-gray-300 mt-0.5">
+                          Custo cadastrado {formatBRL(prod.costPrice)}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <button
@@ -487,6 +620,53 @@ export function CatalogPage() {
                 </p>
               ) : (
                 <>
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => { setSearchOpen(!searchOpen); setSearchQuery(''); setSuggestions([]) }}
+                      className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        Buscar produto (Open Food Facts)
+                      </span>
+                      <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 text-gray-400 transition-transform ${searchOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {searchOpen && (
+                      <div className="px-4 pb-3 space-y-2 border-t border-gray-100 pt-3">
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => handleSearchInput(e.target.value)}
+                          placeholder="Digite o nome de um produto para buscar..."
+                          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                        {searchLoading && <p className="text-xs text-gray-400">Buscando...</p>}
+                        {suggestions.length > 0 && (
+                          <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                            {suggestions.map((suggestion, index) => (
+                              <button
+                                key={suggestion.barcode ?? index}
+                                type="button"
+                                onClick={() => selectSuggestion(suggestion)}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-brand-50 transition-colors"
+                              >
+                                <p className="font-medium text-gray-900 truncate">{suggestion.name}</p>
+                                <p className="text-xs text-gray-400">
+                                  {[suggestion.brand, suggestion.category].filter(Boolean).join(' · ')}
+                                  {suggestion.barcode && <> · {suggestion.barcode}</>}
+                                </p>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                     <input
@@ -507,9 +687,45 @@ export function CatalogPage() {
                       className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Preço de custo (R$)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={prodForm.costPrice}
+                      onChange={(e) => setProdForm((prev) => ({ ...prev, costPrice: e.target.value }))}
+                      placeholder="0,00"
+                      className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+
+                  {prodForm.costPrice && Number(prodForm.costPrice) > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">Margem rápida</label>
+                      <div className="flex gap-2">
+                        {[30, 50, 100].map((margin) => (
+                          <button
+                            key={margin}
+                            type="button"
+                            onClick={() =>
+                              setProdForm((prev) => ({
+                                ...prev,
+                                price: (Number(prev.costPrice) * (1 + margin / 100)).toFixed(2),
+                              }))
+                            }
+                            className="flex-1 py-1.5 text-xs font-medium border border-gray-200 rounded-lg hover:bg-brand-50 hover:border-brand-300 transition-colors"
+                          >
+                            +{margin}%
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Preço (R$)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Preço de venda (R$)</label>
                       <input
                         type="number"
                         min="0"
@@ -519,6 +735,11 @@ export function CatalogPage() {
                         placeholder="0,00"
                         className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                       />
+                      {prodForm.costPrice && prodForm.price && Number(prodForm.costPrice) > 0 && (
+                        <p className="text-xs text-brand-600 mt-1 font-medium">
+                          Margem {(((Number(prodForm.price) - Number(prodForm.costPrice)) / Number(prodForm.costPrice)) * 100).toFixed(0)}%
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Ordem</label>
@@ -529,6 +750,42 @@ export function CatalogPage() {
                         onChange={(e) => setProdForm((prev) => ({ ...prev, sortOrder: e.target.value }))}
                         className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                       />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
+                      <select
+                        value={prodForm.unit}
+                        onChange={(e) => setProdForm((prev) => ({ ...prev, unit: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      >
+                        <option value="un">Unidade</option>
+                        <option value="kg">Kg</option>
+                        <option value="g">Grama</option>
+                        <option value="l">Litro</option>
+                        <option value="ml">Mililitro</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Código de barras</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={prodForm.barcode}
+                          onChange={(e) => setProdForm((prev) => ({ ...prev, barcode: e.target.value }))}
+                          placeholder="Código de barras (EAN)"
+                          className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowScanner(true)}
+                          className="px-3 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                          title="Escanear código de barras"
+                        >
+                          <ScanLine className="h-4 w-4 text-gray-600" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div>
@@ -543,6 +800,44 @@ export function CatalogPage() {
                       searchable={categories.length > 6}
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Seção</label>
+                    <Select
+                      value={prodForm.sectionId}
+                      onChange={(value) => setProdForm((prev) => ({ ...prev, sectionId: value }))}
+                      options={[
+                        { value: '', label: 'Nenhuma' },
+                        ...sections.map((section) => ({ value: section.id, label: section.name })),
+                      ]}
+                      searchable={sections.length > 6}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tempo de preparo (min)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={prodForm.preparationTimeMinutes}
+                        onChange={(e) => setProdForm((prev) => ({ ...prev, preparationTimeMinutes: e.target.value }))}
+                        placeholder="Ex: 30"
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Instruções de preparo</label>
+                      <textarea
+                        value={prodForm.preparationInstructions}
+                        onChange={(e) => setProdForm((prev) => ({ ...prev, preparationInstructions: e.target.value }))}
+                        placeholder="Modo de preparo..."
+                        rows={2}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      />
+                    </div>
+                  </div>
+                  {prodModal === 'edit' && selectedProd && (
+                    <RecipeManager productId={selectedProd.id} />
+                  )}
                 </>
               )}
               {prodError && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{prodError}</p>}
@@ -558,6 +853,12 @@ export function CatalogPage() {
               </div>
             </div>
       </Modal>
+      {showScanner && (
+        <BarcodeScanner
+          onScan={handleBarcodeScan}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
     </div>
   )
 }

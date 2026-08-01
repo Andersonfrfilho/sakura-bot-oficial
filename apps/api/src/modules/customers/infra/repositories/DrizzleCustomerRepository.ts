@@ -123,6 +123,7 @@ export class DrizzleCustomerRepository implements CustomerRepository {
         phone: input.phone ?? null,
         document: input.document ?? null,
         birthDate: input.birthDate ?? null,
+        rating: input.rating ?? null,
       })
       .returning()
     return customer!
@@ -133,9 +134,11 @@ export class DrizzleCustomerRepository implements CustomerRepository {
       .update(schema.customers)
       .set({
         ...(input.name !== undefined && { name: input.name }),
+        ...(input.whatsappNumber !== undefined && { whatsappNumber: input.whatsappNumber }),
         ...(input.phone !== undefined && { phone: input.phone }),
         ...(input.document !== undefined && { document: input.document }),
         ...(input.birthDate !== undefined && { birthDate: input.birthDate }),
+        ...(input.rating !== undefined && { rating: input.rating }),
         updatedAt: new Date(),
       })
       .where(and(eq(schema.customers.id, id), eq(schema.customers.establishmentId, establishmentId)))

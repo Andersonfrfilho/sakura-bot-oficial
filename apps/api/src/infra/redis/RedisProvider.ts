@@ -25,6 +25,11 @@ export class RedisProvider implements CacheProvider {
     }
   }
 
+  async setIfNotExists(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    const result = await redisClient.set(key, value, 'EX', ttlSeconds, 'NX')
+    return result === 'OK'
+  }
+
   async delete(key: string): Promise<void> {
     await redisClient.del(key)
   }

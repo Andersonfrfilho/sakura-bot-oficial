@@ -6,13 +6,16 @@ import { DeliveryPage } from '@/pages/delivery/DeliveryPage'
 import { CashierPage } from '@/pages/cashier/CashierPage'
 import { OrdersPage } from '@/pages/orders/OrdersPage'
 import { ConversationsPage } from '@/pages/conversations/ConversationsPage'
+import { MessagesPage } from '@/pages/messages/MessagesPage'
 import { CustomersPage } from '@/pages/customers/CustomersPage'
 import { TablesPage } from '@/pages/tables/TablesPage'
 import { StaffPage } from '@/pages/staff/StaffPage'
+import { RolesPage } from '@/pages/staff/RolesPage'
 import { CatalogPage } from '@/pages/catalog/CatalogPage'
 import { ReportsPage } from '@/pages/reports/ReportsPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
 import { FiscalDocumentsPage } from '@/pages/fiscal/FiscalDocumentsPage'
+import { FinancePage } from '@/pages/finance/FinancePage'
 import { ChangePasswordPage } from '@/pages/auth/ChangePasswordPage'
 import { ComandaConfirmPage } from '@/pages/comanda/ComandaConfirmPage'
 import { CustomerInvoicePage } from '@/pages/public/CustomerInvoicePage'
@@ -90,6 +93,14 @@ export default function App() {
             }
           />
           <Route
+            path="/messages"
+            element={
+              <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                <MessagesPage />
+              </RoleGuard>
+            }
+          />
+          <Route
             path="/fiscal"
             element={
               <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.CASHIER]}>
@@ -122,6 +133,14 @@ export default function App() {
             }
           />
           <Route
+            path="/roles"
+            element={
+              <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                <RolesPage />
+              </RoleGuard>
+            }
+          />
+          <Route
             path="/catalog"
             element={
               <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}>
@@ -142,6 +161,14 @@ export default function App() {
             element={
               <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}>
                 <SettingsPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/finance"
+            element={
+              <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                <FinancePage />
               </RoleGuard>
             }
           />

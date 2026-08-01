@@ -1,6 +1,6 @@
 import uWS from 'uWebSockets.js'
-import { readFileSync } from 'fs'
-import { join } from 'path'
+import { readFileSync, existsSync } from 'fs'
+import { extname, join } from 'path'
 import { Router } from './router'
 import { WebSocketHub } from '@/infra/websocket/WebSocketHub'
 import { buildContainer } from '@/infra/container'
@@ -15,14 +15,25 @@ import { registerCashierRoutes } from '@/modules/cashier/infra/http/CashierRoute
 import { registerDashboardRoutes } from '@/modules/dashboard/infra/http/DashboardRoutes'
 import { registerReportsRoutes } from '@/modules/reports/infra/http/ReportsRoutes'
 import { registerSettingsRoutes } from '@/modules/settings/infra/http/SettingsRoutes'
+import { registerDeliveryFeeRoutes } from '@/modules/settings/infra/http/DeliveryFeeRoutes'
 import { registerWebhookRoutes } from '@/modules/webhook/infra/http/WebhookRoutes'
 import { registerCustomerRoutes } from '@/modules/customers/infra/http/CustomerRoutes'
+import { registerAddressRoutes } from '@/modules/customers/infra/http/AddressRoutes'
 import { registerTableRoutes } from '@/modules/tables/infra/http/TableRoutes'
 import { registerMenuRoutes } from '@/modules/products/infra/http/MenuRoutes'
 import { registerStaffRoutes } from '@/modules/users/infra/http/StaffRoutes'
+import { registerRoleRoutes } from '@/modules/users/infra/http/RoleRoutes'
 import { registerCatalogRoutes } from '@/modules/products/infra/http/CatalogRoutes'
+import { registerSectionRoutes } from '@/modules/products/infra/http/SectionRoutes'
+import { registerIngredientRoutes } from '@/modules/products/infra/http/IngredientRoutes'
+import { registerStockBatchRoutes } from '@/modules/products/infra/http/StockBatchRoutes'
 import { registerConversationRoutes } from '@/modules/conversations/infra/http/ConversationRoutes'
+import { registerWhatsAppSettingsRoutes } from '@/modules/conversations/infra/http/WhatsAppSettingsRoutes'
 import { registerFiscalRoutes } from '@/modules/fiscal/infra/http/FiscalRoutes'
+import { registerMonthlyAccountRoutes } from '@/modules/finance/infra/http/MonthlyAccountRoutes'
+import { registerExpenseRoutes } from '@/modules/finance/infra/http/ExpenseRoutes'
+import { registerUploadRoutes } from '@/modules/uploads/infra/http/UploadRoutes'
+import { LocalStorageProvider } from '@/shared/providers/LocalStorageProvider'
 import { generateOpenAPISpec } from '@/infra/docs/openapi'
 
 const PORT = parseInt(process.env.PORT ?? '3333')
@@ -47,14 +58,17 @@ export async function createServer() {
   const wsHub = new WebSocketHub(app, new RedisProvider())
   const container = buildContainer(wsHub)
 
-  // Graceful shutdown: drain the fiscal worker before exiting
-  if (container.fiscalWorker) {
-    const shutdownWorker = async (): Promise<void> => {
-      await container.fiscalWorker?.close()
-      process.exit(0)
-    }
-    process.on('SIGTERM', shutdownWorker)
-    process.on('SIGINT', shutdownWorker)
+  // Graceful shutdown: drain workers before exiting
+  const shutdownWorkers = async (): Promise<void> => {
+    if (container.fiscalWorker) await container.fiscalWorker.close()
+    if (container.financeWorker) await container.financeWorker.close()
+    if (container.ifoodWorker) await container.ifoodWorker.close()
+    process.exit(0)
+  }
+
+  if (container.fiscalWorker || container.financeWorker || container.ifoodWorker) {
+    process.on('SIGTERM', shutdownWorkers)
+    process.on('SIGINT', shutdownWorkers)
   }
 
   // CORS pre-flight
@@ -112,14 +126,75 @@ export async function createServer() {
   registerDashboardRoutes(router, container.dashboardController)
   registerReportsRoutes(router, container.reportsController)
   registerSettingsRoutes(router, container.settingsController)
+  registerDeliveryFeeRoutes(router, container.deliveryFeeController)
   registerWebhookRoutes(router, container.webhookController)
   registerCustomerRoutes(router, container.customerController)
+  registerAddressRoutes(router, container.addressController)
   registerTableRoutes(router, container.tableController)
   registerMenuRoutes(router, container.menuController)
   registerStaffRoutes(router, container.staffController)
+  registerRoleRoutes(router, container.roleController)
   registerCatalogRoutes(router, container.catalogController)
+  registerSectionRoutes(router, container.sectionController)
+  registerIngredientRoutes(router, container.ingredientController)
+  registerStockBatchRoutes(router, container.stockBatchController)
   registerConversationRoutes(router, container.conversationController)
+  registerWhatsAppSettingsRoutes(router, container.whatsAppSettingsController)
   registerFiscalRoutes(router, container.fiscalController)
+  registerMonthlyAccountRoutes(router, container.monthlyAccountController)
+  registerExpenseRoutes(router, container.expenseController)
+  registerUploadRoutes(router, container.uploadController)
+
+  // Serve uploaded files (public)
+  const storageProvider = new LocalStorageProvider()
+  const CACHEABLE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.ico', '.css', '.js', '.woff2'])
+
+  const MIME_TYPES: Record<string, string> = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.pdf': 'application/pdf',
+    '.json': 'application/json',
+    '.txt': 'text/plain',
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+  }
+
+  app.get('/uploads/:key', (res, req) => {
+    const key = req.getParameter(0)
+    if (!key) {
+      res.cork(() => {
+        res.writeStatus('404 Not Found').end('File not found')
+      })
+      return
+    }
+
+    const filePath = storageProvider.getFilePath(key)
+
+    if (!existsSync(filePath)) {
+      res.cork(() => {
+        res.writeStatus('404 Not Found').end('File not found')
+      })
+      return
+    }
+
+    const extension = extname(key).toLowerCase()
+    const contentType = MIME_TYPES[extension] ?? 'application/octet-stream'
+
+    const buffer = readFileSync(filePath)
+    res.cork(() => {
+      res.writeStatus('200 OK')
+      res.writeHeader('Content-Type', contentType)
+      if (CACHEABLE_EXTENSIONS.has(extension)) {
+        res.writeHeader('Cache-Control', 'public, max-age=31536000, immutable')
+      }
+      res.end(buffer)
+    })
+  })
 
   return {
     listen() {

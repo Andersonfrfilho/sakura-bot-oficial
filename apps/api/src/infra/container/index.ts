@@ -18,10 +18,20 @@ import { CreateCustomerUseCase } from '@/modules/customers/application/use-cases
 import { UpdateCustomerUseCase } from '@/modules/customers/application/use-cases/UpdateCustomerUseCase'
 import { DeleteCustomerUseCase } from '@/modules/customers/application/use-cases/DeleteCustomerUseCase'
 import { CustomerController } from '@/modules/customers/infra/http/CustomerController'
+import { ListAddressesUseCase } from '@/modules/customers/application/use-cases/ListAddressesUseCase'
+import { CreateAddressUseCase } from '@/modules/customers/application/use-cases/CreateAddressUseCase'
+import { UpdateAddressUseCase } from '@/modules/customers/application/use-cases/UpdateAddressUseCase'
+import { DeleteAddressUseCase } from '@/modules/customers/application/use-cases/DeleteAddressUseCase'
+import { SetDefaultAddressUseCase } from '@/modules/customers/application/use-cases/SetDefaultAddressUseCase'
+import { AddressController } from '@/modules/customers/infra/http/AddressController'
+import { DrizzleAddressRepository } from '@/modules/customers/infra/repositories/DrizzleAddressRepository'
 
 // Products / Catalog
 import { MenuController } from '@/modules/products/infra/http/MenuController'
 import { CatalogController } from '@/modules/products/infra/http/CatalogController'
+import { SectionController } from '@/modules/products/infra/http/SectionController'
+import { IngredientController } from '@/modules/products/infra/http/IngredientController'
+import { StockBatchController } from '@/modules/products/infra/http/StockBatchController'
 
 // Tables
 import { DrizzleTableRepository } from '@/modules/tables/infra/repositories/DrizzleTableRepository'
@@ -45,7 +55,14 @@ import { DeleteStaffUseCase } from '@/modules/users/application/use-cases/Delete
 import { ToggleStaffActiveUseCase } from '@/modules/users/application/use-cases/ToggleStaffActiveUseCase'
 import { ResetStaffPasswordUseCase } from '@/modules/users/application/use-cases/ResetStaffPasswordUseCase'
 import { ListRolesUseCase } from '@/modules/users/application/use-cases/ListRolesUseCase'
+import { CreateRoleUseCase } from '@/modules/users/application/use-cases/CreateRoleUseCase'
+import { UpdateRoleUseCase } from '@/modules/users/application/use-cases/UpdateRoleUseCase'
+import { DeleteRoleUseCase } from '@/modules/users/application/use-cases/DeleteRoleUseCase'
+import { GetRoleWithPermissionsUseCase } from '@/modules/users/application/use-cases/GetRoleWithPermissionsUseCase'
+import { ListRolesWithPermissionsUseCase } from '@/modules/users/application/use-cases/ListRolesWithPermissionsUseCase'
+import { AssignPermissionsUseCase } from '@/modules/users/application/use-cases/AssignPermissionsUseCase'
 import { StaffController } from '@/modules/users/infra/http/StaffController'
+import { RoleController } from '@/modules/users/infra/http/RoleController'
 
 // Orders
 import { CreateOrderUseCase } from '@/modules/orders/application/use-cases/CreateOrderUseCase'
@@ -78,38 +95,34 @@ import { DashboardController } from '@/modules/dashboard/infra/http/DashboardCon
 // Reports
 import { ExportOrdersCSVUseCase } from '@/modules/reports/application/use-cases/ExportOrdersCSVUseCase'
 import { GetMonthlyReportUseCase } from '@/modules/reports/application/use-cases/GetMonthlyReportUseCase'
+import { GetFunnelAnalysisUseCase } from '@/modules/reports/application/use-cases/GetFunnelAnalysisUseCase'
+import { GetTableMetricsUseCase } from '@/modules/reports/application/use-cases/GetTableMetricsUseCase'
+import { GetIngredientsRankingUseCase } from '@/modules/reports/application/use-cases/GetIngredientsRankingUseCase'
+import { GetProductProfitUseCase } from '@/modules/reports/application/use-cases/GetProductProfitUseCase'
+import { GetPreparationTimeComparisonUseCase } from '@/modules/reports/application/use-cases/GetPreparationTimeComparisonUseCase'
 import { ReportsController } from '@/modules/reports/infra/http/ReportsController'
 
 // Settings
 import { GetSettingsUseCase } from '@/modules/settings/application/use-cases/GetSettingsUseCase'
 import { UpsertSettingUseCase } from '@/modules/settings/application/use-cases/UpsertSettingUseCase'
 import { SettingsController } from '@/modules/settings/infra/http/SettingsController'
+import { DeliveryFeeController } from '@/modules/settings/infra/http/DeliveryFeeController'
 
 // Audit
 import { CreateAuditLogUseCase } from '@/modules/audit/application/use-cases/CreateAuditLogUseCase'
 
 // Webhook
-import { ReceiveWhatsAppWebhookUseCase } from '@/modules/webhook/application/use-cases/ReceiveWhatsAppWebhookUseCase'
 import { WebhookController } from '@/modules/webhook/infra/http/WebhookController'
 
-// Conversations
-import { DrizzleConversationRepository } from '@/modules/conversations/infra/repositories/DrizzleConversationRepository'
-import { WhatsAppSender } from '@/modules/conversations/infra/WhatsAppSender'
-import { ListConversationsUseCase } from '@/modules/conversations/application/use-cases/ListConversationsUseCase'
-import { GetConversationHistoryUseCase } from '@/modules/conversations/application/use-cases/GetConversationHistoryUseCase'
-import { GetConversationContextUseCase } from '@/modules/conversations/application/use-cases/GetConversationContextUseCase'
-import { LogMessageUseCase } from '@/modules/conversations/application/use-cases/LogMessageUseCase'
-import { TakeoverConversationUseCase } from '@/modules/conversations/application/use-cases/TakeoverConversationUseCase'
-import { ReleaseConversationUseCase } from '@/modules/conversations/application/use-cases/ReleaseConversationUseCase'
-import { RequestHumanUseCase } from '@/modules/conversations/application/use-cases/RequestHumanUseCase'
-import { MarkConversationReadUseCase } from '@/modules/conversations/application/use-cases/MarkConversationReadUseCase'
-import { MarkAllConversationsReadUseCase } from '@/modules/conversations/application/use-cases/MarkAllConversationsReadUseCase'
-import { SendAgentMessageUseCase } from '@/modules/conversations/application/use-cases/SendAgentMessageUseCase'
-import { SendAgentMediaUseCase } from '@/modules/conversations/application/use-cases/SendAgentMediaUseCase'
-import { SendAgentTemplateUseCase } from '@/modules/conversations/application/use-cases/SendAgentTemplateUseCase'
-import { ExportConversationUseCase } from '@/modules/conversations/application/use-cases/ExportConversationUseCase'
-import { FetchConversationMediaUseCase } from '@/modules/conversations/application/use-cases/FetchConversationMediaUseCase'
+// Conversations — servidas pelo @adatechnology/meta-whatsapp-module
+import { createMetaWhatsAppModuleRegistry } from '@/modules/conversations/infra/whatsapp/metaWhatsAppModule'
 import { ConversationController } from '@/modules/conversations/infra/http/ConversationController'
+import { WhatsAppTemplateProvider } from '@adatechnology/meta-whatsapp-provider'
+import { WhatsAppSettingsController } from '@/modules/conversations/infra/http/WhatsAppSettingsController'
+
+// Finance
+import { MonthlyAccountController } from '@/modules/finance/infra/http/MonthlyAccountController'
+import { ExpenseController } from '@/modules/finance/infra/http/ExpenseController'
 
 // Fiscal
 import { EmitFiscalDocumentUseCase } from '@/modules/fiscal/application/use-cases/EmitFiscalDocumentUseCase'
@@ -119,11 +132,19 @@ import { UpsertFiscalConfigUseCase } from '@/modules/fiscal/application/use-case
 import { TestFiscalConnectionUseCase } from '@/modules/fiscal/application/use-cases/TestFiscalConnectionUseCase'
 import { RetryFiscalDocumentUseCase } from '@/modules/fiscal/application/use-cases/RetryFiscalDocumentUseCase'
 import { PrintFiscalCupomUseCase } from '@/modules/fiscal/application/use-cases/PrintFiscalCupomUseCase'
+import { GenerateFiscalPdfUseCase } from '@/modules/fiscal/application/use-cases/GenerateFiscalPdfUseCase'
 import { ThermalPrinterProvider } from '@/modules/fiscal/application/printing/ThermalPrinterProvider'
 import { FiscalController } from '@/modules/fiscal/infra/http/FiscalController'
 import { startFiscalWorker } from '@/modules/fiscal/application/workers/FiscalEmissionProcessor'
+import { startFinanceWorker } from '@/modules/finance/application/workers/AccountDueWorker'
+import { startIfoodWorker } from '@/modules/orders/application/workers/IfoodPollingWorker'
 import { startBullBoard } from '@/infra/queue/bullBoard'
 import type { Worker } from 'bullmq'
+
+// Uploads
+import { LocalStorageProvider } from '@/shared/providers/LocalStorageProvider'
+import { UploadFileUseCase } from '@/modules/uploads/application/UploadFileUseCase'
+import { UploadController } from '@/modules/uploads/infra/http/UploadController'
 
 // WebSocket Hub (passed in from server bootstrap to avoid circular dep)
 import type { WebSocketHub } from '@/infra/websocket/WebSocketHub'
@@ -132,6 +153,9 @@ export interface AppContainer {
   cache: RedisProvider
   menuController: MenuController
   catalogController: CatalogController
+  sectionController: SectionController
+  ingredientController: IngredientController
+  stockBatchController: StockBatchController
   authController: AuthController
   orderController: OrderController
   kitchenController: KitchenController
@@ -140,17 +164,29 @@ export interface AppContainer {
   dashboardController: DashboardController
   reportsController: ReportsController
   settingsController: SettingsController
+  deliveryFeeController: DeliveryFeeController
   webhookController: WebhookController
   customerController: CustomerController
+  addressController: AddressController
   tableController: TableController
   staffController: StaffController
+  roleController: RoleController
   conversationController: ConversationController
+  whatsAppSettingsController: WhatsAppSettingsController
   fiscalController: FiscalController
+  monthlyAccountController: MonthlyAccountController
+  expenseController: ExpenseController
+  uploadController: UploadController
   fiscalWorker?: Worker | undefined
+  financeWorker?: Worker | undefined
+  ifoodWorker?: Worker | undefined
 }
 
 export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const cache = new RedisProvider()
+
+  // Uma instância do módulo por estabelecimento: os eventos que ele emite não carregam tenant.
+  const metaWhatsAppModules = createMetaWhatsAppModuleRegistry({ db, cache, webSocketHub: wsHub })
 
   // Shared repos
   const userRepository = new DrizzleUserRepository(db)
@@ -165,6 +201,9 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   // Products / Catalog
   const menuController = new MenuController(db, cache)
   const catalogController = new CatalogController(db, cache)
+  const sectionController = new SectionController(db)
+  const ingredientController = new IngredientController(db)
+  const stockBatchController = new StockBatchController(db)
 
   // Shared use cases
   const findOrCreateCustomerUseCase = new FindOrCreateCustomerUseCase(db)
@@ -215,20 +254,29 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   // Reports
   const exportOrdersCSVUseCase = new ExportOrdersCSVUseCase(db)
   const getMonthlyReportUseCase = new GetMonthlyReportUseCase(db, cache)
-  const reportsController = new ReportsController(exportOrdersCSVUseCase, getMonthlyReportUseCase)
+  const getFunnelAnalysisUseCase = new GetFunnelAnalysisUseCase(db)
+  const getTableMetricsUseCase = new GetTableMetricsUseCase(db)
+  const getIngredientsRankingUseCase = new GetIngredientsRankingUseCase(db)
+  const getProductProfitUseCase = new GetProductProfitUseCase(db)
+  const getPreparationTimeComparisonUseCase = new GetPreparationTimeComparisonUseCase(db)
+  const reportsController = new ReportsController(
+    exportOrdersCSVUseCase,
+    getMonthlyReportUseCase,
+    getFunnelAnalysisUseCase,
+    getTableMetricsUseCase,
+    getIngredientsRankingUseCase,
+    getProductProfitUseCase,
+    getPreparationTimeComparisonUseCase
+  )
 
   // Settings
   const getSettingsUseCase = new GetSettingsUseCase(db)
   const upsertSettingUseCase = new UpsertSettingUseCase(db)
   const settingsController = new SettingsController(getSettingsUseCase, upsertSettingUseCase)
+  const deliveryFeeController = new DeliveryFeeController()
 
-  // Webhook
-  const receiveWebhookUseCase = new ReceiveWhatsAppWebhookUseCase(
-    cache,
-    findOrCreateCustomerUseCase,
-    createAuditLogUseCase
-  )
-  const webhookController = new WebhookController(receiveWebhookUseCase)
+  // Webhook — assinatura, replay e persistência ficam no módulo
+  const webhookController = new WebhookController(metaWhatsAppModules)
 
   // Customers
   const customerRepository = new DrizzleCustomerRepository(db)
@@ -243,6 +291,21 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     createCustomerUseCase,
     updateCustomerUseCase,
     deleteCustomerUseCase
+  )
+
+  // Addresses
+  const addressRepository = new DrizzleAddressRepository(db)
+  const listAddressesUseCase = new ListAddressesUseCase(addressRepository)
+  const createAddressUseCase = new CreateAddressUseCase(addressRepository)
+  const updateAddressUseCase = new UpdateAddressUseCase(addressRepository)
+  const deleteAddressUseCase = new DeleteAddressUseCase(addressRepository)
+  const setDefaultAddressUseCase = new SetDefaultAddressUseCase(addressRepository)
+  const addressController = new AddressController(
+    listAddressesUseCase,
+    createAddressUseCase,
+    updateAddressUseCase,
+    deleteAddressUseCase,
+    setDefaultAddressUseCase
   )
 
   // Tables + Comanda
@@ -269,37 +332,16 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   )
 
   // Conversations
-  const conversationRepository = new DrizzleConversationRepository(db)
-  const whatsAppSender = new WhatsAppSender()
-  const listConversationsUseCase = new ListConversationsUseCase(conversationRepository)
-  const getConversationHistoryUseCase = new GetConversationHistoryUseCase(conversationRepository)
-  const getConversationContextUseCase = new GetConversationContextUseCase(conversationRepository)
-  const logMessageUseCase = new LogMessageUseCase(conversationRepository, wsHub)
-  const takeoverConversationUseCase = new TakeoverConversationUseCase(conversationRepository, wsHub)
-  const releaseConversationUseCase = new ReleaseConversationUseCase(conversationRepository, wsHub)
-  const requestHumanUseCase = new RequestHumanUseCase(conversationRepository, wsHub)
-  const markConversationReadUseCase = new MarkConversationReadUseCase(conversationRepository)
-  const markAllConversationsReadUseCase = new MarkAllConversationsReadUseCase(conversationRepository)
-  const sendAgentMessageUseCase = new SendAgentMessageUseCase(conversationRepository, whatsAppSender, wsHub)
-  const sendAgentMediaUseCase = new SendAgentMediaUseCase(conversationRepository, whatsAppSender, wsHub)
-  const sendAgentTemplateUseCase = new SendAgentTemplateUseCase(conversationRepository, whatsAppSender, wsHub)
-  const exportConversationUseCase = new ExportConversationUseCase(conversationRepository)
-  const fetchConversationMediaUseCase = new FetchConversationMediaUseCase(whatsAppSender)
-  const conversationController = new ConversationController(
-    listConversationsUseCase,
-    getConversationHistoryUseCase,
-    getConversationContextUseCase,
-    logMessageUseCase,
-    takeoverConversationUseCase,
-    releaseConversationUseCase,
-    requestHumanUseCase,
-    markConversationReadUseCase,
-    markAllConversationsReadUseCase,
-    sendAgentMessageUseCase,
-    sendAgentMediaUseCase,
-    sendAgentTemplateUseCase,
-    exportConversationUseCase,
-    fetchConversationMediaUseCase
+  const conversationController = new ConversationController(metaWhatsAppModules)
+  const whatsAppSettingsController = new WhatsAppSettingsController(
+    metaWhatsAppModules,
+    new WhatsAppTemplateProvider({
+      accessToken: process.env.WHATSAPP_ACCESS_TOKEN ?? '',
+      ...(process.env.WHATSAPP_BUSINESS_ACCOUNT_ID
+        ? { wabaId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID }
+        : {}),
+      ...(process.env.WHATSAPP_API_VERSION ? { apiVersion: process.env.WHATSAPP_API_VERSION } : {}),
+    })
   )
 
   // Staff
@@ -321,6 +363,22 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     listRolesUseCase
   )
 
+  // Roles
+  const createRoleUseCase = new CreateRoleUseCase(staffRepository)
+  const updateRoleUseCase = new UpdateRoleUseCase(staffRepository)
+  const deleteRoleUseCase = new DeleteRoleUseCase(staffRepository)
+  const getRoleWithPermissionsUseCase = new GetRoleWithPermissionsUseCase(staffRepository)
+  const listRolesWithPermissionsUseCase = new ListRolesWithPermissionsUseCase(staffRepository)
+  const assignPermissionsUseCase = new AssignPermissionsUseCase(staffRepository)
+  const roleController = new RoleController(
+    listRolesWithPermissionsUseCase,
+    getRoleWithPermissionsUseCase,
+    createRoleUseCase,
+    updateRoleUseCase,
+    deleteRoleUseCase,
+    assignPermissionsUseCase
+  )
+
   // Fiscal
   const emitFiscalDocumentUseCase = new EmitFiscalDocumentUseCase(db, wsHub)
   const cancelFiscalDocumentUseCase = new CancelFiscalDocumentUseCase(db, wsHub)
@@ -329,6 +387,9 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const testFiscalConnectionUseCase = new TestFiscalConnectionUseCase()
   const retryFiscalDocumentUseCase = new RetryFiscalDocumentUseCase(db, wsHub)
   const printFiscalCupomUseCase = new PrintFiscalCupomUseCase(db, new ThermalPrinterProvider())
+  const generateFiscalPdfUseCase = new GenerateFiscalPdfUseCase(db)
+
+  // Fiscal
   const fiscalController = new FiscalController(
     emitFiscalDocumentUseCase,
     cancelFiscalDocumentUseCase,
@@ -336,8 +397,18 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     upsertFiscalConfigUseCase,
     testFiscalConnectionUseCase,
     retryFiscalDocumentUseCase,
-    printFiscalCupomUseCase
+    printFiscalCupomUseCase,
+    generateFiscalPdfUseCase
   )
+
+  // Uploads
+  const storageProvider = new LocalStorageProvider()
+  const uploadFileUseCase = new UploadFileUseCase(storageProvider)
+  const uploadController = new UploadController(uploadFileUseCase)
+
+  // Finance
+  const monthlyAccountController = new MonthlyAccountController(db)
+  const expenseController = new ExpenseController(db, uploadFileUseCase)
 
   // Fiscal emission worker — opt-in per environment (consumes the BullMQ fiscal queue)
   const fiscalWorker = process.env.FISCAL_WORKER_ENABLED === 'true'
@@ -348,11 +419,32 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     startBullBoard()
   }
 
+  const financeWorker = process.env.FINANCE_WORKER_ENABLED === 'true'
+    ? startFinanceWorker(db)
+    : undefined
+  if (financeWorker) {
+    console.log('[API] Finance worker started')
+    startBullBoard()
+  }
+
+  const ifoodWorker = process.env.IFOOD_ENABLED === 'true'
+    ? startIfoodWorker(db, createOrderUseCase, updateOrderStatusUseCase)
+    : undefined
+  if (ifoodWorker) {
+    console.log('[API] iFood polling worker started')
+    startBullBoard()
+  }
+
   return {
     fiscalWorker,
+    financeWorker,
+    ifoodWorker,
     cache,
     menuController,
     catalogController,
+    sectionController,
+    ingredientController,
+    stockBatchController,
     authController,
     orderController,
     kitchenController,
@@ -361,11 +453,18 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     dashboardController,
     reportsController,
     settingsController,
+    deliveryFeeController,
     webhookController,
     customerController,
+    addressController,
     tableController,
     staffController,
+    roleController,
     conversationController,
+    whatsAppSettingsController,
     fiscalController,
+    monthlyAccountController,
+    expenseController,
+    uploadController,
   }
 }

@@ -10,7 +10,6 @@ import { seedDeliveries } from './deliveries.seed'
 import { seedCashier } from './cashier.seed'
 import { seedSettings } from './settings.seed'
 import { seedAuditLogs } from './audit-logs.seed'
-import { seedConversations } from './conversations.seed'
 import { seedFiscal } from './fiscal.seed'
 
 async function seed(): Promise<void> {
@@ -32,7 +31,6 @@ async function seed(): Promise<void> {
 
   await seedSettings(establishmentId)
   await seedAuditLogs({ establishmentId, adminUserId: userIds.admin, caixaUserId: userIds.caixa, orders })
-  await seedConversations(establishmentId, userIds.atendente)
 
   console.log('[Seed] Done.')
   process.exit(0)
