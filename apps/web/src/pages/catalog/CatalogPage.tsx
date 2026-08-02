@@ -20,6 +20,7 @@ import {
   type MoneyFormat,
   type ProductSuggestion,
   type PriceReference,
+  type PriceHistoryEntry,
 } from '@adatechnology/products-ui'
 import { productsApiAdapter } from '@/lib/productsApiAdapter'
 
@@ -75,6 +76,15 @@ interface Product {
   preparationInstructions: string | null
   active: boolean
   sortOrder: number
+}
+
+// Linha crua de `GET /catalog/products/:id/price-history` — preço em reais, autor aninhado.
+type PriceHistoryRow = {
+  id: string
+  previousPrice: string
+  newPrice: string
+  createdAt: string
+  user: { id: string; name: string } | null
 }
 
 // Envelope do `GET /catalog/regional-price/:barcode` — preço em reais, como a API guarda.
@@ -384,6 +394,26 @@ function CatalogPageContent() {
       }
     } catch {
       return null
+    }
+  }
+
+  // Histórico de alteração de preço do produto. A API devolve os valores em reais e o autor
+  // aninhado; `user` é nulo quando quem alterou já foi removido.
+  async function fetchPriceHistory(productId: string): Promise<readonly PriceHistoryEntry[]> {
+    try {
+      const rows = await api.get<PriceHistoryRow[]>(
+        `/catalog/products/${productId}/price-history`,
+        accessToken ?? undefined
+      )
+      return rows.map((row) => ({
+        id: row.id,
+        previousPriceInCents: toCents(row.previousPrice),
+        newPriceInCents: toCents(row.newPrice),
+        changedAt: row.createdAt,
+        ...(row.user?.name ? { authorName: row.user.name } : {}),
+      }))
+    } catch {
+      return []
     }
   }
 
@@ -742,6 +772,7 @@ function CatalogPageContent() {
                     onScanBarcode={requestBarcodeScan}
                     onSearchSuggestions={searchSuggestions}
                     onFetchPriceReference={fetchPriceReference}
+                    onFetchPriceHistory={fetchPriceHistory}
                   />
                   {prodModal === 'edit' && selectedProd && (
                     <RecipeManager productId={selectedProd.id} />
