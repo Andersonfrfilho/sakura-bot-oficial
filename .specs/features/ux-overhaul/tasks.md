@@ -164,8 +164,19 @@ barato em seguida).
       para `/login`). Contornado durante os testes injetando um token válido
       diretamente no `localStorage`. Como afeta o fluxo de autenticação,
       recomenda-se abrir task dedicada em Fase 0 ou 1 para corrigir.
-- ⬜ **T2.2** (UX-ORD-05) Pedido de mesa exige comanda (selecionar existente ou
+- ✅ **T2.2** (UX-ORD-05) Pedido de mesa exige comanda (selecionar existente ou
   criar); vincular pedido→comanda. 🔗 T2.1.
+  - *Implementação:* já existia dentro de `CreateOrderPage.tsx` (implementado
+    junto com T2.1, não precisou de código novo): ao selecionar `type=table`,
+    mesa sem `comanda` ativa bloqueia o avanço (`disabled` em "Montar
+    pedido") e exibe "Mesa X não possui comanda aberta" com botão inline
+    "Abrir comanda" (`openComandaMutation` → `POST /tables/:id/comanda`). O
+    passo de confirmação também trata o erro `table_comanda_required` vindo
+    do backend como segunda camada de proteção.
+  - *Verificação:* testado no browser — `/orders/new` → tipo "Mesa" →
+    selecionar mesa 1 (sem `CMD-XXX` no grid, diferente das mesas 3 e 9 que
+    já têm comanda) → confirmado via `javascript_tool`/`document.body.innerText`
+    que a mensagem de bloqueio aparece e o botão de avançar fica desabilitado.
 - ⬜ **T2.3** (UX-ORD-06/07) Listagem melhorada + painel de detalhe do pedido
   (itens, timeline via `order_status_logs`, pagamento, entrega, nota vinculada).
 - ⬜ **T2.4** (UX-ORD-08) Busca textual, filtros multi-select, calendário
