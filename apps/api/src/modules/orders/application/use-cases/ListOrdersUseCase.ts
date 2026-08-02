@@ -33,7 +33,7 @@ export class ListOrdersUseCase {
         orderBy: [desc(schema.orders.receivedAt)],
         limit: pageSize,
         offset,
-        with: { items: true, customer: true },
+        with: { items: true, customer: true, payments: true },
       }),
       this.db.select({ total: count() }).from(schema.orders).where(baseWhere),
     ])

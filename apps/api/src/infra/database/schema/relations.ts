@@ -15,6 +15,8 @@ import { comandas } from './comandas'
 import { orders } from './orders'
 import { orderItems } from './order-items'
 import { orderPayments } from './order-payments'
+import { orderStatusLogs } from './order-status-logs'
+import { fiscalDocuments } from './fiscal-documents'
 import { deliveries } from './deliveries'
 import { cashRegisters } from './cash-registers'
 import { cashMovements } from './cash-movements'
@@ -195,6 +197,11 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   payments: many(orderPayments),
   delivery: many(deliveries),
   cashMovements: many(cashMovements),
+  statusLogs: many(orderStatusLogs),
+  fiscalDocument: one(fiscalDocuments, {
+    fields: [orders.id],
+    references: [fiscalDocuments.orderId],
+  }),
 }))
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
@@ -203,6 +210,14 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
     fields: [orderItems.productId],
     references: [products.id],
   }),
+}))
+
+export const orderStatusLogsRelations = relations(orderStatusLogs, ({ one }) => ({
+  order: one(orders, { fields: [orderStatusLogs.orderId], references: [orders.id] }),
+}))
+
+export const fiscalDocumentsRelations = relations(fiscalDocuments, ({ one }) => ({
+  order: one(orders, { fields: [fiscalDocuments.orderId], references: [orders.id] }),
 }))
 
 export const orderPaymentsRelations = relations(orderPayments, ({ one }) => ({

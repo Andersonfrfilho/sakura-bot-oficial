@@ -177,8 +177,38 @@ barato em seguida).
     selecionar mesa 1 (sem `CMD-XXX` no grid, diferente das mesas 3 e 9 que
     já têm comanda) → confirmado via `javascript_tool`/`document.body.innerText`
     que a mensagem de bloqueio aparece e o botão de avançar fica desabilitado.
-- ⬜ **T2.3** (UX-ORD-06/07) Listagem melhorada + painel de detalhe do pedido
+- ✅ **T2.3** (UX-ORD-06/07) Listagem melhorada + painel de detalhe do pedido
   (itens, timeline via `order_status_logs`, pagamento, entrega, nota vinculada).
+  - *Implementação:*
+    - `OrderDetailPage.tsx` já continha as seções de itens, timeline
+      (`OrderProgressBar`), pagamento, entrega e nota fiscal, mas a API não
+      retornava `statusLogs`/`fiscalDocument` — só a UI existia, os dados
+      nunca chegavam.
+    - Backend: adicionadas as relations que faltavam em `relations.ts`
+      (`ordersRelations.statusLogs` → `many(orderStatusLogs)`,
+      `ordersRelations.fiscalDocument` → `one(fiscalDocuments)` via
+      `orderId` único, mais `orderStatusLogsRelations` e
+      `fiscalDocumentsRelations` inversas). `GetOrderUseCase` agora inclui
+      `fiscalDocument: true` e `statusLogs: { orderBy: asc(createdAt) }` no
+      `with`.
+    - Listagem (UX-ORD-06): `ListOrdersUseCase` passou a trazer
+      `payments: true`; `OrdersPage.tsx` exibe um resumo
+      "Pagamento: <tipo> + <tipo>" no card quando o pedido tem pagamentos
+      registrados. Clique no pedido já abria `/orders/:id` (UX-ORD-07, já
+      implementado antes desta task via `Link` no cabeçalho do card).
+  - *Verificação:*
+    - `npx tsc --noEmit` limpo em `apps/api` (21 erros baseline,
+      inalterado) e `apps/web` (5 erros baseline, inalterado).
+    - Testado via curl: `GET /orders/:id` de um pedido com nota fiscal
+      emitida (seed `...0007-0000...000`) retornou `fiscalDocument`
+      populado corretamente; criado um pedido de teste via
+      `POST /orders` com `payments: [{paymentTypeName:"Pix", amount:10}]`,
+      confirmado no `GET /orders` (listagem) que `payments[]` vem populado
+      — dado de teste removido em seguida via `psql`.
+    - Testado no browser: `/orders` → clique no pedido → `/orders/:id`
+      renderiza corretamente as seções "Pagamento" e "Histórico de status"
+      (vazias para pedidos sem esses dados, conforme esperado), sem erros
+      no console.
 - ⬜ **T2.4** (UX-ORD-08) Busca textual, filtros multi-select, calendário
   (range), busca por cliente, estado na URL. 🔗 T1.1.
 

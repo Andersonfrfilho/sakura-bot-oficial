@@ -24,6 +24,7 @@ interface Order {
   receivedAt: string
   customer: { name: string; phone: string } | null
   items: Array<{ productName: string; quantity: number }>
+  payments: Array<{ paymentTypeName: string }>
 }
 
 interface OrdersResponse {
@@ -272,6 +273,12 @@ export function OrdersPage() {
               <p className="text-xs text-gray-500 mb-2">
                 {order.items.map((i) => `${i.quantity}× ${i.productName}`).join(', ')}
               </p>
+
+              {order.payments.length > 0 && (
+                <p className="text-xs text-gray-400 mb-2">
+                  Pagamento: {order.payments.map((p) => p.paymentTypeName).join(' + ')}
+                </p>
+              )}
 
               {editingNotesId === order.id ? (
                 <div className="mb-2">

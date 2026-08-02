@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm'
+import { eq, and, asc } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import * as schema from '@/infra/database/schema'
 import { NotFoundError } from '@/shared/errors/AppError'
@@ -15,7 +15,14 @@ export class GetOrderUseCase {
         eq(schema.orders.establishmentId, establishmentId)
       ),
       // O cliente vem junto porque a tela de detalhe abre a conversa a partir do WhatsApp dele.
-      with: { items: true, customer: true, payments: true, delivery: true },
+      with: {
+        items: true,
+        customer: true,
+        payments: true,
+        delivery: true,
+        fiscalDocument: true,
+        statusLogs: { orderBy: (log) => [asc(log.createdAt)] },
+      },
     })
 
     if (!order) throw new NotFoundError('Order')
