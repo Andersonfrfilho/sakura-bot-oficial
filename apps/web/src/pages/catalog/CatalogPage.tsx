@@ -19,6 +19,7 @@ import {
   type CreateProductInput,
   type MoneyFormat,
   type ProductSuggestion,
+  type PriceReference,
 } from '@adatechnology/products-ui'
 import { productsApiAdapter } from '@/lib/productsApiAdapter'
 
@@ -74,6 +75,16 @@ interface Product {
   preparationInstructions: string | null
   active: boolean
   sortOrder: number
+}
+
+// Envelope do `GET /catalog/regional-price/:barcode` — preço em reais, como a API guarda.
+type RegionalPriceQuote = {
+  minPrice: number
+  averagePrice: number
+  maxPrice: number
+  sampleCount: number
+  collectedAt: string
+  source: string
 }
 
 type CatalogFormData = {
@@ -351,6 +362,28 @@ function CatalogPageContent() {
     } catch {
       // Código não está na base externa: vale o número lido, o nome o usuário digita.
       finishBarcodeScan({ name: '', barcode })
+    }
+  }
+
+  // Referência de preço regional. Devolver `null` quando não há cobertura é o caminho normal:
+  // o dado vem de NFC-e estadual e a maioria das UFs não publica.
+  async function fetchPriceReference(barcode: string): Promise<PriceReference | null> {
+    try {
+      const result = await api.get<{ available: boolean; quote: RegionalPriceQuote | null }>(
+        `/catalog/regional-price/${barcode}`,
+        accessToken ?? undefined
+      )
+      if (!result.available || !result.quote) return null
+      return {
+        minInCents: toCents(result.quote.minPrice),
+        averageInCents: toCents(result.quote.averagePrice),
+        maxInCents: toCents(result.quote.maxPrice),
+        sampleCount: result.quote.sampleCount,
+        collectedAt: result.quote.collectedAt,
+        source: result.quote.source,
+      }
+    } catch {
+      return null
     }
   }
 
@@ -708,6 +741,7 @@ function CatalogPageContent() {
                     onSubmit={submitProduct}
                     onScanBarcode={requestBarcodeScan}
                     onSearchSuggestions={searchSuggestions}
+                    onFetchPriceReference={fetchPriceReference}
                   />
                   {prodModal === 'edit' && selectedProd && (
                     <RecipeManager productId={selectedProd.id} />

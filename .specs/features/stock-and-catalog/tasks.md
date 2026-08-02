@@ -345,10 +345,37 @@ promessa quebrada se for vendida como universal.
   inválido → 400; sem token → 401. Nenhum caminho grava preço: o endpoint é `GET`
   e só devolve referência. `tsc --noEmit` sem erros novos (os 21 restantes são
   pré-existentes em `tables`/`orders`/`router`/`server`/`cashier`/`delivery`).
-- **T4.5** Na tela, sugestão de preço aparece como **referência ao lado do
+- ✅ **T4.5** Na tela, sugestão de preço aparece como **referência ao lado do
   campo**, nunca preenchendo sozinha, e sempre acompanhada da margem que aquele
   preço daria sobre o custo do último lote (Fase 1). É aqui que o estoque paga a
   integração: sem custo real, "preço da região" não informa decisão nenhuma.
+
+  *Implementação:* no SDK (`@adatechnology/products-ui`, branch
+  `feat/products-price-reference`, commit `cee1e4f`): tipo `PriceReference`,
+  componente `PriceReferenceHint` e a prop opcional `onFetchPriceReference` no
+  `ProductForm` — sem a prop o formulário não muda em nada. O bloco fica logo
+  abaixo do campo de preço de venda e mostra mínimo/médio/máximo, cada um com a
+  margem sobre o custo digitado, mais contagem de notas, data da coleta e a
+  procedência. Aplicar é clique explícito no `usar`; a consulta também é sob
+  demanda, não a cada tecla, porque a base limita requisição por IP. Trocar o
+  código de barras descarta a referência anterior — mantê-la a atribuiria ao
+  produto errado. No host, `CatalogPage` traduz o envelope do
+  `GET /catalog/regional-price/:barcode` para o tipo do SDK e devolve `null`
+  quando não há cobertura.
+
+  *Verificação:* no navegador, GTIN `7891000100103` com custo R$ 6,50 exibiu
+  `mín R$ 6,98 · margem 7%`, `méd R$ 10,88 · margem 40%`, `máx R$ 13,99 ·
+  margem 54%`, com "17 nota(s), coleta de 02/08/2026 · precodahora-ba". O campo
+  de preço permaneceu vazio até o clique em `usar`, quando recebeu R$ 10,88.
+  GTIN sem cobertura exibiu o aviso de programa estadual em vez de erro. Trocar
+  o código depois da consulta apagou o bloco. Nada foi salvo: o catálogo seguiu
+  com 5 produtos. `tsc --noEmit` limpo no SDK e sem erros novos em `apps/web`
+  (os 5 restantes são pré-existentes em `pwa`, `layout` e `LoginPage`).
+
+  *Pendência de configuração:* a UF e o CEP saem de `establishments.settings`,
+  que o seed cria vazio. O piloto foi configurado direto no banco com
+  `{"state":"BA","postalCode":"41750000"}` — falta expor esses dois campos na
+  tela de Configurações para que não dependa de SQL.
 
 ### 4C — Sugestão de produtos e kits (o mais valioso, e nem precisa de fora)
 
