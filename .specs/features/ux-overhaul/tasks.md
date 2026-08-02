@@ -34,13 +34,38 @@ barato em seguida).
   - PDF (UX-FIS-02) **não é bug de wiring** — nenhum provider do
     `@adatechnology/fiscal-provider` persiste PDF, e o `ResponseHelper` não
     suporta binário. Rescopado para **T8.5** (junto da infra de storage).
-- ⬜ **T0.2** (UX-DLV-01) Join `deliveries → users` no backend + exibir nome do
+- ✅ **T0.2** (UX-DLV-01) Join `deliveries → users` no backend + exibir nome do
   entregador na tela de Entregas.
-- ⬜ **T0.3** (UX-CSH-01) Ocultar valores do caixa por padrão + botão olho.
-- ⬜ **T0.4** (UX-DSN-03) Traduzir strings em inglês: tipos de pedido
+  - Feito (commit `9459eec`, não estava marcado): `GetDeliveryQueueUseCase`
+    já resolvia `with: { deliverer: true }` via `deliveriesRelations` em
+    `relations.ts`, e `DeliveryPage.tsx` já renderizava
+    `delivery.deliverer.name`. Confirmado ao vivo em `GET /delivery/queue`
+    (`deliverer: {"name":"Entregador Demo"}`) e na tela
+    (`/delivery` exibe "Entregador: Entregador Demo").
+- ✅ **T0.3** (UX-CSH-01) Ocultar valores do caixa por padrão + botão olho.
+  - Feito (commit `cc16216`, não estava marcado): `showValues` inicia `false`
+    em `CashierPage.tsx`, todo valor monetário passa por
+    `formatBRL(valor, !showValues)`, placeholder `R$ ••••••`. Confirmado ao
+    vivo: tela abre com valores ocultos; clique em "Mostrar valores" revela
+    ("R$ 272,80" etc.) e alterna de volta em "Ocultar valores".
+- ✅ **T0.4** (UX-DSN-03) Traduzir strings em inglês: tipos de pedido
   (`table`/`pickup`/`delivery` → Mesa/Retirada/Entrega), canal `manual`,
   corrigir badge colado "Recebidomanual" (OrdersPage). Depois varredura geral
   (grep + revisão visual) nas demais telas.
+  - Parte específica já resolvida em commit anterior: `orderLabels.ts` traduz
+    `ORDER_STATUS_LABELS`/`ORDER_TYPE_LABELS`/`ORDER_CHANNEL_LABELS`
+    integralmente (Recebido/Em preparo/Pronto/.../Mesa/Entrega/Retirada/
+    WhatsApp/iFood/Manual); `OrdersPage.tsx` não concatena mais status+canal
+    sem separador — confirmado via grep, sem ocorrência de "Recebidomanual".
+  - Varredura geral feita nesta sessão: `rg` por `placeholder="[A-Z]..."` em
+    todo `apps/web/src` (CreateOrderModal, CashierPage, StaffPage,
+    OrdersFilterBar, PaymentStep, RolesPage, FiscalDocumentsPage,
+    FinancePage, ComandaConfirmPage, ConversationsPage, AddressForm) e por
+    texto de botão/label/heading (`>[A-Z][a-z]+...<` sem acento, filtrando
+    siglas legítimas como NCM/CFOP/CST/CEP/CRT/PIX/NF) em todos os `.tsx` do
+    projeto. Nenhuma string em inglês encontrada — todo texto visível ao
+    usuário já está em português. "Dashboard" e "Status" mantidos por serem
+    termos consagrados em software de gestão brasileiro.
 
 ## Fase 1 — Design System base (pré-requisito das telas novas)
 > 🤖 Modelo: `sonnet` para T1.1/T1.4 (componente e animações); `haiku` para T1.2/T1.3 (passes mecânicos)
