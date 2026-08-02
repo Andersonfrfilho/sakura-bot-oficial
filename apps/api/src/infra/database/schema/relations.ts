@@ -7,6 +7,7 @@ import { customers } from './customers'
 import { addresses } from './addresses'
 import { catalogs } from './catalogs'
 import { products } from './products'
+import { productPriceHistory } from './product-price-history'
 import { restaurantTables } from './tables'
 import { comandas } from './comandas'
 import { orders } from './orders'
@@ -106,6 +107,22 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   }),
   orderItems: many(orderItems),
   productIngredients: many(productIngredients),
+  priceHistory: many(productPriceHistory),
+}))
+
+export const productPriceHistoryRelations = relations(productPriceHistory, ({ one }) => ({
+  establishment: one(establishments, {
+    fields: [productPriceHistory.establishmentId],
+    references: [establishments.id],
+  }),
+  product: one(products, {
+    fields: [productPriceHistory.productId],
+    references: [products.id],
+  }),
+  user: one(users, {
+    fields: [productPriceHistory.userId],
+    references: [users.id],
+  }),
 }))
 
 export const restaurantTablesRelations = relations(restaurantTables, ({ one, many }) => ({

@@ -206,9 +206,30 @@ R$ 0,00 e a "receita" do produto é decorativa.
     descrição, preço R$ 6,00 e catálogo/seção "Bebidas" pré-preenchidos e
     código de barras vazio; salvar criou o produto (6 produtos na lista),
     depois excluído para limpar o dado de teste (voltou a 5).
-- **T3.4** Histórico de preço (`product_price_history`: produto, preço anterior,
+- ✅ **T3.4** Histórico de preço (`product_price_history`: produto, preço anterior,
   novo, autor, data). Sem ele não há como responder "quando esse item subiu",
   e retroagir depois é impossível: o dado não existe em lugar nenhum.
+  - *Implementação:* tabela `product_price_history` (migration
+    `0028_add_product_price_history.sql`, aplicada manualmente ao Postgres
+    de dev via `psql` — sem `drizzle-kit generate` interativo disponível
+    neste ambiente; `drizzle-kit migrate` aplica a mesma migration em
+    produção normalmente). `CatalogController.updateProduct` grava uma
+    linha só quando `Number(existing.price) !== Number(updated.price)`, com
+    `previousPrice`, `newPrice` e `userId` de quem editou — descrição,
+    catálogo etc. não geram entrada, só preço. Rota nova `GET
+    /catalog/products/:id/price-history`, ordenada por `createdAt desc`,
+    com o nome do autor via relation `user`. Ainda sem UI própria no
+    frontend (fica pendente numa task de tela); a API está completa e
+    testável.
+  - *Verificação:* `tsc --noEmit` sem novos erros nos arquivos tocados
+    (`CatalogController.ts`, `CatalogRoutes.ts`, schema/relations).
+    Testado ao vivo via curl: `PUT` alterando preço de R$6,00 para R$6,50
+    gerou 1 linha em `price-history` com `previousPrice: "6.00"`,
+    `newPrice: "6.50"` e o usuário autenticado; um segundo `PUT` mudando só
+    a descrição (preço igual) não criou linha nova — confirmado que a
+    lista de histórico continuou com 1 item. Preço e descrição revertidos
+    ao valor original e as 2 linhas de teste (subida e volta) apagadas do
+    banco ao final.
 - **T3.5** Upload de imagem — **bloqueado**. Depende de storage de objetos, que
   o `apps/api` não tem (mesmo bloqueio dos documentos das conversas). Fica aqui
   registrado para não ser redescoberto.

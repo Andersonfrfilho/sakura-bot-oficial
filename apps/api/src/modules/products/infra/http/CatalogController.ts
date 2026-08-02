@@ -291,8 +291,43 @@ export class CatalogController {
       .where(and(eq(schema.products.id, id), eq(schema.products.establishmentId, establishmentId)))
       .returning()
 
+    // Preço é o único campo com histórico: é o que o gerente precisa responder
+    // "quando esse item subiu", e o dado deixa de existir se não for gravado aqui.
+    if (updated && Number(existing.price) !== Number(updated.price)) {
+      await this.db.insert(schema.productPriceHistory).values({
+        establishmentId,
+        productId: id,
+        userId: request.user.id,
+        previousPrice: existing.price,
+        newPrice: updated.price,
+      })
+    }
+
     await this.invalidateCache(establishmentId)
     response.json(updated)
+  }
+
+  getProductPriceHistory: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const { establishmentId } = request.user
+    const id = request.params['id']!
+
+    const existing = await this.db.query.products.findFirst({
+      where: and(eq(schema.products.id, id), eq(schema.products.establishmentId, establishmentId)),
+      columns: { id: true },
+    })
+    if (!existing) throw new NotFoundError('Produto')
+
+    const history = await this.db.query.productPriceHistory.findMany({
+      where: and(
+        eq(schema.productPriceHistory.productId, id),
+        eq(schema.productPriceHistory.establishmentId, establishmentId)
+      ),
+      orderBy: (row, { desc }) => [desc(row.createdAt)],
+      with: { user: { columns: { id: true, name: true } } },
+    })
+
+    response.json(history)
   }
 
   toggleProductActive: RouteHandler = async (request, response) => {
