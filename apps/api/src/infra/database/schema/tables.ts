@@ -10,6 +10,8 @@ export const restaurantTables = pgTable('tables', {
   number: integer('number').notNull(),
   capacity: integer('capacity').notNull(),
   status: tableStatusEnum('status').default('available').notNull(),
+  positionX: integer('position_x'),
+  positionY: integer('position_y'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })

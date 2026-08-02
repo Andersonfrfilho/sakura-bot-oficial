@@ -42,6 +42,7 @@ import { DrizzleTableRepository } from '@/modules/tables/infra/repositories/Driz
 import { DrizzleComandaRepository } from '@/modules/tables/infra/repositories/DrizzleComandaRepository'
 import { ListTablesUseCase } from '@/modules/tables/application/use-cases/ListTablesUseCase'
 import { CreateTableUseCase } from '@/modules/tables/application/use-cases/CreateTableUseCase'
+import { UpdateTablePositionUseCase } from '@/modules/tables/application/use-cases/UpdateTablePositionUseCase'
 import { UpdateTableUseCase } from '@/modules/tables/application/use-cases/UpdateTableUseCase'
 import { DeleteTableUseCase } from '@/modules/tables/application/use-cases/DeleteTableUseCase'
 import { OpenComandaUseCase } from '@/modules/tables/application/use-cases/OpenComandaUseCase'
@@ -384,6 +385,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const listTablesUseCase = new ListTablesUseCase(tableRepository)
   const createTableUseCase = new CreateTableUseCase(tableRepository)
   const updateTableUseCase = new UpdateTableUseCase(tableRepository)
+  const updateTablePositionUseCase = new UpdateTablePositionUseCase(tableRepository)
   const deleteTableUseCase = new DeleteTableUseCase(tableRepository)
   const openComandaUseCase = new OpenComandaUseCase(tableRepository, comandaRepository)
   const closeComandaUseCase = new CloseComandaUseCase(tableRepository, comandaRepository)
@@ -393,6 +395,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     listTablesUseCase,
     createTableUseCase,
     updateTableUseCase,
+    updateTablePositionUseCase,
     deleteTableUseCase,
     openComandaUseCase,
     closeComandaUseCase,

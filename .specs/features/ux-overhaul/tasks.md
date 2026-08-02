@@ -243,8 +243,36 @@ barato em seguida).
 ## Fase 3 — Mesas, comandas e salão
 > 🤖 Modelo: `sonnet` (T3.2 junção de mesas é 🧠 — validar modelagem com `opus` antes de implementar)
 
-- ⬜ **T3.1** (UX-TBL-01/02) Migration `tables.position_x/y` + mapa do salão
+- ✅ **T3.1** (UX-TBL-01/02) Migration `tables.position_x/y` + mapa do salão
   drag-and-drop com capacidade e status por cor.
+  - *Implementação:* colunas nullable `position_x`/`position_y` adicionadas
+    em `tables` (migration `0032_add_table_position.sql`, escrita manualmente
+    porque `drizzle-kit generate` ficava preso em prompt interativo por causa
+    de drift pré-existente não relacionado no schema — `table_groups` não
+    exportado do índice e renomeações de `conversation_*`; a migration escrita
+    à mão + entrada manual no `_journal.json` funciona porque o migrator de
+    boot da API só depende do SQL + journal, não do snapshot do drizzle-kit).
+    Endpoint `PATCH /tables/:id/position` (Zod valida inteiros ≥ 0) com
+    `UpdateTablePositionUseCase` e `updatePosition` no `DrizzleTableRepository`.
+    Frontend: `TableFloorMap.tsx` (componente órfão já existente, com drag via
+    Pointer Events nativo e snap de grade de 20px) foi conectado em
+    `TablesPage.tsx` através de um toggle grade/mapa; posições sem valor salvo
+    caem num layout de fallback em grade. Labels/cores de status extraídos
+    para `apps/web/src/constants/tableLabels.ts` (mesmo padrão de
+    `orderLabels.ts`). Campo `groupId` fica `null` (junção de mesas é T3.2,
+    ainda não implementado).
+  - *Verificação:* `npx tsc --noEmit` limpo nas duas apps (baseline
+    inalterado: 21 erros pré-existentes na API por causa do drift de
+    `table_groups`/`conversation_*` não relacionado a esta task, 5 no web).
+    Curl confirmou `PATCH /tables/:id/position` persistindo e rejeitando
+    valores negativos (400). No browser: login via `fetch` direto no
+    `/auth/login` + `localStorage['order-hub-auth']` (chave correta,
+    diferente de `auth-storage`); `/tables` renderizou as 10 mesas seed;
+    toggle "Visualização em grade"/"em mapa do salão" alternou corretamente
+    (`get_page_text` confirmou os mesmos dados nos dois modos); drag simulado
+    via `PointerEvent` disparou `PATCH .../position` com `200` (confirmado em
+    `read_network_requests`) e nenhum erro no console. Posições de teste
+    resetadas para `NULL` via `psql` após a verificação.
 - ⬜ **T3.2** (UX-TBL-03) Junção/separação de mesas (grupo temporário).
 - ⬜ **T3.3** (UX-TBL-04) Auditoria de mover/juntar/separar em `audit_logs`.
   🔗 T3.1, T3.2.

@@ -4,9 +4,14 @@ import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { Modal } from '@/components/ui/Modal'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
-
-type TableStatus = 'available' | 'occupied' | 'reserved'
+import { Plus, LayoutGrid, Map } from 'lucide-react'
+import { TableFloorMap } from './TableFloorMap'
+import {
+  TABLE_STATUS_LABELS,
+  TABLE_STATUS_COLORS,
+  TABLE_STATUS_CARD,
+  type TableStatus,
+} from '@/constants/tableLabels'
 
 interface Comanda {
   id: string
@@ -22,27 +27,18 @@ interface TableWithComanda {
   number: number
   capacity: number
   status: TableStatus
+  positionX: number | null
+  positionY: number | null
   createdAt: string
   comanda: Comanda | null
+  groupId: string | null
 }
 
-const STATUS_LABELS: Record<TableStatus, string> = {
-  available: 'Disponível',
-  occupied: 'Ocupada',
-  reserved: 'Reservada',
-}
+const EMPTY_SELECTION = new Set<string>()
 
-const STATUS_COLORS: Record<TableStatus, string> = {
-  available: 'bg-green-100 text-green-800 border-green-200',
-  occupied: 'bg-red-100 text-red-800 border-red-200',
-  reserved: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-}
-
-const STATUS_CARD: Record<TableStatus, string> = {
-  available: 'border-green-200 bg-green-50',
-  occupied: 'border-red-200 bg-red-50',
-  reserved: 'border-yellow-200 bg-yellow-50',
-}
+const STATUS_LABELS = TABLE_STATUS_LABELS
+const STATUS_COLORS = TABLE_STATUS_COLORS
+const STATUS_CARD = TABLE_STATUS_CARD
 
 export function TablesPage() {
   const accessToken = useAuthStore((state) => state.accessToken)
@@ -59,11 +55,23 @@ export function TablesPage() {
   const [closeStatus, setCloseStatus] = useState<'closed' | 'paid'>('paid')
   const [actionLoading, setActionLoading] = useState(false)
 
-  const { data: tables = [], isLoading } = useQuery({
+  const { data: rawTables = [], isLoading } = useQuery({
     queryKey: ['tables'],
     queryFn: () => api.get<TableWithComanda[]>('/tables', accessToken ?? undefined),
     refetchInterval: 15_000,
   })
+  // groupId ainda não é retornado pela API (junção de mesas é T3.2) — default null.
+  const tables = rawTables.map((table) => ({ ...table, groupId: table.groupId ?? null }))
+  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid')
+
+  async function handlePositionChange(tableId: string, positionX: number, positionY: number) {
+    try {
+      await api.patch(`/tables/${tableId}/position`, { positionX, positionY }, accessToken ?? undefined)
+      void queryClient.invalidateQueries({ queryKey: ['tables'] })
+    } catch {
+      // Falha silenciosa: a mesa volta para a posição anterior no próximo refetch.
+    }
+  }
 
   function openCreate() {
     setFormNumber('')
@@ -153,13 +161,31 @@ export function TablesPage() {
             {tables.length} mesa{tables.length !== 1 ? 's' : ''} · {available} livre{available !== 1 ? 's' : ''} · {occupied} ocupada{occupied !== 1 ? 's' : ''}
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors active:scale-95 self-start sm:self-auto"
-        >
-          <Plus className="h-4 w-4" />
-          Nova mesa
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex border border-gray-300 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode('grid')}
+              aria-label="Visualização em grade"
+              className={`p-2 transition-colors ${viewMode === 'grid' ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 hover:bg-gray-100'}`}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('map')}
+              aria-label="Visualização em mapa do salão"
+              className={`p-2 transition-colors border-l border-gray-300 ${viewMode === 'map' ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 hover:bg-gray-100'}`}
+            >
+              <Map className="h-4 w-4" />
+            </button>
+          </div>
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors active:scale-95"
+          >
+            <Plus className="h-4 w-4" />
+            Nova mesa
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -173,6 +199,19 @@ export function TablesPage() {
           <p className="text-lg mb-2">Nenhuma mesa cadastrada</p>
           <p className="text-sm">Clique em "+ Nova mesa" para começar</p>
         </div>
+      ) : viewMode === 'map' ? (
+        <TableFloorMap
+          tables={tables}
+          statusLabels={STATUS_LABELS}
+          statusColors={STATUS_COLORS}
+          statusCard={STATUS_CARD}
+          onSelectTable={openEdit}
+          onPositionChange={(tableId, positionX, positionY) => void handlePositionChange(tableId, positionX, positionY)}
+          selectionMode={false}
+          selectedIds={EMPTY_SELECTION}
+          onToggleSelect={() => {}}
+          onUngroup={() => {}}
+        />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {tables.map((table) => (

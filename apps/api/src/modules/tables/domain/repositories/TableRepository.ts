@@ -18,5 +18,6 @@ export interface TableRepository {
   create(input: CreateTableInput): Promise<RestaurantTable>
   update(id: string, establishmentId: string, input: UpdateTableInput): Promise<RestaurantTable>
   updateStatus(id: string, establishmentId: string, status: 'available' | 'occupied' | 'reserved'): Promise<RestaurantTable>
+  updatePosition(id: string, establishmentId: string, positionX: number, positionY: number): Promise<RestaurantTable>
   delete(id: string, establishmentId: string): Promise<void>
 }

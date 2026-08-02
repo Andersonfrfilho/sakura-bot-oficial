@@ -3,6 +3,7 @@ import type { RouteHandler } from '@/infra/http/router'
 import type { ListTablesUseCase } from '../../application/use-cases/ListTablesUseCase'
 import type { CreateTableUseCase } from '../../application/use-cases/CreateTableUseCase'
 import type { UpdateTableUseCase } from '../../application/use-cases/UpdateTableUseCase'
+import type { UpdateTablePositionUseCase } from '../../application/use-cases/UpdateTablePositionUseCase'
 import type { DeleteTableUseCase } from '../../application/use-cases/DeleteTableUseCase'
 import type { OpenComandaUseCase } from '../../application/use-cases/OpenComandaUseCase'
 import type { CloseComandaUseCase } from '../../application/use-cases/CloseComandaUseCase'
@@ -21,6 +22,11 @@ const updateTableSchema = z.object({
   capacity: z.number().int().positive().max(50).optional(),
 })
 
+const updateTablePositionSchema = z.object({
+  positionX: z.number().int().min(0),
+  positionY: z.number().int().min(0),
+})
+
 const closeComandaSchema = z.object({
   status: z.enum(['closed', 'paid']),
 })
@@ -36,6 +42,7 @@ export class TableController {
     private readonly listTablesUseCase: ListTablesUseCase,
     private readonly createTableUseCase: CreateTableUseCase,
     private readonly updateTableUseCase: UpdateTableUseCase,
+    private readonly updateTablePositionUseCase: UpdateTablePositionUseCase,
     private readonly deleteTableUseCase: DeleteTableUseCase,
     private readonly openComandaUseCase: OpenComandaUseCase,
     private readonly closeComandaUseCase: CloseComandaUseCase,
@@ -72,6 +79,19 @@ export class TableController {
       request.params['id']!,
       request.user.establishmentId,
       parsed.data
+    )
+    response.json(table)
+  }
+
+  updatePosition: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const parsed = updateTablePositionSchema.safeParse(request.body)
+    if (!parsed.success) throw new ValidationError('Dados inválidos', parsed.error.flatten().fieldErrors)
+    const table = await this.updateTablePositionUseCase.execute(
+      request.params['id']!,
+      request.user.establishmentId,
+      parsed.data.positionX,
+      parsed.data.positionY
     )
     response.json(table)
   }

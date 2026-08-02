@@ -8,6 +8,7 @@ export function registerTableRoutes(router: Router, controller: TableController)
   router.get('/tables', authenticate, authorize('orders', 'read'), controller.list)
   router.post('/tables', authenticate, authorize('orders', 'write'), controller.create)
   router.put('/tables/:id', authenticate, authorize('orders', 'write'), controller.update)
+  router.patch('/tables/:id/position', authenticate, authorize('orders', 'write'), controller.updatePosition)
   router.delete('/tables/:id', authenticate, authorize('orders', 'write'), controller.delete)
 
   // Comanda management (authenticated — waiter/admin)

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { GripVertical } from 'lucide-react'
-
-type TableStatus = 'available' | 'occupied' | 'reserved'
+import type { TableStatus } from '@/constants/tableLabels'
 
 interface Comanda {
   id: string

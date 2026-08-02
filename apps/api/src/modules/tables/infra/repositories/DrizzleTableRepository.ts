@@ -65,6 +65,15 @@ export class DrizzleTableRepository implements TableRepository {
     return table!
   }
 
+  async updatePosition(id: string, establishmentId: string, positionX: number, positionY: number): Promise<RestaurantTable> {
+    const [table] = await this.db
+      .update(schema.restaurantTables)
+      .set({ positionX, positionY, updatedAt: new Date() })
+      .where(and(eq(schema.restaurantTables.id, id), eq(schema.restaurantTables.establishmentId, establishmentId)))
+      .returning()
+    return table!
+  }
+
   async delete(id: string, establishmentId: string): Promise<void> {
     await this.db
       .delete(schema.restaurantTables)
