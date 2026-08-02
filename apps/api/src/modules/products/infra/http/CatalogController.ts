@@ -7,6 +7,7 @@ import { UnauthorizedError, ValidationError, NotFoundError, ConflictError } from
 import type { CacheProvider } from '@/shared/providers/CacheProvider'
 import type { ProductLookupProvider } from '@/shared/providers/ProductLookupProvider'
 import { PRODUCT_LOOKUP_MIN_QUERY_LENGTH } from '@/shared/constants/productLookup.constant'
+import { PRODUCT_AFFINITY_SUGGESTION_LIMIT } from '@/infra/queue/QueueNames.constant'
 import { parseMultipart } from '@/shared/utils/parseMultipart'
 import { parseProductsCsv } from '../../application/parseProductsCsv'
 
@@ -328,6 +329,38 @@ export class CatalogController {
     })
 
     response.json(history)
+  }
+
+  getProductAffinities: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const { establishmentId } = request.user
+    const id = request.params['id']!
+
+    const existing = await this.db.query.products.findFirst({
+      where: and(eq(schema.products.id, id), eq(schema.products.establishmentId, establishmentId)),
+      columns: { id: true },
+    })
+    if (!existing) throw new NotFoundError('Produto')
+
+    // Só leitura da tabela materializada. O cálculo é do job: varrer o histórico
+    // aqui colocaria uma agregação de 90 dias dentro do tempo de resposta da tela.
+    const affinities = await this.db.query.productAffinities.findMany({
+      where: and(
+        eq(schema.productAffinities.productId, id),
+        eq(schema.productAffinities.establishmentId, establishmentId)
+      ),
+      orderBy: (row, { desc }) => [desc(row.confidence), desc(row.coOccurrenceCount)],
+      limit: PRODUCT_AFFINITY_SUGGESTION_LIMIT,
+      with: {
+        suggestedProduct: {
+          columns: { id: true, name: true, price: true, active: true },
+        },
+      },
+    })
+
+    // Produto desativado depois do último cálculo continua na tabela até o próximo
+    // job; sugerir item que não está à venda é pior do que sugerir menos.
+    response.json(affinities.filter((affinity) => affinity.suggestedProduct?.active))
   }
 
   toggleProductActive: RouteHandler = async (request, response) => {

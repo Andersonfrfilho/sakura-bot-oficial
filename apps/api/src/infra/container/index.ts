@@ -142,6 +142,7 @@ import { FiscalController } from '@/modules/fiscal/infra/http/FiscalController'
 import { startFiscalWorker } from '@/modules/fiscal/application/workers/FiscalEmissionProcessor'
 import { startFinanceWorker } from '@/modules/finance/application/workers/AccountDueWorker'
 import { startIfoodWorker } from '@/modules/orders/application/workers/IfoodPollingWorker'
+import { startProductAffinityWorker } from '@/modules/products/application/workers/ProductAffinityWorker'
 import { startBullBoard } from '@/infra/queue/bullBoard'
 import type { Worker } from 'bullmq'
 
@@ -187,6 +188,7 @@ export interface AppContainer {
   fiscalWorker?: Worker | undefined
   financeWorker?: Worker | undefined
   ifoodWorker?: Worker | undefined
+  productAffinityWorker?: Worker | undefined
 }
 
 export function buildContainer(wsHub: WebSocketHub): AppContainer {
@@ -450,10 +452,19 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     startBullBoard()
   }
 
+  const productAffinityWorker = process.env.PRODUCT_AFFINITY_WORKER_ENABLED === 'true'
+    ? startProductAffinityWorker(db)
+    : undefined
+  if (productAffinityWorker) {
+    console.log('[API] Product affinity worker started')
+    startBullBoard()
+  }
+
   return {
     fiscalWorker,
     financeWorker,
     ifoodWorker,
+    productAffinityWorker,
     cache,
     menuController,
     catalogController,

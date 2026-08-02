@@ -64,10 +64,16 @@ export async function createServer() {
     if (container.fiscalWorker) await container.fiscalWorker.close()
     if (container.financeWorker) await container.financeWorker.close()
     if (container.ifoodWorker) await container.ifoodWorker.close()
+    if (container.productAffinityWorker) await container.productAffinityWorker.close()
     process.exit(0)
   }
 
-  if (container.fiscalWorker || container.financeWorker || container.ifoodWorker) {
+  if (
+    container.fiscalWorker ||
+    container.financeWorker ||
+    container.ifoodWorker ||
+    container.productAffinityWorker
+  ) {
     process.on('SIGTERM', shutdownWorkers)
     process.on('SIGINT', shutdownWorkers)
   }

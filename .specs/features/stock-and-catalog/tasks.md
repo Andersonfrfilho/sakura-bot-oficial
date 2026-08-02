@@ -332,10 +332,43 @@ promessa quebrada se for vendida como universal.
 Aqui eu discordo do caminho externo. Base externa não sabe o que **este**
 estabelecimento vende junto; o histórico de pedidos sabe, e ele já está no banco.
 
-- **T4.6** "Comprados juntos": co-ocorrência de itens em `order_items` no mesmo
+- ✅ **T4.6** "Comprados juntos": co-ocorrência de itens em `order_items` no mesmo
   pedido, calculada em job agendado (não na requisição). Alimenta sugestão de
   kit no cadastro e upsell no bot do WhatsApp — o mesmo dado serve às duas
   telas.
+
+  *Implementação:* tabela `product_affinities` (migration `0029`) com o par
+  **direcionado**: a linha (A → B) responde "quem levou A, com que frequência levou
+  B", que não é a mesma pergunta que (B → A). Guardar as duas direções também torna
+  "sugestões para o produto X" um único lookup indexado. Cálculo em
+  `ProductAffinityCalculator.ts`, consumido por `ProductAffinityWorker` na fila
+  `product-affinity` (BullMQ, cron `0 4 * * *`), ligado por
+  `PRODUCT_AFFINITY_WORKER_ENABLED` no mesmo padrão opt-in dos workers fiscal/finance/
+  iFood, com shutdown gracioso e registro no Bull Board. O recálculo é **total dentro
+  de uma transação** (`DELETE` + `INSERT ... SELECT`), não incremental: contagem
+  incremental derivaria da verdade a cada pedido cancelado ou item removido, e a janela
+  móvel exige reprocessar o passado de qualquer forma. Pedido cancelado é excluído
+  (`cancelled_at IS NULL`) e o `DISTINCT` no CTE impede que o mesmo produto em duas
+  linhas do pedido (sabores, observações) conte como co-ocorrência consigo mesmo.
+  Cortes em constante: janela 90 dias, mínimo 3 co-ocorrências, confiança mínima 15%,
+  5 sugestões por produto. Leitura por `GET /catalog/products/:id/affinities`, que só
+  lê a tabela materializada — a agregação de 90 dias não pode cair no tempo de resposta
+  da tela.
+
+  *Verificação:* migration aplicada e conferida com `\d product_affinities` (unique do
+  par, índice de lookup e três FKs em cascade). Worker exercitado de verdade dentro do
+  container (fila → worker → cálculo), não só a função: `6 par(es) calculado(s)`. Os
+  dados do seed confirmaram a assimetria que motivou o par direcionado — Refrigerante
+  Lata → Prato Feito Carne dá confiança **0,75**, enquanto Prato Feito Carne →
+  Refrigerante Lata dá **0,30**. Endpoint retorna 3 sugestões ordenadas por confiança
+  decrescente com o produto sugerido embutido; 404 em produto inexistente e 401 sem
+  token. Filtro de inativo testado desativando o Refrigerante: a lista caiu para 2 itens
+  e voltou a 3 ao reativar. Estado de teste removido ao final (tabela, chaves
+  `bull:product-affinity` e produto reativado).
+
+  *Não verificado:* o isolamento por estabelecimento está no `WHERE` das duas consultas,
+  mas o seed tem um único estabelecimento — não houve como provar ao vivo que produto de
+  outro tenant devolve 404.
 - **T4.7** Kit/combo como produto composto: um produto que agrega outros com
   preço próprio, que ao ser vendido baixa a receita de cada componente
   (reaproveita T1.2 direto).

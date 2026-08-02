@@ -8,6 +8,7 @@ import { addresses } from './addresses'
 import { catalogs } from './catalogs'
 import { products } from './products'
 import { productPriceHistory } from './product-price-history'
+import { productAffinities } from './product-affinities'
 import { restaurantTables } from './tables'
 import { comandas } from './comandas'
 import { orders } from './orders'
@@ -122,6 +123,21 @@ export const productPriceHistoryRelations = relations(productPriceHistory, ({ on
   user: one(users, {
     fields: [productPriceHistory.userId],
     references: [users.id],
+  }),
+}))
+
+export const productAffinitiesRelations = relations(productAffinities, ({ one }) => ({
+  establishment: one(establishments, {
+    fields: [productAffinities.establishmentId],
+    references: [establishments.id],
+  }),
+  product: one(products, {
+    fields: [productAffinities.productId],
+    references: [products.id],
+  }),
+  suggestedProduct: one(products, {
+    fields: [productAffinities.suggestedProductId],
+    references: [products.id],
   }),
 }))
 

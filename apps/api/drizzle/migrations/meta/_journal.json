@@ -197,6 +197,13 @@
       "when": 1783817784685,
       "tag": "0028_add_product_price_history",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1785000000000,
+      "tag": "0029_add_product_affinities",
+      "breakpoints": true
     }
   ]
 }

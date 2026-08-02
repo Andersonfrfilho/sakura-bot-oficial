@@ -29,6 +29,29 @@ export const STOCK_EXPIRY_JOB = {
 
 export type StockExpiryJobName = (typeof STOCK_EXPIRY_JOB)[keyof typeof STOCK_EXPIRY_JOB]
 
+export const PRODUCT_AFFINITY_QUEUE = 'product-affinity' as const
+
+export const PRODUCT_AFFINITY_JOB = {
+  CALCULATE: 'calculate',
+} as const
+
+export type ProductAffinityJobName = (typeof PRODUCT_AFFINITY_JOB)[keyof typeof PRODUCT_AFFINITY_JOB]
+
+/** De madrugada: a varredura é do histórico inteiro e não disputa com o horário de pico. */
+export const PRODUCT_AFFINITY_SCAN_CRON = '0 4 * * *'
+
+/** Cardápio muda; hábito de compra de um ano atrás não descreve o que se vende hoje. */
+export const PRODUCT_AFFINITY_WINDOW_DAYS = 90
+
+/** Abaixo disso é coincidência, não padrão — sugerir viraria ruído no cadastro. */
+export const PRODUCT_AFFINITY_MIN_CO_OCCURRENCE = 3
+
+/** 15% dos pedidos do item; menos que isso não sustenta uma sugestão na tela. */
+export const PRODUCT_AFFINITY_MIN_CONFIDENCE = 0.15
+
+/** Mais que isso vira lista, não sugestão — ninguém escolhe entre dez upsells. */
+export const PRODUCT_AFFINITY_SUGGESTION_LIMIT = 5
+
 export const MEDIA_PROCESSING_QUEUE = 'media-processing' as const
 
 export const MEDIA_PROCESSING_JOB = {

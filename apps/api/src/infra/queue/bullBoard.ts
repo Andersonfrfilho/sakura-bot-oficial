@@ -7,6 +7,7 @@ import { fiscalQueue } from './fiscalQueue'
 import { stockExpiryQueue } from './stockQueue'
 import { financeDueQueue } from './financeQueue'
 import { ifoodPollingQueue } from './ifoodQueue'
+import { productAffinityQueue } from './productAffinityQueue'
 
 const BULLBOARD_PORT = Number(process.env.BULLBOARD_PORT ?? 4200)
 const BULLBOARD_USER = process.env.BULLBOARD_USER ?? 'admin'
@@ -44,6 +45,7 @@ export function startBullBoard(): void {
       new BullMQAdapter(stockExpiryQueue as unknown as Queue),
       new BullMQAdapter(financeDueQueue as unknown as Queue),
       new BullMQAdapter(ifoodPollingQueue as unknown as Queue),
+      new BullMQAdapter(productAffinityQueue as unknown as Queue),
     ],
     serverAdapter,
   })
