@@ -1,10 +1,9 @@
-export interface ProductSuggestion {
-  name: string
-  brand?: string
-  barcode?: string
-  imageUrl?: string
-  category?: string
-}
+import type { ProductLookupProvider, ProductSuggestion } from './ProductLookupProvider'
+import { productSuggestionSchema } from './ProductLookupProvider'
+import { PRODUCT_LOOKUP_TIMEOUT_MS } from '@/shared/constants/productLookup.constant'
+
+const SOURCE_NAME = 'openfoodfacts'
+const SEARCH_PAGE_SIZE = 10
 
 type OpenFoodFactsSearchProduct = {
   product_name?: string
@@ -23,50 +22,54 @@ type OpenFoodFactsLookupResponse = {
   product?: OpenFoodFactsSearchProduct
 }
 
-export class OpenFoodFactsProvider {
-  private toSuggestion(product: OpenFoodFactsSearchProduct): ProductSuggestion {
-    const suggestion: ProductSuggestion = {
-      name: product.product_name ?? '',
-    }
-    if (product.brands) suggestion.brand = product.brands
-    if (product.code) suggestion.barcode = product.code
-    if (product.image_url) suggestion.imageUrl = product.image_url
-    if (product.categories) suggestion.category = product.categories
-    return suggestion
+export class OpenFoodFactsProvider implements ProductLookupProvider {
+  readonly name = SOURCE_NAME
+
+  // Devolve `null` quando o payload externo não passa no schema, em vez de propagar
+  // um objeto meio válido para dentro do formulário.
+  private toSuggestion(product: OpenFoodFactsSearchProduct): ProductSuggestion | null {
+    const parsed = productSuggestionSchema.safeParse({
+      name: product.product_name,
+      source: SOURCE_NAME,
+      ...(product.brands && { brand: product.brands }),
+      ...(product.code && { barcode: product.code }),
+      ...(product.image_url && { imageUrl: product.image_url }),
+      ...(product.categories && { category: product.categories }),
+    })
+    return parsed.success ? parsed.data : null
   }
 
-  async search(query: string): Promise<ProductSuggestion[]> {
-    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&json=1&page_size=10&search_simple=1`
-
+  private async fetchJson<TResponse>(url: string): Promise<TResponse | null> {
     try {
-      const response = await fetch(url)
-      if (!response.ok) return []
-
-      const data = (await response.json()) as OpenFoodFactsSearchResponse
-      const products = data.products ?? []
-
-      return products
-        .filter((p) => p.product_name)
-        .slice(0, 10)
-        .map((p) => this.toSuggestion(p))
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(PRODUCT_LOOKUP_TIMEOUT_MS),
+      })
+      if (!response.ok) return null
+      return (await response.json()) as TResponse
     } catch {
-      return []
+      // Degradação silenciosa: indisponibilidade de base externa não é erro do usuário.
+      return null
     }
+  }
+
+  async search(query: string): Promise<readonly ProductSuggestion[]> {
+    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&json=1&page_size=${SEARCH_PAGE_SIZE}&search_simple=1`
+
+    const data = await this.fetchJson<OpenFoodFactsSearchResponse>(url)
+    if (!data) return []
+
+    return (data.products ?? [])
+      .slice(0, SEARCH_PAGE_SIZE)
+      .map((product) => this.toSuggestion(product))
+      .filter((suggestion): suggestion is ProductSuggestion => suggestion !== null)
   }
 
   async getByBarcode(barcode: string): Promise<ProductSuggestion | null> {
     const url = `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json`
 
-    try {
-      const response = await fetch(url)
-      if (!response.ok) return null
+    const data = await this.fetchJson<OpenFoodFactsLookupResponse>(url)
+    if (!data || data.status !== 1 || !data.product) return null
 
-      const data = (await response.json()) as OpenFoodFactsLookupResponse
-      if (data.status !== 1 || !data.product?.product_name) return null
-
-      return this.toSuggestion(data.product)
-    } catch {
-      return null
-    }
+    return this.toSuggestion(data.product)
   }
 }

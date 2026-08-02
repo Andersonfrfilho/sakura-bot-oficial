@@ -252,17 +252,60 @@ Limites reais dessa base, que precisam estar claros antes de prometer:
 cobre **alimento embalado com GTIN** — hortifrúti, prato pronto e serviço não
 existem lá; descrição é fraca ou ausente; e **não tem preço**.
 
-- **T4.1** Cache dos resultados externos (Redis, TTL longo) por código de barras
+- ✅ **T4.1** Cache dos resultados externos (Redis, TTL longo) por código de barras
   e por termo. Chamada externa em digitação é lenta e instável, e o mesmo item
   é consultado por todo estabelecimento da base.
+
+  *Implementação:* `apps/api/src/shared/providers/CachedProductLookup.ts` — composite
+  que implementa a própria `ProductLookupProvider`, então o controller não sabe se a
+  resposta veio de cache ou de rede. Constantes em
+  `apps/api/src/shared/constants/productLookup.constant.ts`: TTL de acerto 7 dias
+  (nome/marca/imagem de item embalado não mudam) e TTL de miss 6 horas (item ausente
+  hoje pode entrar na base amanhã; 7 dias congelaria a correção). **Miss também é
+  cacheado**, com marcador `__none__` — string vazia seria indistinguível de chave
+  ausente. Sem isso, hortifrúti, prato pronto e serviço, que são a maioria neste
+  domínio e não existem na OpenFoodFacts, pagariam rede a cada digitação. Termo é
+  normalizado (`trim` + minúscula + colapso de espaço) antes de virar chave. O que sai
+  do cache é revalidado pelo mesmo schema Zod: entrada gravada antes de uma mudança de
+  formato não pode vazar para o formulário como se fosse válida.
+
+  *Verificação:* API reiniciada, testes ao vivo via `rtk proxy curl`. Barcode
+  `3017620422003` (Nutella): 1ª chamada 967 ms (rede), 2ª 30 ms (cache), payload
+  idêntico. Barcode inexistente `7622210951953`: 1002 ms → 31 ms, ou seja, o miss
+  negativo funciona. Busca `?q=nutella`: 1927 ms → 33 ms. Normalização confirmada —
+  `?q=NUTELLA%20%20` respondeu em 27 ms servido da chave `product-lookup:search:nutella`,
+  sem criar chave nova. TTLs conferidos no Redis: `604799` (7 d) nos acertos e `21600`
+  (6 h) nos misses. Chaves de teste removidas ao final.
 - **T4.2** Segundo provider de GTIN atrás da mesma interface `ProductLookup`,
   para trazer **NCM** e descrição fiscal (Cosmos/Bluesoft, GS1). É serviço pago
   e por chave — a interface fica pronta, a contratação é decisão comercial.
   Traz o NCM que hoje é digitado à mão no catálogo e alimenta direto a NFC-e.
-- **T4.3** Fallback ordenado e explícito: cache → OpenFoodFacts → provider
+- ✅ **T4.3** Fallback ordenado e explícito: cache → OpenFoodFacts → provider
   fiscal → nada. Nunca gravar sozinho: sugestão **preenche o formulário**, o
   usuário confirma. Dado externo é entrada não confiável e passa por Zod, na
   mesma régua de qualquer outra fronteira.
+
+  *Implementação:* interface `ProductLookupProvider` em
+  `apps/api/src/shared/providers/ProductLookupProvider.ts` (sem prefixo `I`, seguindo
+  `GeocodingProvider`), com `productSuggestionSchema` como fonte da verdade — o tipo
+  `ProductSuggestion` é derivado dele por `z.infer`, porque com
+  `exactOptionalPropertyTypes` um tipo declarado à parte diverge do schema no
+  `| undefined` dos opcionais. Campos opcionais que não passam são cortados em vez de
+  reprovarem a sugestão inteira: item sem imagem ainda serve para preencher o nome.
+  `OpenFoodFactsProvider` reescrito para implementar a interface, com timeout de 4 s
+  (`AbortSignal.timeout`) e degradação silenciosa — base externa lenta não pode
+  impedir o catálogo de abrir. A ordem do fallback é a ordem do array injetado no
+  container: `new CachedProductLookup(cache, [new OpenFoodFactsProvider()])`, e o
+  provider fiscal da T4.2 entra como segundo item sem tocar no controller. Corrigida
+  de passagem uma violação de DI que já existia: o `CatalogController` instanciava
+  `new OpenFoodFactsProvider()` no próprio corpo; agora recebe a interface pelo
+  construtor.
+
+  *Verificação:* mesma bateria da T4.1. Cadeia esgotada devolve `[]` na busca e 404 no
+  lookup por código, nunca erro 500 — confirmado com o termo `zzqqxx` e com o barcode
+  `7622210951953`. Nenhum caminho grava produto: os dois endpoints são `GET` e apenas
+  devolvem sugestão. `npx tsc --noEmit` sem erros nos arquivos da fase (os 21 restantes
+  são pré-existentes em `modules/tables` e `modules/orders`, não tocados aqui).
 
 ### 4B — Preço sugerido por região (parcialmente viável, com ressalva)
 

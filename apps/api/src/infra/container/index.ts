@@ -147,6 +147,8 @@ import type { Worker } from 'bullmq'
 
 // Uploads
 import { LocalStorageProvider } from '@/shared/providers/LocalStorageProvider'
+import { CachedProductLookup } from '@/shared/providers/CachedProductLookup'
+import { OpenFoodFactsProvider } from '@/shared/providers/OpenFoodFactsProvider'
 import { UploadFileUseCase } from '@/modules/uploads/application/UploadFileUseCase'
 import { UploadController } from '@/modules/uploads/infra/http/UploadController'
 
@@ -208,8 +210,12 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const createAuditLogUseCase = new CreateAuditLogUseCase(db)
 
   // Products / Catalog
+  // A ordem do array é a ordem de tentativa do fallback. Provider fiscal (T4.2) entra
+  // depois da OpenFoodFacts quando houver contrato — sem mudar nada no controller.
+  const productLookup = new CachedProductLookup(cache, [new OpenFoodFactsProvider()])
+
   const menuController = new MenuController(db, cache)
-  const catalogController = new CatalogController(db, cache)
+  const catalogController = new CatalogController(db, cache, productLookup)
   const sectionController = new SectionController(db)
   const ingredientController = new IngredientController(db)
   const createStockBatchUseCase = new CreateStockBatchUseCase(db, createAuditLogUseCase)

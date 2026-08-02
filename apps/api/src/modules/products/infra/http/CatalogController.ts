@@ -5,7 +5,8 @@ import type { RouteHandler } from '@/infra/http/router'
 import * as schema from '@/infra/database/schema'
 import { UnauthorizedError, ValidationError, NotFoundError, ConflictError } from '@/shared/errors/AppError'
 import type { CacheProvider } from '@/shared/providers/CacheProvider'
-import { OpenFoodFactsProvider } from '@/shared/providers/OpenFoodFactsProvider'
+import type { ProductLookupProvider } from '@/shared/providers/ProductLookupProvider'
+import { PRODUCT_LOOKUP_MIN_QUERY_LENGTH } from '@/shared/constants/productLookup.constant'
 import { parseMultipart } from '@/shared/utils/parseMultipart'
 import { parseProductsCsv } from '../../application/parseProductsCsv'
 
@@ -46,11 +47,10 @@ function toSlug(name: string): string {
 }
 
 export class CatalogController {
-  private readonly openFoodFacts = new OpenFoodFactsProvider()
-
   constructor(
     private readonly db: Database,
-    private readonly cache: CacheProvider
+    private readonly cache: CacheProvider,
+    private readonly productLookupProvider: ProductLookupProvider
   ) {}
 
   private async invalidateCache(establishmentId: string): Promise<void> {
@@ -435,18 +435,18 @@ export class CatalogController {
   productSearch: RouteHandler = async (request, response) => {
     if (!request.user) throw new UnauthorizedError()
     const query = request.query['q'] ?? ''
-    if (query.length < 2) {
+    if (query.length < PRODUCT_LOOKUP_MIN_QUERY_LENGTH) {
       response.json([])
       return
     }
-    const suggestions = await this.openFoodFacts.search(query)
+    const suggestions = await this.productLookupProvider.search(query)
     response.json(suggestions)
   }
 
   productLookup: RouteHandler = async (request, response) => {
     if (!request.user) throw new UnauthorizedError()
     const barcode = request.params['barcode']!
-    const suggestion = await this.openFoodFacts.getByBarcode(barcode)
+    const suggestion = await this.productLookupProvider.getByBarcode(barcode)
     if (!suggestion) throw new NotFoundError('Produto')
     response.json(suggestion)
   }
