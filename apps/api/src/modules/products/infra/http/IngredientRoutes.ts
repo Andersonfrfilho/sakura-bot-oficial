@@ -9,6 +9,8 @@ export function registerIngredientRoutes(router: Router, controller: IngredientC
   const del = [authenticate, authorize('products', 'delete')]
 
   router.get('/ingredients', ...read, controller.list)
+  router.get('/ingredients/low-stock', ...read, controller.listLowStock)
+  router.get('/ingredients/low-stock/count', ...read, controller.countLowStock)
   router.post('/ingredients', ...write, controller.create)
   router.put('/ingredients/:id', ...write, controller.update)
   router.delete('/ingredients/:id', ...del, controller.delete)

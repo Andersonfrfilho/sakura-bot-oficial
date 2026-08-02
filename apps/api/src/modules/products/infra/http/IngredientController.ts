@@ -1,4 +1,4 @@
-import { eq, and, asc } from 'drizzle-orm'
+import { eq, and, asc, lte, isNotNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import type { RouteHandler } from '@/infra/http/router'
@@ -29,6 +29,43 @@ export class IngredientController {
       .orderBy(asc(schema.ingredients.name))
 
     response.json(rows)
+  }
+
+  listLowStock: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const { establishmentId } = request.user
+
+    const rows = await this.db
+      .select()
+      .from(schema.ingredients)
+      .where(
+        and(
+          eq(schema.ingredients.establishmentId, establishmentId),
+          isNotNull(schema.ingredients.minimumStock),
+          lte(schema.ingredients.stockQuantity, sql`${schema.ingredients.minimumStock}`)
+        )
+      )
+      .orderBy(asc(schema.ingredients.name))
+
+    response.json(rows)
+  }
+
+  countLowStock: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const { establishmentId } = request.user
+
+    const rows = await this.db
+      .select({ id: schema.ingredients.id })
+      .from(schema.ingredients)
+      .where(
+        and(
+          eq(schema.ingredients.establishmentId, establishmentId),
+          isNotNull(schema.ingredients.minimumStock),
+          lte(schema.ingredients.stockQuantity, sql`${schema.ingredients.minimumStock}`)
+        )
+      )
+
+    response.json({ count: rows.length })
   }
 
   create: RouteHandler = async (request, response) => {

@@ -73,9 +73,14 @@ R$ 0,00 e a "receita" do produto é decorativa.
   decrescer) → saldo cai para 15, `quantity` gravada como `-5.0000`; `reason`
   vazio → 400; ingrediente de outro estabelecimento/inexistente → 404.
 
-- **T1.4** Alerta de estoque mínimo: `GET /ingredients/low-stock` comparando
-  `stockQuantity <= minimumStock`, mais o contador no mesmo lugar onde já vive
-  o de lotes vencendo. O campo já é preenchido pelo CRUD e nunca lido.
+- **T1.4** ✅ Alerta de estoque mínimo: `GET /ingredients/low-stock` compara
+  `stockQuantity <= minimumStock` (ignora ingrediente sem `minimumStock`
+  definido — sem limite não há como estar "abaixo dele"), mais
+  `GET /ingredients/low-stock/count`, no mesmo padrão do par
+  `expiring`/`expiring/count` de `StockBatchController`.
+  *Verificação (feita ao vivo):* ingrediente com `minimumStock=10` e
+  `stockQuantity=0` aparece na lista e no contador; após ajuste de estoque
+  para 50 (acima do mínimo), some de ambos.
 
 - **T1.5** Seed de catálogo e estoque. Hoje nenhum seed popula produtos ou
   ingredientes — a tela do gerente abre vazia, e todo teste manual começa por
