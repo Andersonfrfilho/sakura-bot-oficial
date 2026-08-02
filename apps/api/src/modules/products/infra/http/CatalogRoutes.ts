@@ -26,4 +26,5 @@ export function registerCatalogRoutes(router: Router, controller: CatalogControl
 
   router.get('/catalog/product-search', ...read, controller.productSearch)
   router.get('/catalog/product-lookup/:barcode', ...read, controller.productLookup)
+  router.get('/catalog/regional-price/:barcode', ...read, controller.regionalPrice)
 }

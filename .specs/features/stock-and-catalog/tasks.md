@@ -319,9 +319,32 @@ estado, e disponibilidade que não dá para garantir. É uma feature honesta se 
 apresentada como *"preço praticado na sua região, quando disponível"*, e uma
 promessa quebrada se for vendida como universal.
 
-- **T4.4** Interface `RegionalPriceProvider` + implementação para **uma** UF
+- ✅ **T4.4** Interface `RegionalPriceProvider` + implementação para **uma** UF
   primeiro (a do estabelecimento piloto). Entrada: GTIN + CEP/raio. Saída:
   mínimo, médio, máximo e data da coleta — sem data o número engana.
+
+  *Implementação:* `RegionalPriceProvider` (interface + schemas Zod como fonte da
+  verdade, tipos por `z.infer`), `PrecoDaHoraBahiaProvider` (piloto BA) e
+  `CachedRegionalPrice` (cache + roteamento por UF, implementa a própria interface
+  mais `RegionalPriceResolver`). Endpoint `GET /catalog/regional-price/:barcode`
+  com `?cep=&uf=&raio=`; sem parâmetro, UF e CEP saem de `establishments.settings`
+  — a tabela não tem colunas de endereço. O envelope carrega `available` + `reason`
+  (`uf_nao_configurada` / `sem_cobertura`) em vez de erro: ausência de cobertura é
+  resposta normal, não falha. A quota traz `sampleCount` além de mín/méd/máx —
+  sem isso, mínimo e máximo podem ser a mesma venda. Amostra abaixo de
+  `REGIONAL_PRICE_MIN_SAMPLE` (3) é descartada. O portal da BA exige três passos
+  (sessão com CSRF de input escondido → geocodificação do CEP via Nominatim →
+  POST com `gtin` + lat/lng + raio) e limita requisições por IP, então cache com
+  TTL de 12h para acerto e 2h para vazio é parte do contrato, não otimização.
+
+  *Verificação:* consulta real ao portal com o GTIN `7891000100103` (Leite Moça)
+  no CEP `41750000`/raio 5km devolveu `min 6.98 · méd 10.88 · máx 13.99` sobre
+  17 notas, coleta de `2026-08-02T12:46:52Z`. Segunda chamada idêntica: 1,086s →
+  0,010s pelo cache. UF sem provider (SP) e estabelecimento sem UF nas settings
+  devolvem `available:false` com o motivo correspondente, 200 e não 500. Barcode
+  inválido → 400; sem token → 401. Nenhum caminho grava preço: o endpoint é `GET`
+  e só devolve referência. `tsc --noEmit` sem erros novos (os 21 restantes são
+  pré-existentes em `tables`/`orders`/`router`/`server`/`cashier`/`delivery`).
 - **T4.5** Na tela, sugestão de preço aparece como **referência ao lado do
   campo**, nunca preenchendo sozinha, e sempre acompanhada da margem que aquele
   preço daria sobre o custo do último lote (Fase 1). É aqui que o estoque paga a

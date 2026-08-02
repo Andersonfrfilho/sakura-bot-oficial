@@ -6,7 +6,13 @@ import * as schema from '@/infra/database/schema'
 import { UnauthorizedError, ValidationError, NotFoundError, ConflictError } from '@/shared/errors/AppError'
 import type { CacheProvider } from '@/shared/providers/CacheProvider'
 import type { ProductLookupProvider } from '@/shared/providers/ProductLookupProvider'
+import type { RegionalPriceResolver } from '@/shared/providers/RegionalPriceProvider'
+import { regionalPriceQuerySchema } from '@/shared/providers/RegionalPriceProvider'
 import { PRODUCT_LOOKUP_MIN_QUERY_LENGTH } from '@/shared/constants/productLookup.constant'
+import {
+  REGIONAL_PRICE_DEFAULT_RADIUS_KM,
+  REGIONAL_PRICE_MAX_RADIUS_KM,
+} from '@/shared/constants/regionalPrice.constant'
 import { PRODUCT_AFFINITY_SUGGESTION_LIMIT } from '@/infra/queue/QueueNames.constant'
 import { parseMultipart } from '@/shared/utils/parseMultipart'
 import { parseProductsCsv } from '../../application/parseProductsCsv'
@@ -59,11 +65,18 @@ function toSlug(name: string): string {
     .replace(/^-|-$/g, '')
 }
 
+/** Endereço do estabelecimento mora em `settings`; a tabela não tem colunas de local. */
+const establishmentLocationSchema = z.object({
+  state: z.string().length(2).optional(),
+  postalCode: z.string().optional(),
+})
+
 export class CatalogController {
   constructor(
     private readonly db: Database,
     private readonly cache: CacheProvider,
-    private readonly productLookupProvider: ProductLookupProvider
+    private readonly productLookupProvider: ProductLookupProvider,
+    private readonly regionalPriceResolver: RegionalPriceResolver
   ) {}
 
   private async invalidateCache(establishmentId: string): Promise<void> {
@@ -594,5 +607,59 @@ export class CatalogController {
     const suggestion = await this.productLookupProvider.getByBarcode(barcode)
     if (!suggestion) throw new NotFoundError('Produto')
     response.json(suggestion)
+  }
+
+  /**
+   * Preço praticado na região, quando disponível.
+   *
+   * A cobertura é por UF e vem de NFC-e estadual, então indisponível é resposta
+   * normal — o envelope carrega `available` e um motivo em vez de erro, para a tela
+   * poder dizer "sem cobertura na sua região" sem parecer falha do sistema.
+   */
+  regionalPrice: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const { establishmentId } = request.user
+
+    const establishment = await this.db.query.establishments.findFirst({
+      where: eq(schema.establishments.id, establishmentId),
+      columns: { settings: true },
+    })
+    if (!establishment) throw new NotFoundError('Estabelecimento')
+
+    const settings = establishmentLocationSchema.safeParse(establishment.settings ?? {})
+    const state = request.query['uf'] ?? (settings.success ? settings.data.state : undefined)
+    const postalCode = (
+      request.query['cep'] ??
+      (settings.success ? settings.data.postalCode : undefined) ??
+      ''
+    ).replace(/\D/g, '')
+
+    if (!state) {
+      response.json({ available: false, reason: 'uf_nao_configurada', quote: null })
+      return
+    }
+
+    const requestedRadius = Number(request.query['raio'] ?? REGIONAL_PRICE_DEFAULT_RADIUS_KM)
+    const radiusKm = Math.min(
+      Number.isFinite(requestedRadius) && requestedRadius > 0
+        ? Math.trunc(requestedRadius)
+        : REGIONAL_PRICE_DEFAULT_RADIUS_KM,
+      REGIONAL_PRICE_MAX_RADIUS_KM
+    )
+
+    const query = regionalPriceQuerySchema.safeParse({
+      barcode: request.params['barcode'],
+      postalCode,
+      radiusKm,
+    })
+    if (!query.success) throw new ValidationError('Código de barras ou CEP inválido')
+
+    const quote = await this.regionalPriceResolver.getQuoteForState(state, query.data)
+    if (!quote) {
+      response.json({ available: false, reason: 'sem_cobertura', quote: null })
+      return
+    }
+
+    response.json({ available: true, quote })
   }
 }

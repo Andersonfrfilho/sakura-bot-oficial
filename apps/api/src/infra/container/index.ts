@@ -150,6 +150,9 @@ import type { Worker } from 'bullmq'
 import { LocalStorageProvider } from '@/shared/providers/LocalStorageProvider'
 import { CachedProductLookup } from '@/shared/providers/CachedProductLookup'
 import { OpenFoodFactsProvider } from '@/shared/providers/OpenFoodFactsProvider'
+import { CachedRegionalPrice } from '@/shared/providers/CachedRegionalPrice'
+import { PrecoDaHoraBahiaProvider } from '@/shared/providers/PrecoDaHoraBahiaProvider'
+import { NominatimProvider } from '@/shared/providers/NominatimProvider'
 import { UploadFileUseCase } from '@/modules/uploads/application/UploadFileUseCase'
 import { UploadController } from '@/modules/uploads/infra/http/UploadController'
 
@@ -216,8 +219,14 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   // depois da OpenFoodFacts quando houver contrato — sem mudar nada no controller.
   const productLookup = new CachedProductLookup(cache, [new OpenFoodFactsProvider()])
 
+  // Preço regional tem cobertura por UF, não nacional: cada provider cobre um estado
+  // e o resolver escolhe pelo estado do estabelecimento. UF sem provider → sem sugestão.
+  const regionalPrice = new CachedRegionalPrice(cache, [
+    new PrecoDaHoraBahiaProvider(new NominatimProvider()),
+  ])
+
   const menuController = new MenuController(db, cache)
-  const catalogController = new CatalogController(db, cache, productLookup)
+  const catalogController = new CatalogController(db, cache, productLookup, regionalPrice)
   const sectionController = new SectionController(db)
   const ingredientController = new IngredientController(db)
   const createStockBatchUseCase = new CreateStockBatchUseCase(db, createAuditLogUseCase)
