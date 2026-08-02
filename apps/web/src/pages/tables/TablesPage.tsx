@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { Modal } from '@/components/ui/Modal'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { Plus, LayoutGrid, Map } from 'lucide-react'
+import { Plus, LayoutGrid, Map, Link2 } from 'lucide-react'
 import { TableFloorMap } from './TableFloorMap'
 import {
   TABLE_STATUS_LABELS,
@@ -60,9 +60,11 @@ export function TablesPage() {
     queryFn: () => api.get<TableWithComanda[]>('/tables', accessToken ?? undefined),
     refetchInterval: 15_000,
   })
-  // groupId ainda não é retornado pela API (junção de mesas é T3.2) — default null.
   const tables = rawTables.map((table) => ({ ...table, groupId: table.groupId ?? null }))
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid')
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(EMPTY_SELECTION)
+  const [groupError, setGroupError] = useState<string | null>(null)
 
   async function handlePositionChange(tableId: string, positionX: number, positionY: number) {
     try {
@@ -70,6 +72,45 @@ export function TablesPage() {
       void queryClient.invalidateQueries({ queryKey: ['tables'] })
     } catch {
       // Falha silenciosa: a mesa volta para a posição anterior no próximo refetch.
+    }
+  }
+
+  function handleToggleSelect(tableId: string) {
+    setSelectedIds((previous) => {
+      const next = new Set(previous)
+      if (next.has(tableId)) next.delete(tableId)
+      else next.add(tableId)
+      return next
+    })
+  }
+
+  function exitSelectionMode() {
+    setSelectionMode(false)
+    setSelectedIds(EMPTY_SELECTION)
+    setGroupError(null)
+  }
+
+  async function handleGroup() {
+    setGroupError(null)
+    setActionLoading(true)
+    try {
+      await api.post('/tables/group', { tableIds: [...selectedIds] }, accessToken ?? undefined)
+      void queryClient.invalidateQueries({ queryKey: ['tables'] })
+      exitSelectionMode()
+    } catch (error) {
+      setGroupError(error instanceof Error ? error.message : 'Não foi possível juntar as mesas')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function handleUngroup(groupId: string) {
+    setGroupError(null)
+    try {
+      await api.delete(`/tables/group/${groupId}`, accessToken ?? undefined)
+      void queryClient.invalidateQueries({ queryKey: ['tables'] })
+    } catch (error) {
+      setGroupError(error instanceof Error ? error.message : 'Não foi possível desagrupar as mesas')
     }
   }
 
@@ -178,6 +219,19 @@ export function TablesPage() {
               <Map className="h-4 w-4" />
             </button>
           </div>
+          {viewMode === 'map' && (
+            <button
+              onClick={() => (selectionMode ? exitSelectionMode() : setSelectionMode(true))}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors active:scale-95 ${
+                selectionMode
+                  ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <Link2 className="h-4 w-4" />
+              {selectionMode ? 'Cancelar' : 'Juntar mesas'}
+            </button>
+          )}
           <button
             onClick={openCreate}
             className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors active:scale-95"
@@ -187,6 +241,30 @@ export function TablesPage() {
           </button>
         </div>
       </div>
+
+      {selectionMode && viewMode === 'map' && (
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <p className="text-sm text-indigo-900">
+            {selectedIds.size === 0
+              ? 'Selecione ao menos 2 mesas para juntar.'
+              : `${selectedIds.size} mesa${selectedIds.size !== 1 ? 's' : ''} selecionada${selectedIds.size !== 1 ? 's' : ''}.`}
+          </p>
+          <button
+            onClick={() => void handleGroup()}
+            disabled={selectedIds.size < 2 || actionLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Link2 className="h-4 w-4" />
+            {actionLoading ? 'Juntando...' : 'Juntar selecionadas'}
+          </button>
+        </div>
+      )}
+
+      {groupError && (
+        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          {groupError}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -207,10 +285,10 @@ export function TablesPage() {
           statusCard={STATUS_CARD}
           onSelectTable={openEdit}
           onPositionChange={(tableId, positionX, positionY) => void handlePositionChange(tableId, positionX, positionY)}
-          selectionMode={false}
-          selectedIds={EMPTY_SELECTION}
-          onToggleSelect={() => {}}
-          onUngroup={() => {}}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
+          onToggleSelect={handleToggleSelect}
+          onUngroup={(groupId) => void handleUngroup(groupId)}
         />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">

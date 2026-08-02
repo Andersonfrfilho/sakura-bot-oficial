@@ -273,7 +273,48 @@ barato em seguida).
     via `PointerEvent` disparou `PATCH .../position` com `200` (confirmado em
     `read_network_requests`) e nenhum erro no console. Posições de teste
     resetadas para `NULL` via `psql` após a verificação.
-- ⬜ **T3.2** (UX-TBL-03) Junção/separação de mesas (grupo temporário).
+- ✅ **T3.2** (UX-TBL-03) Junção/separação de mesas (grupo temporário).
+  - *Modelagem (validada com `opus`):* o modelo já existia parcialmente no repo
+    (`table_groups` + `tables.group_id`, criados pela migration `0012`, com
+    `GroupTablesUseCase`/`UngroupTablesUseCase` escritos mas nunca ligados). A
+    modelagem foi revisada e aprovada: `table_groups(id, establishment_id,
+    opened_at, closed_at)` com `tables.group_id` nullable e FK
+    `ON DELETE SET NULL`; desagrupar preenche `closed_at` **e** zera
+    `group_id`, então o histórico fica preservado para auditoria sem deixar
+    ponteiro pendurado para grupo fechado. Uma mesa pertence a no máximo um
+    grupo aberto por construção.
+  - *Implementação:* o drift era só de TypeScript — `table-groups.ts` não era
+    exportado do `schema/index.ts` e `tables.ts` não declarava `groupId`.
+    Ambos corrigidos, mais `tableGroupsRelations` e a relação `group` em
+    `restaurantTablesRelations`. Nenhuma migration nova foi necessária (banco
+    já estava correto). `GroupTablesUseCase` endurecido contra corrida: a
+    checagem de `groupId` nulo passou para dentro da transação, no próprio
+    `WHERE` do UPDATE, e o use case aborta se o número de linhas afetadas for
+    menor que o de mesas pedidas — duas junções simultâneas com mesas em comum
+    não conseguem mais criar grupos sobrepostos. Rotas
+    `POST /tables/group` e `DELETE /tables/group/:groupId`
+    (`authorize('orders','write')`), handlers no `TableController` e fiação no
+    container. Frontend: `TablesPage` ganhou modo de seleção (botão "Juntar
+    mesas", visível só na visão de mapa), barra de ação com contador e botão
+    desabilitado abaixo de 2 mesas, banner de erro, e o `TableFloorMap` agora
+    recebe `selectionMode`/`selectedIds`/`onToggleSelect`/`onUngroup` de
+    verdade em vez dos stubs deixados em T3.1.
+  - *Verificação:* `npx tsc --noEmit` — baseline da API **caiu de 21 para 13**
+    erros (os 8 restantes eram exatamente o drift de `tableGroups`/`groupId`
+    resolvido aqui); web permanece nos 5 pré-existentes. Curl cobriu o ciclo
+    completo: juntar 2 mesas → `201` com `{id, tableIds}`; `groupId` aparece no
+    `GET /tables`; rejuntar as mesmas mesas → `409`; enviar 1 mesa só → `400`;
+    desagrupar → `200`; desagrupar de novo → `404`; `group_id` volta a `NULL`.
+    `audit_logs` gravou `table.grouped` (com `tableIds` e `tableNumbers`) e
+    `table.ungrouped` (com `tableNumbers`) — isso já cobre a parte de
+    juntar/separar de T3.3. No browser: modo de seleção exibiu "Toque para
+    selecionar" em todas as mesas, seleção de 2 mesas atualizou o contador
+    para "2 mesas selecionadas", "Juntar selecionadas" renderizou o badge
+    "Grupo 4+5" nas duas, e "Desagrupar" removeu o badge. Banco conferido ao
+    final: nenhum grupo aberto e nenhum `group_id` residual.
+  - *Corrigido durante o teste:* `response.status(201).json(...)` não existe
+    no `ResponseHelper` do projeto (a assinatura é `json(data, statusCode)`) —
+    causava `500` e deixava o grupo já commitado sem resposta.
 - ⬜ **T3.3** (UX-TBL-04) Auditoria de mover/juntar/separar em `audit_logs`.
   🔗 T3.1, T3.2.
 - ⬜ **T3.4** (UX-TBL-05) Comandas da mesa no detalhe + abrir nova. 🔗 T2.2.

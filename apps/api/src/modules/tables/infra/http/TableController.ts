@@ -5,6 +5,8 @@ import type { CreateTableUseCase } from '../../application/use-cases/CreateTable
 import type { UpdateTableUseCase } from '../../application/use-cases/UpdateTableUseCase'
 import type { UpdateTablePositionUseCase } from '../../application/use-cases/UpdateTablePositionUseCase'
 import type { DeleteTableUseCase } from '../../application/use-cases/DeleteTableUseCase'
+import type { GroupTablesUseCase } from '../../application/use-cases/GroupTablesUseCase'
+import type { UngroupTablesUseCase } from '../../application/use-cases/UngroupTablesUseCase'
 import type { OpenComandaUseCase } from '../../application/use-cases/OpenComandaUseCase'
 import type { CloseComandaUseCase } from '../../application/use-cases/CloseComandaUseCase'
 import type { GetComandaByCodeUseCase } from '../../application/use-cases/GetComandaByCodeUseCase'
@@ -27,6 +29,10 @@ const updateTablePositionSchema = z.object({
   positionY: z.number().int().min(0),
 })
 
+const groupTablesSchema = z.object({
+  tableIds: z.array(z.string().uuid()).min(2),
+})
+
 const closeComandaSchema = z.object({
   status: z.enum(['closed', 'paid']),
 })
@@ -44,6 +50,8 @@ export class TableController {
     private readonly updateTableUseCase: UpdateTableUseCase,
     private readonly updateTablePositionUseCase: UpdateTablePositionUseCase,
     private readonly deleteTableUseCase: DeleteTableUseCase,
+    private readonly groupTablesUseCase: GroupTablesUseCase,
+    private readonly ungroupTablesUseCase: UngroupTablesUseCase,
     private readonly openComandaUseCase: OpenComandaUseCase,
     private readonly closeComandaUseCase: CloseComandaUseCase,
     private readonly getComandaByCodeUseCase: GetComandaByCodeUseCase,
@@ -94,6 +102,28 @@ export class TableController {
       parsed.data.positionY
     )
     response.json(table)
+  }
+
+  group: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const parsed = groupTablesSchema.safeParse(request.body)
+    if (!parsed.success) throw new ValidationError('Dados inválidos', parsed.error.flatten().fieldErrors)
+    const group = await this.groupTablesUseCase.execute(
+      request.user.establishmentId,
+      parsed.data.tableIds,
+      request.user.id
+    )
+    response.json(group, 201)
+  }
+
+  ungroup: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    await this.ungroupTablesUseCase.execute(
+      request.params['groupId']!,
+      request.user.establishmentId,
+      request.user.id
+    )
+    response.json({ success: true })
   }
 
   delete: RouteHandler = async (request, response) => {

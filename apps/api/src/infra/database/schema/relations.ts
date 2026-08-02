@@ -11,6 +11,7 @@ import { productPriceHistory } from './product-price-history'
 import { productAffinities } from './product-affinities'
 import { productComponents } from './product-components'
 import { restaurantTables } from './tables'
+import { tableGroups } from './table-groups'
 import { comandas } from './comandas'
 import { orders } from './orders'
 import { orderItems } from './order-items'
@@ -161,8 +162,20 @@ export const restaurantTablesRelations = relations(restaurantTables, ({ one, man
     fields: [restaurantTables.establishmentId],
     references: [establishments.id],
   }),
+  group: one(tableGroups, {
+    fields: [restaurantTables.groupId],
+    references: [tableGroups.id],
+  }),
   orders: many(orders),
   comandas: many(comandas),
+}))
+
+export const tableGroupsRelations = relations(tableGroups, ({ one, many }) => ({
+  establishment: one(establishments, {
+    fields: [tableGroups.establishmentId],
+    references: [establishments.id],
+  }),
+  tables: many(restaurantTables),
 }))
 
 export const comandasRelations = relations(comandas, ({ one }) => ({

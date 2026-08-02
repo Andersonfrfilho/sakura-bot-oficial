@@ -43,6 +43,8 @@ import { DrizzleComandaRepository } from '@/modules/tables/infra/repositories/Dr
 import { ListTablesUseCase } from '@/modules/tables/application/use-cases/ListTablesUseCase'
 import { CreateTableUseCase } from '@/modules/tables/application/use-cases/CreateTableUseCase'
 import { UpdateTablePositionUseCase } from '@/modules/tables/application/use-cases/UpdateTablePositionUseCase'
+import { GroupTablesUseCase } from '@/modules/tables/application/use-cases/GroupTablesUseCase'
+import { UngroupTablesUseCase } from '@/modules/tables/application/use-cases/UngroupTablesUseCase'
 import { UpdateTableUseCase } from '@/modules/tables/application/use-cases/UpdateTableUseCase'
 import { DeleteTableUseCase } from '@/modules/tables/application/use-cases/DeleteTableUseCase'
 import { OpenComandaUseCase } from '@/modules/tables/application/use-cases/OpenComandaUseCase'
@@ -387,6 +389,8 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const updateTableUseCase = new UpdateTableUseCase(tableRepository)
   const updateTablePositionUseCase = new UpdateTablePositionUseCase(tableRepository)
   const deleteTableUseCase = new DeleteTableUseCase(tableRepository)
+  const groupTablesUseCase = new GroupTablesUseCase(db, tableRepository, createAuditLogUseCase)
+  const ungroupTablesUseCase = new UngroupTablesUseCase(db, createAuditLogUseCase)
   const openComandaUseCase = new OpenComandaUseCase(tableRepository, comandaRepository)
   const closeComandaUseCase = new CloseComandaUseCase(tableRepository, comandaRepository)
   const getComandaByCodeUseCase = new GetComandaByCodeUseCase(comandaRepository)
@@ -397,6 +401,8 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     updateTableUseCase,
     updateTablePositionUseCase,
     deleteTableUseCase,
+    groupTablesUseCase,
+    ungroupTablesUseCase,
     openComandaUseCase,
     closeComandaUseCase,
     getComandaByCodeUseCase,

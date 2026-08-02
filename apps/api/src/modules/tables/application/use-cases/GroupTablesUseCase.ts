@@ -1,4 +1,4 @@
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, isNull } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import * as schema from '@/infra/database/schema'
 import type { TableRepository } from '../../domain/repositories/TableRepository'
@@ -38,15 +38,23 @@ export class GroupTablesUseCase {
         .values({ establishmentId })
         .returning()
 
-      await tx
+      // O filtro por groupId nulo é o que serializa duas junções simultâneas:
+      // a segunda transação atinge menos linhas e aborta.
+      const grouped = await tx
         .update(schema.restaurantTables)
         .set({ groupId: insertedGroup!.id, updatedAt: new Date() })
         .where(
           and(
             inArray(schema.restaurantTables.id, uniqueIds),
-            eq(schema.restaurantTables.establishmentId, establishmentId)
+            eq(schema.restaurantTables.establishmentId, establishmentId),
+            isNull(schema.restaurantTables.groupId)
           )
         )
+        .returning({ id: schema.restaurantTables.id })
+
+      if (grouped.length !== uniqueIds.length) {
+        throw new ConflictError('Alguma das mesas selecionadas já entrou em outro grupo')
+      }
 
       return insertedGroup!
     })

@@ -11,6 +11,10 @@ export function registerTableRoutes(router: Router, controller: TableController)
   router.patch('/tables/:id/position', authenticate, authorize('orders', 'write'), controller.updatePosition)
   router.delete('/tables/:id', authenticate, authorize('orders', 'write'), controller.delete)
 
+  // Junção temporária de mesas
+  router.post('/tables/group', authenticate, authorize('orders', 'write'), controller.group)
+  router.delete('/tables/group/:groupId', authenticate, authorize('orders', 'write'), controller.ungroup)
+
   // Comanda management (authenticated — waiter/admin)
   router.post('/tables/:id/comanda', authenticate, authorize('orders', 'write'), controller.openComanda)
   router.patch('/comandas/:comandaId/close', authenticate, authorize('orders', 'write'), controller.closeComanda)
