@@ -754,6 +754,31 @@ datalake por último (dependem do core estável).
     comparados" para acurácia de 25.7% sobre 5. Baselines de tsc mantidas
     (API 11, web 5).
 
+- ✅ **TX.7** Menu e permissões da API divergiam; Financeiro era inacessível.
+  - *Descoberta:* varredura de rede navegando todas as rotas do menu com o
+    usuário gerente — `/staff`, `/staff/roles`, `/roles`, `/finance/overview`,
+    `/expenses` e `/monthly-accounts` voltavam 403.
+  - *Sintoma:* mesma classe do TX.1 — erro renderizado como vazio. A tela de
+    Funcionários exibia "6 cadastrados" como **"0 cadastrados"** mais o botão
+    "Novo funcionário", como se o estabelecimento não tivesse ninguém.
+  - *Causa 1 (a mais grave):* `finance` não constava em `ALL_RESOURCES` no
+    `roles-permissions.seed.ts`, embora as rotas usem `authorize('finance')`.
+    Nenhum papel recebia o recurso — **nem o admin**. A tela Financeiro estava
+    inacessível para todos os usuários do sistema.
+  - *Causa 2:* `constants/navigation.ts` liberava Financeiro, Funcionários e
+    Cargos ao gerente, mas a API não concedia `finance` nem `users` ao papel.
+  - *Implementação:* `finance` somado a `ALL_RESOURCES` (o admin passa a ter o
+    recurso por construção) e `finance`/`users` em `read`+`write` concedidos ao
+    gerente — apensados ao FIM do array, como o comentário do arquivo exige,
+    já que o id da permissão deriva da posição.
+  - *Decisão de segurança:* `/roles` exige `users:manage` e **não** foi
+    concedido ao gerente — quem edita cargos pode conceder permissões a si
+    mesmo. Corrigi o lado do menu: "Cargos" agora é só `ROLES.ADMIN`.
+  - *Verificação:* após reset + seed, os seis endpoints voltaram 200 para o
+    gerente, exceto `/roles`, que segue 403 por decisão. A tela de Funcionários
+    passou a mostrar "6 cadastrados"; o Financeiro renderizou as três abas; e
+    "Cargos" saiu do menu do gerente. Baselines de tsc mantidas (API 11, web 5).
+
 ## Riscos
 
 - **R1**: pacote compartilhado de conversas exige alinhamento de versões React

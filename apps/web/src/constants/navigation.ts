@@ -32,7 +32,9 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/customers', label: 'Clientes', roles: [ROLES.ADMIN, ROLES.MANAGER] },
   { to: '/finance', label: 'Financeiro', roles: [ROLES.ADMIN, ROLES.MANAGER], icon: Banknote },
   { to: '/staff', label: 'Funcionários', roles: [ROLES.ADMIN, ROLES.MANAGER] },
-  { to: '/roles', label: 'Cargos', roles: [ROLES.ADMIN, ROLES.MANAGER], icon: Shield },
+  // Só admin: a API exige `users:manage` aqui, e quem edita cargos pode
+  // conceder permissões a si mesmo.
+  { to: '/roles', label: 'Cargos', roles: [ROLES.ADMIN], icon: Shield },
   { to: '/catalog', label: 'Cardápio', roles: [ROLES.ADMIN, ROLES.MANAGER] },
   { to: '/reports', label: 'Relatórios', roles: [ROLES.ADMIN, ROLES.MANAGER] },
   { to: '/settings', label: 'Configurações', roles: [ROLES.ADMIN, ROLES.MANAGER] },

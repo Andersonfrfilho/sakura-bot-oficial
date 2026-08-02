@@ -10,7 +10,10 @@ export const ROLE_IDS = {
   atendente: '00000000-0000-0000-0001-000000000006',
 } as const
 
-const ALL_RESOURCES = ['orders', 'kitchen', 'cashier', 'delivery', 'users', 'products', 'reports', 'settings', 'conversations'] as const
+// `finance` estava fora desta lista embora as rotas usem `authorize('finance')`
+// — nenhum papel recebia a permissão, nem o admin, e a tela Financeiro ficava
+// inacessível para todo mundo.
+const ALL_RESOURCES = ['orders', 'kitchen', 'cashier', 'delivery', 'users', 'products', 'reports', 'settings', 'conversations', 'finance'] as const
 const ALL_ACTIONS = ['read', 'write', 'delete', 'manage'] as const
 
 const ADMIN_PERMISSIONS = ALL_RESOURCES.flatMap((resource) =>
@@ -41,6 +44,13 @@ const ROLE_PERMISSIONS = [
   // e inserir no meio deslocaria o id de todas as seguintes, duplicando-as no próximo seed.
   { roleId: ROLE_IDS.gerente, resource: 'settings', action: 'read' },
   { roleId: ROLE_IDS.gerente, resource: 'settings', action: 'write' },
+  // O menu do frontend (`constants/navigation.ts`) libera Financeiro,
+  // Funcionários e Cargos para o gerente, mas a API não concedia nenhum dos
+  // dois recursos — o gerente via a tela vazia como se não houvesse cadastro.
+  { roleId: ROLE_IDS.gerente, resource: 'finance', action: 'read' },
+  { roleId: ROLE_IDS.gerente, resource: 'finance', action: 'write' },
+  { roleId: ROLE_IDS.gerente, resource: 'users', action: 'read' },
+  { roleId: ROLE_IDS.gerente, resource: 'users', action: 'write' },
 ]
 
 // Permissions have no unique constraint besides `id`. Assign deterministic ids
