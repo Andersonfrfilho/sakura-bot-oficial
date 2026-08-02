@@ -143,6 +143,7 @@ import { startFiscalWorker } from '@/modules/fiscal/application/workers/FiscalEm
 import { startFinanceWorker } from '@/modules/finance/application/workers/AccountDueWorker'
 import { startIfoodWorker } from '@/modules/orders/application/workers/IfoodPollingWorker'
 import { startProductAffinityWorker } from '@/modules/products/application/workers/ProductAffinityWorker'
+import { startStockWorker } from '@/modules/products/application/workers/StockExpiryWorker'
 import { startBullBoard } from '@/infra/queue/bullBoard'
 import type { Worker } from 'bullmq'
 
@@ -192,6 +193,7 @@ export interface AppContainer {
   financeWorker?: Worker | undefined
   ifoodWorker?: Worker | undefined
   productAffinityWorker?: Worker | undefined
+  stockWorker?: Worker | undefined
 }
 
 export function buildContainer(wsHub: WebSocketHub): AppContainer {
@@ -469,11 +471,20 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     startBullBoard()
   }
 
+  const stockWorker = process.env.STOCK_WORKER_ENABLED === 'true'
+    ? startStockWorker(db)
+    : undefined
+  if (stockWorker) {
+    console.log('[API] Stock expiry worker started')
+    startBullBoard()
+  }
+
   return {
     fiscalWorker,
     financeWorker,
     ifoodWorker,
     productAffinityWorker,
+    stockWorker,
     cache,
     menuController,
     catalogController,

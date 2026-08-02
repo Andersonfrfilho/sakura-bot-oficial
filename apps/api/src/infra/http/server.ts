@@ -65,6 +65,7 @@ export async function createServer() {
     if (container.financeWorker) await container.financeWorker.close()
     if (container.ifoodWorker) await container.ifoodWorker.close()
     if (container.productAffinityWorker) await container.productAffinityWorker.close()
+    if (container.stockWorker) await container.stockWorker.close()
     process.exit(0)
   }
 
@@ -72,7 +73,8 @@ export async function createServer() {
     container.fiscalWorker ||
     container.financeWorker ||
     container.ifoodWorker ||
-    container.productAffinityWorker
+    container.productAffinityWorker ||
+    container.stockWorker
   ) {
     process.on('SIGTERM', shutdownWorkers)
     process.on('SIGINT', shutdownWorkers)

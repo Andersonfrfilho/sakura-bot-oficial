@@ -101,6 +101,20 @@ R$ 0,00 e a "receita" do produto é decorativa.
   `stockQuantity=0` aparece na lista e no contador; após ajuste de estoque
   para 50 (acima do mínimo), some de ambos.
 
+  *Dívida resolvida (alerta de validade):* o `StockExpiryWorker` existia mas
+  nunca era instanciado — o container não o chamava, então a varredura diária
+  de lotes vencendo jamais rodou e o `ExpiringBatchBadge` nunca acenderia por
+  conta própria. Ligado no `buildContainer` atrás de `STOCK_WORKER_ENABLED`,
+  no mesmo padrão dos demais workers, com `close()` no encerramento gracioso
+  do `server.ts` e a variável documentada no `.env.example` e no compose.
+  *Verificação (feita ao vivo):* com a flag ligada, o boot registra
+  "Stock expiry worker started" e o job repetível aparece em
+  `bull:stock-expiry-alerts:repeat`. Sem lote vencendo, a varredura fecha com
+  0. Com um lote criado para vencer em 2 dias, a mesma varredura acha 1 e
+  grava o `audit_logs` de `stock_expiry_alert` com número do lote e validade.
+  Lote de teste removido depois; a linha de auditoria permanece por ser
+  imutável por trigger.
+
 - **T1.5** ✅ Seed de catálogo e estoque (`catalog.seed.ts`, chamado de
   `seeds/index.ts` logo após `seedUsers`). 2 categorias, 3 seções, 5 produtos,
   4 ingredientes e 4 linhas de receita (`product_ingredients`) via `INSERT`
