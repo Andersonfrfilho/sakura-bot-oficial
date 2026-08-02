@@ -163,11 +163,30 @@ R$ 0,00 e a "receita" do produto é decorativa.
     `{"succeeded":0,"failed":2,"errors":[...]}` com mensagem de duplicidade
     por linha; CSV com preço vazio → erro de validação por linha. Produtos
     de teste revertidos via SQL após a verificação.
-- **T3.2** Ações em lote no `ProductList` do SDK: seleção por linha,
+- **T3.2** ✅ Ações em lote no `ProductList` do SDK: seleção por linha,
   ativar/desativar, mover de catálogo e reajuste percentual de preço. Isso
   também cobre a dívida do padrão de listagens (checkbox + barra de ação em
   lote, ordenação por cabeçalho, filtros na URL), que o `ProductList` ainda não
   cumpre. **Adição no pacote**, não no Order Hub.
+  - Implementado em `adatechnology-packages` (repo irmão), pacote
+    `@adatechnology/products-ui`, branch `feat/products-bulk-actions`
+    (commit `bf5446c`, aberta a partir de `main`).
+    `ProductList.tsx` ganhou a prop `bulkActionsEnabled` (desligada por
+    padrão — lista só-leitura, como um seletor de produto num pedido, não
+    deve oferecer ativar/desativar): checkbox por linha, "selecionar todos"
+    no cabeçalho, e barra de ação com ativar/desativar, mover para catálogo
+    (via `listCatalogs`) e reajuste percentual de preço. Cada ação dispara
+    N chamadas `updateProduct` em paralelo — o contrato `ProductsApi` não
+    tem endpoint de batch — e uma falha isolada não aborta as demais.
+    Ordenação por cabeçalho já existia no componente; **filtros na URL
+    seguem como dívida em aberto** (o `ProductList` ainda não tem UI de
+    filtro nenhuma, é debt maior que cabe numa task própria).
+  - *Verificação:* `npm run check` (tsc --noEmit) e `npm run build` do
+    pacote sem erros. Sem suíte de testes no pacote (nenhuma pré-existente
+    em `products-ui`); verificação visual em navegador não feita porque o
+    componente ainda não está montado em nenhuma tela do Order Hub — é
+    biblioteca aguardando consumidor. Changeset registrado
+    (`.changeset/product-list-bulk-actions.md`, minor).
 - **T3.3** Duplicar produto — variação de tamanho e sabor é o caso comum, e
   hoje se resolve redigitando.
 - **T3.4** Histórico de preço (`product_price_history`: produto, preço anterior,
