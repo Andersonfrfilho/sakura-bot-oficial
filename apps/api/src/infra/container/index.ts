@@ -387,7 +387,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const listTablesUseCase = new ListTablesUseCase(tableRepository)
   const createTableUseCase = new CreateTableUseCase(tableRepository)
   const updateTableUseCase = new UpdateTableUseCase(tableRepository)
-  const updateTablePositionUseCase = new UpdateTablePositionUseCase(tableRepository)
+  const updateTablePositionUseCase = new UpdateTablePositionUseCase(tableRepository, createAuditLogUseCase)
   const deleteTableUseCase = new DeleteTableUseCase(tableRepository)
   const groupTablesUseCase = new GroupTablesUseCase(db, tableRepository, createAuditLogUseCase)
   const ungroupTablesUseCase = new UngroupTablesUseCase(db, createAuditLogUseCase)

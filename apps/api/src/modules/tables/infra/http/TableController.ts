@@ -95,12 +95,13 @@ export class TableController {
     if (!request.user) throw new UnauthorizedError()
     const parsed = updateTablePositionSchema.safeParse(request.body)
     if (!parsed.success) throw new ValidationError('Dados inválidos', parsed.error.flatten().fieldErrors)
-    const table = await this.updateTablePositionUseCase.execute(
-      request.params['id']!,
-      request.user.establishmentId,
-      parsed.data.positionX,
-      parsed.data.positionY
-    )
+    const table = await this.updateTablePositionUseCase.execute({
+      id: request.params['id']!,
+      establishmentId: request.user.establishmentId,
+      positionX: parsed.data.positionX,
+      positionY: parsed.data.positionY,
+      userId: request.user.id,
+    })
     response.json(table)
   }
 

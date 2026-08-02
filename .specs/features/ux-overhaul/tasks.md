@@ -315,8 +315,32 @@ barato em seguida).
   - *Corrigido durante o teste:* `response.status(201).json(...)` não existe
     no `ResponseHelper` do projeto (a assinatura é `json(data, statusCode)`) —
     causava `500` e deixava o grupo já commitado sem resposta.
-- ⬜ **T3.3** (UX-TBL-04) Auditoria de mover/juntar/separar em `audit_logs`.
+- ✅ **T3.3** (UX-TBL-04) Auditoria de mover/juntar/separar em `audit_logs`.
   🔗 T3.1, T3.2.
+  - *Implementação:* juntar e separar já gravavam (`table.grouped` /
+    `table.ungrouped`, feitos junto com T3.2); faltava mover.
+    `UpdateTablePositionUseCase` passou a receber `CreateAuditLogUseCase` e
+    grava `table.moved` com `tableNumber` e as posições `from`/`to` — o
+    `from` é lido antes do update, então a trilha registra o deslocamento e
+    não só o destino. O use case também virou objeto de parâmetros
+    (`UpdateTablePositionParams`), já que com `userId` passaria de 4
+    argumentos posicionais, violando a regra de no máximo 1 parâmetro
+    posicional do code-standart §10.
+  - *Guard contra ruído:* mover para a mesma posição retorna a mesa sem
+    escrever no banco nem gerar log. Sem isso o drag-and-drop do mapa
+    inundaria a auditoria com eventos de deslocamento zero, já que o
+    `pointerup` dispara o PATCH mesmo em clique sem arraste.
+  - *Verificação:* `npx tsc --noEmit` — baseline da API caiu de 13 para 12
+    erros (a conversão para objeto de parâmetros resolveu um `TS2379` de
+    `exactOptionalPropertyTypes` no controller); web inalterado em 5. Curl:
+    3 PATCHs (mover → mover para a mesma posição → mover de novo) geraram
+    exatamente **2** registros `table.moved`, com `user_id` preenchido e
+    `from: {null, null} → to: {120, 80}` no primeiro e `{120,80} → {200,140}`
+    no segundo; posição negativa segue retornando `400`.
+  - *Observação:* `audit_logs` é append-only por trigger
+    (`fn_audit_logs_immutable`), então os registros gerados no teste
+    permanecem no banco — isso é o comportamento correto de trilha de
+    auditoria, não sujeira. Posições e grupos de teste foram revertidos.
 - ⬜ **T3.4** (UX-TBL-05) Comandas da mesa no detalhe + abrir nova. 🔗 T2.2.
 
 ## Fase 4 — Clientes
