@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { ORDER_CHANNEL_LABELS, ORDER_TYPE_LABELS, ORDER_STATUS_LABELS } from '@/constants/orderLabels'
 import { Select } from '@/components/ui/Select'
+import { AlertTriangle } from 'lucide-react'
 
 interface DailyBreakdown {
   day: number
@@ -142,8 +143,22 @@ const PAYMENT_LABELS: Record<string, string> = {
   voucher: 'Voucher',
 }
 
+const NO_DATA = '—'
+const NO_COST_REGISTERED = 'sem custo'
+
 function formatBRL(value: string | number) {
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+// Sem comanda fechada não existe média: exibir "R$ 0,00" faz a mesa parecer um
+// caso de ticket zerado em vez de ausência de base de cálculo.
+function formatPerComanda(value: string | number, comandaCount: number) {
+  return comandaCount > 0 ? formatBRL(value) : NO_DATA
+}
+
+// Custo zerado significa ficha técnica não cadastrada, não margem de 100%.
+function hasCost(costPrice: string | number) {
+  return Number(costPrice) > 0
 }
 
 function getMiniBar(value: number, max: number) {
@@ -575,7 +590,7 @@ export function ReportsPage() {
                     <thead>
                       <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
                         <th className="pb-2 font-medium">Mesa</th>
-                        <th className="pb-2 font-medium text-right">Comandas</th>
+                        <th className="pb-2 font-medium text-right">Comandas fechadas</th>
                         <th className="pb-2 font-medium text-right">Tempo médio</th>
                         <th className="pb-2 font-medium text-right">Receita total</th>
                         <th className="pb-2 font-medium text-right">Ticket/comanda</th>
@@ -586,9 +601,13 @@ export function ReportsPage() {
                         <tr key={t.tableId} className="border-b border-gray-50">
                           <td className="py-2 font-medium text-gray-800">Mesa {t.tableNumber}</td>
                           <td className="py-2 text-right text-gray-600">{t.comandaCount}</td>
-                          <td className="py-2 text-right text-gray-600">{t.avgTimeMinutes} min</td>
+                          <td className="py-2 text-right text-gray-600">
+                            {t.comandaCount > 0 ? `${t.avgTimeMinutes} min` : NO_DATA}
+                          </td>
                           <td className="py-2 text-right text-gray-900 font-medium">{formatBRL(t.totalRevenue)}</td>
-                          <td className="py-2 text-right text-gray-600">{formatBRL(t.avgSpendPerComanda)}</td>
+                          <td className="py-2 text-right text-gray-600">
+                            {formatPerComanda(t.avgSpendPerComanda, t.comandaCount)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -624,6 +643,16 @@ export function ReportsPage() {
 
         {ingredientsRanking && (
           <div className="space-y-6">
+            {ingredientsRanking.topProfitableProducts.some((prod) => !hasCost(prod.costPrice)) && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" aria-hidden="true" />
+                <p className="text-xs text-amber-800">
+                  Há pratos sem ficha técnica cadastrada. Sem o custo, o lucro exibido é igual à
+                  receita e a margem aparece como 100% — cadastre a ficha técnica no catálogo para
+                  que estes números façam sentido.
+                </p>
+              </div>
+            )}
             {/* Summary cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {ingredientsRanking.summary.bestMargin && (
@@ -632,8 +661,16 @@ export function ReportsPage() {
                   <p className="text-lg font-bold text-gray-900 truncate">
                     {ingredientsRanking.summary.bestMargin.productName}
                   </p>
-                  <p className="text-sm text-green-600">
-                    {formatBRL(ingredientsRanking.summary.bestMargin.margin)} por unidade
+                  <p
+                    className={
+                      hasCost(ingredientsRanking.summary.bestMargin.costPrice)
+                        ? 'text-sm text-green-600'
+                        : 'text-sm text-amber-600'
+                    }
+                  >
+                    {hasCost(ingredientsRanking.summary.bestMargin.costPrice)
+                      ? `${formatBRL(ingredientsRanking.summary.bestMargin.margin)} por unidade`
+                      : NO_COST_REGISTERED}
                   </p>
                 </div>
               )}
@@ -654,8 +691,16 @@ export function ReportsPage() {
                   <p className="text-lg font-bold text-gray-900 truncate">
                     {ingredientsRanking.summary.bestCombo.productName}
                   </p>
-                  <p className="text-sm text-green-600">
-                    {formatBRL(ingredientsRanking.summary.bestCombo.totalProfit)} lucro
+                  <p
+                    className={
+                      hasCost(ingredientsRanking.summary.bestCombo.costPrice)
+                        ? 'text-sm text-green-600'
+                        : 'text-sm text-amber-600'
+                    }
+                  >
+                    {hasCost(ingredientsRanking.summary.bestCombo.costPrice)
+                      ? `${formatBRL(ingredientsRanking.summary.bestCombo.totalProfit)} lucro`
+                      : NO_COST_REGISTERED}
                   </p>
                 </div>
               )}
@@ -713,10 +758,18 @@ export function ReportsPage() {
                           <td className="py-2 text-gray-400 text-xs">{idx + 1}</td>
                           <td className="py-2 font-medium text-gray-800 truncate max-w-[150px]">{prod.productName}</td>
                           <td className="py-2 text-right text-gray-600">{formatBRL(prod.price)}</td>
-                          <td className="py-2 text-right text-gray-600">{formatBRL(prod.costPrice)}</td>
-                          <td className="py-2 text-right text-green-600 font-medium">{formatBRL(prod.margin)}</td>
+                          <td className="py-2 text-right text-gray-600">
+                            {hasCost(prod.costPrice) ? formatBRL(prod.costPrice) : (
+                              <span className="text-amber-600">{NO_COST_REGISTERED}</span>
+                            )}
+                          </td>
+                          <td className="py-2 text-right text-green-600 font-medium">
+                            {hasCost(prod.costPrice) ? formatBRL(prod.margin) : NO_DATA}
+                          </td>
                           <td className="py-2 text-right text-gray-900">{prod.quantitySold}</td>
-                          <td className="py-2 text-right text-green-700 font-semibold">{formatBRL(prod.totalProfit)}</td>
+                          <td className="py-2 text-right text-green-700 font-semibold">
+                            {hasCost(prod.costPrice) ? formatBRL(prod.totalProfit) : NO_DATA}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -750,9 +803,15 @@ export function ReportsPage() {
                       {productProfit.bestCombo.map((prod) => (
                         <tr key={prod.productId} className="border-b border-gray-50">
                           <td className="py-2 font-medium text-gray-800 truncate max-w-[200px]">{prod.productName}</td>
-                          <td className="py-2 text-right text-green-600">{prod.marginPercent}%</td>
+                          <td className="py-2 text-right text-green-600">
+                            {hasCost(prod.costPrice) ? `${prod.marginPercent}%` : (
+                              <span className="text-amber-600">{NO_COST_REGISTERED}</span>
+                            )}
+                          </td>
                           <td className="py-2 text-right text-gray-900">{prod.quantitySold}</td>
-                          <td className="py-2 text-right text-green-700 font-semibold">{formatBRL(prod.totalProfit)}</td>
+                          <td className="py-2 text-right text-green-700 font-semibold">
+                            {hasCost(prod.costPrice) ? formatBRL(prod.totalProfit) : NO_DATA}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

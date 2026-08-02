@@ -648,6 +648,28 @@ datalake por último (dependem do core estável).
     produtos após um único `POST /auth/refresh` (200); com refresh token também
     inválido, a aplicação foi para `/login`. `npx tsc --noEmit` na baseline de 5.
 
+- ✅ **TX.2** Relatórios exibiam número honesto com leitura enganosa.
+  - *Sintoma:* mesas sem comanda fechada no período apareciam como "0 min" e
+    "R$ 0,00" de ticket — indistinguível de mesa com ticket realmente zerado.
+    Mesa 7 e Mesa 9 exibiam receita (R$ 99,70 / R$ 155,40) com "0 comandas",
+    porque a coluna conta só as comandas *fechadas no período* enquanto a
+    receita soma os pedidos da mesa. Nos rankings de lucro, prato sem ficha
+    técnica (`costPrice = 0`) rendia "margem 100%" e lucro igual à receita.
+  - *Causa:* nenhum erro de cálculo — a apresentação é que não distinguia
+    "ausência de base de cálculo" de "valor zero".
+  - *Implementação:* `ReportsPage.tsx` ganhou `NO_DATA` (`—`),
+    `NO_COST_REGISTERED` (`sem custo`), `formatPerComanda()` e `hasCost()`.
+    Tempo médio e ticket/comanda mostram `—` quando `comandaCount === 0`; o
+    cabeçalho virou "Comandas fechadas"; custo, margem e lucro total mostram
+    `sem custo` em âmbar e `—` quando não há ficha técnica — nas duas tabelas e
+    também nos cards de resumo (Melhor Margem / Melhor Combo). Um aviso âmbar
+    com `AlertTriangle` explica que o número só faz sentido após cadastrar a
+    ficha técnica no catálogo.
+  - *Verificação:* browser em `/reports` — Mesas 2/4/5/6/8/10 com `—`, Mesas 7 e
+    9 com receita e ticket `—`, as duas tabelas de lucro com "sem custo" e `—`,
+    os três cards de resumo coerentes e o banner renderizado.
+    `npx tsc --noEmit` na baseline de 5.
+
 ## Riscos
 
 - **R1**: pacote compartilhado de conversas exige alinhamento de versões React
