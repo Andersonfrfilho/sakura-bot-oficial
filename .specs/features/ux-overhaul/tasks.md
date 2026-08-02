@@ -670,6 +670,30 @@ datalake por último (dependem do core estável).
     os três cards de resumo coerentes e o banner renderizado.
     `npx tsc --noEmit` na baseline de 5.
 
+- ✅ **TX.3** Seed tornava relatórios indemonstráveis.
+  - *Sintoma:* na Análise de Funil, as nove células (3 etapas × 3 tipos)
+    mostravam exatamente `60.0 min`, e o "gargalo identificado" era um empate
+    arbitrário. Nos relatórios de lucro, todo prato aparecia com margem de 100%
+    e disparava o aviso de ficha técnica pendente.
+  - *Causa:* não era bug de cálculo. `buildLifecycleTimestamps` usava
+    `daysAgo(base, 3|2|1|0)` — o offset é em horas, então cada etapa ficava
+    exatamente 1h após a anterior. E `catalog.seed.ts` nunca preenchia
+    `products.costPrice`, que os use cases leem como `COALESCE(..., '0')`.
+  - *Implementação:* `orders.seed.ts` ganhou `STAGE_DURATION_MINUTES` por tipo
+    de pedido (delivery 8/22/34, retirada 5/18/11, mesa 4/26/9) mais um jitter
+    determinístico por índice, para as médias não saírem redondas nem variarem
+    entre execuções; `buildLifecycleTimestamps` passou a receber objeto tipado
+    (code-standart §10). `catalog.seed.ts` ganhou `costPrice` por produto, com
+    margens deliberadamente diferentes para o ranking ter o que ordenar.
+  - *Verificação:* seed executado contra base descartável `botdb_seedcheck`
+    (schema copiado de `botdb`, derrubada ao fim — o banco de dev não foi
+    tocado). Médias por tipo saíram 9.4/19.6/35.2 (delivery), 4.5/16.5/14.0
+    (retirada) e 4.0/29.0/3.0 (mesa) — nove valores distintos, gargalo real em
+    Delivery: Pronto → Concluído. Os 5 produtos com `cost_price` preenchido.
+    `npx tsc --noEmit` na baseline de 11 da API.
+  - *Pendente:* o banco de dev só reflete isso após `make db-reset` + seed —
+    ação destrutiva, deixada a critério do usuário.
+
 ## Riscos
 
 - **R1**: pacote compartilhado de conversas exige alinhamento de versões React

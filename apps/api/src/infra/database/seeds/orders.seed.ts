@@ -39,17 +39,55 @@ const BLUEPRINTS: OrderBlueprint[] = [
   { type: 'delivery', channel: 'whatsapp', status: 'completed', customerIndex: 4, daysAgo: 10 },
 ]
 
-function buildLifecycleTimestamps(status: OrderStatusValue, baseDaysAgo: number) {
+// Duração média de cada etapa, em minutos, por tipo de pedido. Sem essa
+// variação todas as etapas empatam e a análise de funil não consegue apontar
+// gargalo nenhum — a tela fica indemonstrável.
+const STAGE_DURATION_MINUTES: Record<OrderBlueprint['type'], {
+  toProduction: number
+  toReady: number
+  toCompleted: number
+}> = {
+  delivery: { toProduction: 8, toReady: 22, toCompleted: 34 },
+  pickup: { toProduction: 5, toReady: 18, toCompleted: 11 },
+  table: { toProduction: 4, toReady: 26, toCompleted: 9 },
+}
+
+// Desvio determinístico por pedido, para as médias não saírem redondas nem o
+// seed variar entre execuções.
+function jitterMinutes(index: number, stageOffset: number): number {
+  return ((index * 7 + stageOffset * 3) % 9) - 4
+}
+
+type LifecycleParams = {
+  status: OrderStatusValue
+  type: OrderBlueprint['type']
+  baseDaysAgo: number
+  index: number
+}
+
+function buildLifecycleTimestamps({ status, type, baseDaysAgo, index }: LifecycleParams) {
   const inProgress: OrderStatusValue[] = ['in_production', 'ready', 'in_delivery', 'picked_up', 'completed']
   const ready: OrderStatusValue[] = ['ready', 'in_delivery', 'picked_up', 'completed']
   const finished: OrderStatusValue[] = ['picked_up', 'completed']
 
+  const durations = STAGE_DURATION_MINUTES[type]
+  const receivedAt = daysAgo(baseDaysAgo, 3)
+
+  function stageAt(elapsedMinutes: number, stageOffset: number): Date {
+    const jittered = Math.max(1, elapsedMinutes + jitterMinutes(index, stageOffset))
+    return new Date(receivedAt.getTime() + jittered * 60 * 1000)
+  }
+
+  const productionMinutes = durations.toProduction
+  const readyMinutes = productionMinutes + durations.toReady
+  const completedMinutes = readyMinutes + durations.toCompleted
+
   return {
-    receivedAt: daysAgo(baseDaysAgo, 3),
-    productionStartedAt: inProgress.includes(status) ? daysAgo(baseDaysAgo, 2) : null,
-    readyAt: ready.includes(status) ? daysAgo(baseDaysAgo, 1) : null,
-    completedAt: finished.includes(status) ? daysAgo(baseDaysAgo, 0) : null,
-    cancelledAt: status === 'cancelled' ? daysAgo(baseDaysAgo, 1) : null,
+    receivedAt,
+    productionStartedAt: inProgress.includes(status) ? stageAt(productionMinutes, 0) : null,
+    readyAt: ready.includes(status) ? stageAt(readyMinutes, 1) : null,
+    completedAt: finished.includes(status) ? stageAt(completedMinutes, 2) : null,
+    cancelledAt: status === 'cancelled' ? stageAt(productionMinutes, 0) : null,
     cancellationReason: status === 'cancelled' ? 'Cliente desistiu do pedido' : null,
   }
 }
@@ -125,7 +163,12 @@ export async function seedOrders({ establishmentId, customerIds, tableIds }: See
       type: blueprint.type,
       totalAmount: money(totalAmount),
       fiscalEnabled: true,
-      ...buildLifecycleTimestamps(blueprint.status, blueprint.daysAgo),
+      ...buildLifecycleTimestamps({
+        status: blueprint.status,
+        type: blueprint.type,
+        baseDaysAgo: blueprint.daysAgo,
+        index,
+      }),
     })
   })
 
