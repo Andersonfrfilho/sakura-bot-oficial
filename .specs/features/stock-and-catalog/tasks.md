@@ -30,7 +30,7 @@ R$ 0,00 e a "receita" do produto é decorativa.
 ## Fase 1 — Escrita de estoque (a base)
 > 🤖 Modelo: `sonnet` (T1.2 é 🧠 — validar com `opus` antes)
 
-- **T1.1** `POST /stock-batches` — entrada de compra: ingrediente, número do
+- ✅ **T1.1** `POST /stock-batches` — entrada de compra: ingrediente, número do
   lote, quantidade, custo unitário, validade. Em **uma transação**: cria o lote
   com `remainingQuantity = quantity`, grava `stock_movements` do tipo `in` e
   soma em `ingredients.stockQuantity`. Recalcula `ingredients.costPerUnit` como
@@ -38,6 +38,25 @@ R$ 0,00 e a "receita" do produto é decorativa.
   a margem exibida.
   *Verificação:* `POST` → `GET /ingredients` mostra o novo saldo e o novo custo;
   segundo lote mais caro move a média na direção certa.
+
+  *Implementação:* `CreateStockBatchUseCase` + `StockBatchController`
+  (`POST /stock-batches`). A média ponderada vive na função `weightedAverageCost`,
+  calculada sobre o saldo corrente antes da transação; a transação insere o lote
+  com `remainingQuantity = quantity`, grava o `stock_movements` do tipo `in` com
+  o número do lote no motivo e atualiza saldo e custo do ingrediente. Trilha de
+  auditoria (`stock_batch.created`) fora da transação, com quantidade e custo no
+  metadata. Ingrediente de outro estabelecimento não é encontrado — o filtro por
+  `establishmentId` está no `where`, não na aplicação.
+
+  *Verificação (feita ao vivo):* ingrediente zerado recebeu 10 kg a R$ 5,00
+  (saldo 10, custo 5,00) e depois 10 kg a R$ 9,00 → saldo 20,0000 e custo
+  7,0000, a média ponderada exata. Os dois `stock_movements` do tipo `in` foram
+  gravados com "Entrada de lote LOTE-T11-A/B". Dados de teste removidos ao fim;
+  a tentativa de apagar a auditoria foi barrada pela trigger
+  `fn_audit_logs_immutable`, que é o comportamento correto.
+
+  *Achado fora do escopo:* `GET /ingredients?search=` ignora o parâmetro e
+  devolve a lista inteira — não afeta esta task, mas quebra a busca da tela.
 
 - **T1.2** ✅ 🧠 Baixa por receita no fechamento do pedido. Concluído: gatilho é a
   transição `received → in_production` (kitchen começa a produzir), via
