@@ -2,6 +2,7 @@ import { seedFaker } from './helpers/seed-helpers'
 import { seedEstablishment } from './establishment.seed'
 import { seedRolesAndPermissions } from './roles-permissions.seed'
 import { seedUsers } from './users.seed'
+import { seedCatalog } from './catalog.seed'
 import { seedCustomers } from './customers.seed'
 import { seedTables } from './tables.seed'
 import { seedComandas } from './comandas.seed'
@@ -19,6 +20,7 @@ async function seed(): Promise<void> {
   const establishmentId = await seedEstablishment()
   await seedRolesAndPermissions(establishmentId)
   const userIds = await seedUsers(establishmentId)
+  await seedCatalog(establishmentId)
 
   const customerIds = await seedCustomers(establishmentId)
   const tableIds = await seedTables(establishmentId)

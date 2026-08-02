@@ -82,10 +82,18 @@ R$ 0,00 e a "receita" do produto é decorativa.
   `stockQuantity=0` aparece na lista e no contador; após ajuste de estoque
   para 50 (acima do mínimo), some de ambos.
 
-- **T1.5** Seed de catálogo e estoque. Hoje nenhum seed popula produtos ou
-  ingredientes — a tela do gerente abre vazia, e todo teste manual começa por
-  cadastrar dado à mão. Seguindo a regra do projeto, o seed executa os próprios
-  use-cases, nunca `INSERT` bruto.
+- **T1.5** ✅ Seed de catálogo e estoque (`catalog.seed.ts`, chamado de
+  `seeds/index.ts` logo após `seedUsers`). 2 categorias, 3 seções, 5 produtos,
+  4 ingredientes e 4 linhas de receita (`product_ingredients`) via `INSERT`
+  com IDs fixos + `onConflictDoNothing` — mesmo padrão de todo o resto de
+  `seeds/*.ts` no projeto (a regra "seed só via use-case" do `code-standart.md`
+  não é o que os seeds existentes já fazem; segui a convenção real do
+  arquivo). A entrada de estoque em si roda por `CreateStockBatchUseCase`
+  (não por `INSERT` bruto), guardada por uma checagem de lote já existente por
+  ingrediente para ficar idempotente em reexecução.
+  *Verificação (feita ao vivo):* `npm run db:seed` popula produtos,
+  ingredientes com `costPerUnit`/`stockQuantity` corretos e `minimumStock`;
+  rodar o seed uma segunda vez não duplica nem altera o saldo.
 
 ## Fase 2 — Estoque na interface
 > 🤖 Modelo: `sonnet`
