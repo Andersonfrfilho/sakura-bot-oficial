@@ -57,9 +57,21 @@ R$ 0,00 e a "receita" do produto é decorativa.
   quantidade esperada, do lote que vence primeiro; repetir a chamada não muda
   saldo algum.
 
-- **T1.3** `POST /stock-movements` — ajuste, perda e contagem. `movementType`
-  em `adjustment` / `loss`, `reason` obrigatório. É o que fecha o inventário
-  quando o físico diverge do sistema, e a trilha de quem mexeu.
+- **T1.3** ✅ `POST /stock-movements` — ajuste, perda e contagem. Concluído via
+  `CreateStockMovementUseCase`. `movementType` em `adjustment` (bidirecional,
+  exige `direction: increase|decrease` — é o que fecha a contagem física
+  quando ela diverge do sistema pra mais ou pra menos) / `loss` (sempre
+  decrescente, `direction` ignorado). `reason` obrigatório (1–255 chars) em
+  ambos. `quantity` é gravada com sinal em `stock_movements` (negativa para
+  decréscimo), então a soma da coluna já reflete o saldo corrente sem precisar
+  reler `movementType` para inferir direção. Uma transação: insere o
+  movimento e atualiza `ingredients.stockQuantity`; sem checagem de saldo
+  mínimo aqui — ajuste/perda é correção manual e deliberada de quem está no
+  chão da cozinha, não uma venda.
+  *Verificação (feita ao vivo):* adjustment sem `direction` → 400; adjustment
+  `increase` 20 → saldo sobe para 20; loss 5 (sem `direction`, forçado a
+  decrescer) → saldo cai para 15, `quantity` gravada como `-5.0000`; `reason`
+  vazio → 400; ingrediente de outro estabelecimento/inexistente → 404.
 
 - **T1.4** Alerta de estoque mínimo: `GET /ingredients/low-stock` comparando
   `stockQuantity <= minimumStock`, mais o contador no mesmo lugar onde já vive

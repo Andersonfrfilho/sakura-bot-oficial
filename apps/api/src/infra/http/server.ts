@@ -27,6 +27,7 @@ import { registerCatalogRoutes } from '@/modules/products/infra/http/CatalogRout
 import { registerSectionRoutes } from '@/modules/products/infra/http/SectionRoutes'
 import { registerIngredientRoutes } from '@/modules/products/infra/http/IngredientRoutes'
 import { registerStockBatchRoutes } from '@/modules/products/infra/http/StockBatchRoutes'
+import { registerStockMovementRoutes } from '@/modules/products/infra/http/StockMovementRoutes'
 import { registerConversationRoutes } from '@/modules/conversations/infra/http/ConversationRoutes'
 import { registerWhatsAppSettingsRoutes } from '@/modules/conversations/infra/http/WhatsAppSettingsRoutes'
 import { registerFiscalRoutes } from '@/modules/fiscal/infra/http/FiscalRoutes'
@@ -138,6 +139,7 @@ export async function createServer() {
   registerSectionRoutes(router, container.sectionController)
   registerIngredientRoutes(router, container.ingredientController)
   registerStockBatchRoutes(router, container.stockBatchController)
+  registerStockMovementRoutes(router, container.stockMovementController)
   registerConversationRoutes(router, container.conversationController)
   registerWhatsAppSettingsRoutes(router, container.whatsAppSettingsController)
   registerFiscalRoutes(router, container.fiscalController)

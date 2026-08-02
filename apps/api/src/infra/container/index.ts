@@ -34,6 +34,8 @@ import { IngredientController } from '@/modules/products/infra/http/IngredientCo
 import { StockBatchController } from '@/modules/products/infra/http/StockBatchController'
 import { CreateStockBatchUseCase } from '@/modules/products/application/use-cases/CreateStockBatchUseCase'
 import { DeductStockForOrderUseCase } from '@/modules/products/application/use-cases/DeductStockForOrderUseCase'
+import { StockMovementController } from '@/modules/products/infra/http/StockMovementController'
+import { CreateStockMovementUseCase } from '@/modules/products/application/use-cases/CreateStockMovementUseCase'
 
 // Tables
 import { DrizzleTableRepository } from '@/modules/tables/infra/repositories/DrizzleTableRepository'
@@ -158,6 +160,7 @@ export interface AppContainer {
   sectionController: SectionController
   ingredientController: IngredientController
   stockBatchController: StockBatchController
+  stockMovementController: StockMovementController
   authController: AuthController
   orderController: OrderController
   kitchenController: KitchenController
@@ -211,6 +214,8 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const ingredientController = new IngredientController(db)
   const createStockBatchUseCase = new CreateStockBatchUseCase(db, createAuditLogUseCase)
   const stockBatchController = new StockBatchController(db, createStockBatchUseCase)
+  const createStockMovementUseCase = new CreateStockMovementUseCase(db, createAuditLogUseCase)
+  const stockMovementController = new StockMovementController(createStockMovementUseCase)
   const deductStockForOrderUseCase = new DeductStockForOrderUseCase(db)
   const triggerFiscalEmissionUseCase = new TriggerFiscalEmissionUseCase(db, wsHub)
   const updateOrderStatusUseCase = new UpdateOrderStatusUseCase(db, wsHub, triggerFiscalEmissionUseCase, deductStockForOrderUseCase)
@@ -449,6 +454,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     sectionController,
     ingredientController,
     stockBatchController,
+    stockMovementController,
     authController,
     orderController,
     kitchenController,
