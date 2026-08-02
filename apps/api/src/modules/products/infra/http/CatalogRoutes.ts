@@ -15,6 +15,7 @@ export function registerCatalogRoutes(router: Router, controller: CatalogControl
 
   router.get('/catalog/products', ...read, controller.listProducts)
   router.post('/catalog/products', ...write, controller.createProduct)
+  router.post('/catalog/products/bulk', ...write, controller.bulkImportProducts)
   router.put('/catalog/products/:id', ...write, controller.updateProduct)
   router.patch('/catalog/products/:id/toggle-active', ...write, controller.toggleProductActive)
   router.delete('/catalog/products/:id', ...del, controller.deleteProduct)

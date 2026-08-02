@@ -145,9 +145,24 @@ R$ 0,00 e a "receita" do produto é decorativa.
 ## Fase 3 — Gestão de produto que falta
 > 🤖 Modelo: `sonnet`
 
-- **T3.1** `POST /catalog/products/bulk` (CSV) → habilita o `BulkImport` do SDK,
+- **T3.1** ✅ `POST /catalog/products/bulk` (CSV) → habilita o `BulkImport` do SDK,
   que está pronto e desligado só por falta de rota. (Era a T4.1 da spec
   `products-sdk-migration`.)
+  - Backend: `parseProductsCsv.ts` (parser tolerante a cabeçalho com/sem
+    acento — `nome`/`preço`/`descrição`/`unidade`/`código_barras`/`catálogo`)
+    + `CatalogController.bulkImportProducts` reaproveitando o parser
+    multipart já usado em `UploadController`/`ExpenseController`. Cada linha
+    é validada e inserida individualmente (mesmas regras de slug único do
+    `createProduct`); erros de linha não interrompem o lote.
+  - Frontend: `productsApiAdapter.bulkImportProducts` trocou o `reject`
+    fixo por um `fetch` multipart (mesmo padrão do `useUpload.ts`), plugando
+    o `BulkImport` do SDK que já existia desligado.
+  - *Verificação (feita ao vivo, via `curl`):* CSV com 2 produtos válidos →
+    `{"succeeded":2,"failed":0}` e os produtos aparecem em
+    `GET /catalog/products`; reenviar o mesmo arquivo →
+    `{"succeeded":0,"failed":2,"errors":[...]}` com mensagem de duplicidade
+    por linha; CSV com preço vazio → erro de validação por linha. Produtos
+    de teste revertidos via SQL após a verificação.
 - **T3.2** Ações em lote no `ProductList` do SDK: seleção por linha,
   ativar/desativar, mover de catálogo e reajuste percentual de preço. Isso
   também cobre a dívida do padrão de listagens (checkbox + barra de ação em

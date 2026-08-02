@@ -6,6 +6,8 @@ import * as schema from '@/infra/database/schema'
 import { UnauthorizedError, ValidationError, NotFoundError, ConflictError } from '@/shared/errors/AppError'
 import type { CacheProvider } from '@/shared/providers/CacheProvider'
 import { OpenFoodFactsProvider } from '@/shared/providers/OpenFoodFactsProvider'
+import { parseMultipart } from '@/shared/utils/parseMultipart'
+import { parseProductsCsv } from '../../application/parseProductsCsv'
 
 type Database = NodePgDatabase<typeof schema>
 
@@ -336,6 +338,63 @@ export class CatalogController {
 
     await this.invalidateCache(establishmentId)
     response.json({ success: true }, 200)
+  }
+
+  bulkImportProducts: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const { establishmentId } = request.user
+
+    const contentType = request.headers['content-type'] ?? ''
+    if (!contentType.includes('multipart/form-data')) {
+      throw new ValidationError('Content-Type deve ser multipart/form-data')
+    }
+
+    const parsed = parseMultipart(request.rawBody, contentType)
+    const csvFile = parsed.files[0]
+    if (!csvFile) throw new ValidationError('Nenhum arquivo enviado no campo "file"')
+
+    const { rows, errors } = parseProductsCsv(csvFile.buffer.toString('utf-8'))
+
+    const catalogs = await this.db.query.catalogs.findMany({
+      where: eq(schema.catalogs.establishmentId, establishmentId),
+      columns: { id: true, name: true },
+    })
+    const catalogIdByName = new Map(catalogs.map((catalog) => [catalog.name.toLowerCase(), catalog.id]))
+
+    let succeeded = 0
+
+    for (const row of rows) {
+      const slug = toSlug(row.name)
+
+      const existing = await this.db.query.products.findFirst({
+        where: and(
+          eq(schema.products.establishmentId, establishmentId),
+          eq(schema.products.slug, slug)
+        ),
+        columns: { id: true },
+      })
+      if (existing) {
+        errors.push({ row: row.row, message: `Produto "${row.name}" já existe` })
+        continue
+      }
+
+      await this.db.insert(schema.products).values({
+        establishmentId,
+        name: row.name,
+        slug,
+        price: String(row.price),
+        ...(row.description && { description: row.description }),
+        ...(row.unit && { unit: row.unit }),
+        ...(row.barcode && { barcode: row.barcode }),
+        ...(row.catalogName && { catalogId: catalogIdByName.get(row.catalogName.toLowerCase()) ?? null }),
+      })
+
+      succeeded += 1
+    }
+
+    if (succeeded > 0) await this.invalidateCache(establishmentId)
+
+    response.json({ succeeded, failed: errors.length, errors }, 201)
   }
 
   productSearch: RouteHandler = async (request, response) => {

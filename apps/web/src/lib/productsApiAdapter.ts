@@ -7,9 +7,8 @@
  * passa por `Math.round` sobre a string multiplicada, nunca por aritmética de float acumulada —
  * `0.1 + 0.2` não pode virar preço de venda.
  *
- * `uploadImage` e `bulkImportProducts` fazem parte do contrato mas não têm rota na API; lançam erro
- * em vez de falhar em silêncio, porque um upload que "funciona" sem persistir é pior que a ausência
- * do botão.
+ * `uploadImage` não tem rota na API (sem storage de objetos) e lança erro em vez de falhar em
+ * silêncio, porque um upload que "funciona" sem persistir é pior que a ausência do botão.
  */
 
 import type {
@@ -26,6 +25,7 @@ import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/authStore'
 
 const CENTS_PER_UNIT = 100
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3333'
 
 interface OrderHubCatalog {
   id: string
@@ -204,7 +204,21 @@ export const productsApiAdapter: ProductsApi = {
     return Promise.reject(new Error('Upload de imagem indisponível: a API não tem storage de objetos.'))
   },
 
-  bulkImportProducts() {
-    return Promise.reject(new Error('Importação em massa indisponível: falta POST /catalog/products/bulk.'))
+  async bulkImportProducts(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch(`${API_URL}/catalog/products/bulk`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token()}` },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { message?: string } | null
+      throw new Error(body?.message ?? `Importação falhou com status ${response.status}`)
+    }
+
+    return response.json()
   },
 }
