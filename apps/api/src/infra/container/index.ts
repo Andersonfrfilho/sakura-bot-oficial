@@ -77,6 +77,11 @@ import { GetOrderUseCase } from '@/modules/orders/application/use-cases/GetOrder
 import { ListOrdersUseCase } from '@/modules/orders/application/use-cases/ListOrdersUseCase'
 import { OrderController } from '@/modules/orders/infra/http/OrderController'
 import { RequestPartialOrderConfirmationUseCase } from '@/modules/orders/application/use-cases/RequestPartialOrderConfirmationUseCase'
+import { ListPaymentTypesUseCase } from '@/modules/orders/application/use-cases/ListPaymentTypesUseCase'
+import { ListOrderTypesUseCase } from '@/modules/orders/application/use-cases/ListOrderTypesUseCase'
+import { OrderReferenceDataController } from '@/modules/orders/infra/http/OrderReferenceDataController'
+import { BotConfigRepository } from '@/infra/database/BotConfigRepository'
+import { CalculateDeliveryFeeUseCase } from '@/modules/delivery/application/use-cases/CalculateDeliveryFeeUseCase'
 import type { CustomerMessageProvider } from '@/shared/providers/CustomerMessageProvider'
 import {
   CONVERSATION_AGENT_SENDER,
@@ -176,6 +181,7 @@ export interface AppContainer {
   stockMovementController: StockMovementController
   authController: AuthController
   orderController: OrderController
+  orderReferenceDataController: OrderReferenceDataController
   kitchenController: KitchenController
   deliveryController: DeliveryController
   cashierController: CashierController
@@ -246,10 +252,18 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const updateOrderStatusUseCase = new UpdateOrderStatusUseCase(db, wsHub, triggerFiscalEmissionUseCase, deductStockForOrderUseCase)
 
   // Orders
-  const createOrderUseCase = new CreateOrderUseCase(db, wsHub)
+  const botConfigRepository = new BotConfigRepository(db)
+  const calculateDeliveryFeeUseCase = new CalculateDeliveryFeeUseCase(botConfigRepository, new NominatimProvider())
+  const createOrderUseCase = new CreateOrderUseCase(db, wsHub, calculateDeliveryFeeUseCase)
   const updateOrderNotesUseCase = new UpdateOrderNotesUseCase(db)
   const getOrderUseCase = new GetOrderUseCase(db)
   const listOrdersUseCase = new ListOrdersUseCase(db)
+  const listPaymentTypesUseCase = new ListPaymentTypesUseCase(botConfigRepository)
+  const listOrderTypesUseCase = new ListOrderTypesUseCase(botConfigRepository)
+  const orderReferenceDataController = new OrderReferenceDataController(
+    listPaymentTypesUseCase,
+    listOrderTypesUseCase
+  )
 
   // Único caminho de envio ao cliente: o mesmo módulo que a inbox usa, só que atrás de uma
   // interface, para o módulo de pedidos não conhecer o registry.
@@ -522,6 +536,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     stockMovementController,
     authController,
     orderController,
+    orderReferenceDataController,
     kitchenController,
     deliveryController,
     cashierController,

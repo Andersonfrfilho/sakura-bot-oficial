@@ -14,6 +14,7 @@ import { restaurantTables } from './tables'
 import { comandas } from './comandas'
 import { orders } from './orders'
 import { orderItems } from './order-items'
+import { orderPayments } from './order-payments'
 import { deliveries } from './deliveries'
 import { cashRegisters } from './cash-registers'
 import { cashMovements } from './cash-movements'
@@ -191,6 +192,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     references: [restaurantTables.id],
   }),
   items: many(orderItems),
+  payments: many(orderPayments),
   delivery: many(deliveries),
   cashMovements: many(cashMovements),
 }))
@@ -201,6 +203,10 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
     fields: [orderItems.productId],
     references: [products.id],
   }),
+}))
+
+export const orderPaymentsRelations = relations(orderPayments, ({ one }) => ({
+  order: one(orders, { fields: [orderPayments.orderId], references: [orders.id] }),
 }))
 
 export const deliveriesRelations = relations(deliveries, ({ one }) => ({

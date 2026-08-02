@@ -1,8 +1,15 @@
 import type { Router } from '@/infra/http/router'
 import { authenticate, authorize } from '@/infra/http/middlewares'
 import type { OrderController } from './OrderController'
+import type { OrderReferenceDataController } from './OrderReferenceDataController'
 
-export function registerOrderRoutes(router: Router, controller: OrderController): void {
+export function registerOrderRoutes(
+  router: Router,
+  controller: OrderController,
+  referenceDataController: OrderReferenceDataController
+): void {
+  router.get('/payment-types', authenticate, authorize('orders', 'read'), referenceDataController.listPaymentTypes)
+  router.get('/order-types', authenticate, authorize('orders', 'read'), referenceDataController.listOrderTypes)
   router.get('/orders', authenticate, authorize('orders', 'read'), controller.list)
   router.post('/orders', authenticate, authorize('orders', 'write'), controller.create)
   router.get('/orders/:id', authenticate, authorize('orders', 'read'), controller.get)

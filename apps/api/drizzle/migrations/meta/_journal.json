@@ -211,6 +211,13 @@
       "when": 1785000100000,
       "tag": "0030_add_product_components",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1785000200000,
+      "tag": "0031_add_order_scheduling_delivery_fee",
+      "breakpoints": true
     }
   ]
 }

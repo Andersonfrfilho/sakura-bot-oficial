@@ -10,9 +10,8 @@ import {
   ORDER_TYPE_LABELS,
   type OrderStatus,
 } from '@/constants/orderLabels'
-import { CreateOrderModal } from './CreateOrderModal'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Plus, ChevronRight } from 'lucide-react'
 
 interface Order {
@@ -78,7 +77,7 @@ export function OrdersPage() {
   const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active')
   const [page, setPage] = useState(1)
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const navigate = useNavigate()
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null)
   const [editingNotesText, setEditingNotesText] = useState('')
   const [emittingOrderId, setEmitiringOrderId] = useState<string | null>(null)
@@ -182,7 +181,7 @@ export function OrdersPage() {
         <h1 className="text-xl font-bold text-gray-900">Pedidos</h1>
         <div className="flex gap-2">
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => navigate('/orders/new')}
             className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors active:scale-95"
           >
             <Plus className="h-4 w-4" />
@@ -411,10 +410,6 @@ export function OrdersPage() {
             Próxima
           </button>
         </div>
-      )}
-
-      {showCreateModal && (
-        <CreateOrderModal onClose={() => setShowCreateModal(false)} />
       )}
     </div>
   )

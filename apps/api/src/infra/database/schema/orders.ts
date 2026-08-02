@@ -18,6 +18,8 @@ export const orders = pgTable('orders', {
   notes: text('notes'),
   fiscalEnabled: boolean('fiscal_enabled').notNull().default(true),
   whatsappMessageId: varchar('whatsapp_message_id', { length: 255 }).unique(),
+  // Retirada/entrega marcada para um horário futuro. `null` é o caso comum — pedido para agora.
+  scheduledFor: timestamp('scheduled_for', { withTimezone: true }),
   receivedAt: timestamp('received_at', { withTimezone: true }).defaultNow().notNull(),
   productionStartedAt: timestamp('production_started_at', { withTimezone: true }),
   readyAt: timestamp('ready_at', { withTimezone: true }),

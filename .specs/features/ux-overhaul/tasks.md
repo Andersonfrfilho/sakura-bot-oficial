@@ -107,11 +107,63 @@ barato em seguida).
 ## Fase 2 — Pedidos completos (maior valor de negócio)
 > 🤖 Modelo: `sonnet`
 
-- ⬜ **T2.1** (UX-ORD-01..04) Redesenhar fluxo de criação de pedido:
+- ✅ **T2.1** (UX-ORD-01..04) Redesenhar fluxo de criação de pedido:
   data/hora, pagamento (tipos, troco, divisão, misto), entrega, cliente+CPF.
-  - Backend: aceitar/persistir os novos campos; expor `payment_types` e
-    `order_types` do schema do bot via API.
-  - Provável promoção de `CreateOrderModal` → página multi-etapa.
+  - *Implementação:*
+    - Backend: `CreateOrderUseCase` estendido para aceitar `payments[]`
+      (tipo, valor, troco, rótulo de divisão), `scheduledFor`,
+      `customerDocument` e `delivery{address,complement}`. `GetOrderUseCase`
+      passou a retornar as relations `payments` e `delivery` junto do pedido.
+    - Nova `CalculateDeliveryFeeUseCase`
+      (`modules/delivery/application/use-cases/`): calcula taxa de entrega
+      via distância Haversine entre coordenadas do estabelecimento e do
+      endereço geocodificado (Nominatim), respeitando o `mode` da regra ativa
+      (`fixed`, `per_km`, `zones_km`). Modos `per_route_min`/`zones_min`
+      (dependem de tempo de rota, sem API de roteamento integrada) caem para
+      a taxa base — dívida técnica documentada no código.
+    - Documento do cliente (CPF/CNPJ): só atualiza cliente já existente
+      (`customerId` presente) e só se o campo `document` ainda for nulo —
+      nunca sobrescreve dado já cadastrado. Cliente novo/avulso sem
+      correspondência não gera registro automaticamente (fora do escopo
+      desta task).
+    - `OrderController` ganhou os schemas Zod `orderPaymentSchema` e
+      `orderDeliverySchema`, compondo `createOrderSchema`. O frontend também
+      envia `customerName`, que não está declarado no schema — comportamento
+      padrão do Zod (`z.object()`) descarta chaves desconhecidas
+      silenciosamente, então o campo é ignorado sem erro (não é bug).
+    - `OrderReferenceDataController` (`listPaymentTypes`/`listOrderTypes`,
+      lendo de `BotConfigRepository`) estava órfão no código-fonte — agora
+      instanciado e cabeado no `container/index.ts`, com rotas
+      `GET /payment-types` e `GET /order-types` registradas em
+      `OrderRoutes.ts`.
+    - Frontend: `CreateOrderModal.tsx` removido (único consumidor era
+      `OrdersPage.tsx`); página multi-etapa `CreateOrderPage.tsx` promovida
+      à rota `/orders/new`, substituindo o modal. Botão "Novo pedido" em
+      `OrdersPage.tsx` agora navega via `useNavigate()`.
+  - *Verificação:*
+    - `npx tsc --noEmit` limpo em `apps/api` (21 erros pré-existentes, todos
+      não relacionados a este trabalho) e `apps/web` (5 erros pré-existentes,
+      idem) — nenhuma regressão introduzida.
+    - Testado via curl com usuário `admin@orderhub.io`: `GET /payment-types`
+      e `GET /order-types` retornam os dados reais do seed;
+      `POST /orders` com `type=delivery`, `payments[]` (dividido) e
+      `delivery.address` persistiu corretamente pedido, itens, pagamentos e
+      uma linha em `deliveries` com `feeAmount`/`distanceKm` calculados a
+      partir da regra `fixed` ativa (confirmado via `psql`).
+    - Testado no browser: navegação `/orders` → clique em "Novo pedido" →
+      `/orders/new` renderiza a etapa de seleção de tipo (mesa/entrega/
+      retirada) com grid de mesas e badges de comanda ativa. Confirmado via
+      `read_page`/`get_page_text` (sem `screenshot` intermediário, conforme
+      regra de economia de contexto).
+    - **Bug pré-existente encontrado e não corrigido (fora do escopo)**:
+      `LoginPage.tsx:21` (`TS2554 Expected 2 arguments, but got 3`) já
+      constava no baseline de typecheck do frontend — a action de login da
+      store é chamada com argumentos errados, o que faz o formulário de
+      login real não autenticar (POST retorna 200, mas `accessToken`/`user`
+      nunca populam o `localStorage`, então o `AuthGuard` bounça de volta
+      para `/login`). Contornado durante os testes injetando um token válido
+      diretamente no `localStorage`. Como afeta o fluxo de autenticação,
+      recomenda-se abrir task dedicada em Fase 0 ou 1 para corrigir.
 - ⬜ **T2.2** (UX-ORD-05) Pedido de mesa exige comanda (selecionar existente ou
   criar); vincular pedido→comanda. 🔗 T2.1.
 - ⬜ **T2.3** (UX-ORD-06/07) Listagem melhorada + painel de detalhe do pedido

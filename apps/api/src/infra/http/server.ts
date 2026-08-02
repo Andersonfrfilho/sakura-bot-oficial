@@ -128,7 +128,7 @@ export async function createServer() {
 
   // Register all module routes
   registerAuthRoutes(router, container.authController)
-  registerOrderRoutes(router, container.orderController)
+  registerOrderRoutes(router, container.orderController, container.orderReferenceDataController)
   registerKitchenRoutes(router, container.kitchenController)
   registerDeliveryRoutes(router, container.deliveryController)
   registerCashierRoutes(router, container.cashierController)

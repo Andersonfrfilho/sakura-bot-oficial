@@ -15,7 +15,7 @@ export class GetOrderUseCase {
         eq(schema.orders.establishmentId, establishmentId)
       ),
       // O cliente vem junto porque a tela de detalhe abre a conversa a partir do WhatsApp dele.
-      with: { items: true, customer: true },
+      with: { items: true, customer: true, payments: true, delivery: true },
     })
 
     if (!order) throw new NotFoundError('Order')

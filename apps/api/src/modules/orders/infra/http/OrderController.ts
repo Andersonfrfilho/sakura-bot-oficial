@@ -17,6 +17,18 @@ const orderItemSchema = z.object({
   notes: z.string().max(500).optional(),
 })
 
+const orderPaymentSchema = z.object({
+  paymentTypeName: z.string().min(1).max(50),
+  amount: z.number().positive(),
+  changeFor: z.number().positive().optional(),
+  splitLabel: z.string().max(100).optional(),
+})
+
+const orderDeliverySchema = z.object({
+  address: z.string().min(1).max(500),
+  complement: z.string().max(255).optional(),
+})
+
 const createOrderSchema = z.object({
   customerId: z.string().uuid().optional(),
   tableId: z.string().uuid().optional(),
@@ -26,6 +38,10 @@ const createOrderSchema = z.object({
   notes: z.string().max(1000).optional(),
   fiscalEnabled: z.boolean().optional(),
   whatsappMessageId: z.string().max(255).optional(),
+  scheduledFor: z.string().datetime().optional(),
+  payments: z.array(orderPaymentSchema).optional(),
+  customerDocument: z.string().max(20).optional(),
+  delivery: orderDeliverySchema.optional(),
 })
 
 const updateStatusSchema = z.object({
