@@ -7,6 +7,7 @@ export function registerStockBatchRoutes(router: Router, controller: StockBatchC
   const read = [authenticate, authorize('products', 'read')]
   const write = [authenticate, authorize('products', 'write')]
 
+  router.get('/stock-batches', ...read, controller.listByIngredient)
   router.get('/stock-batches/expiring', ...read, controller.listExpiring)
   router.get('/stock-batches/expiring/count', ...read, controller.countExpiring)
   router.post('/stock-batches', ...write, controller.create)

@@ -8,12 +8,11 @@ import { Plus, AlertTriangle } from 'lucide-react'
 interface StockBatch {
   id: string
   ingredientId: string
+  batchNumber: string
   quantity: string
   remainingQuantity: string
-  unitCost: string
-  expiresAt: string | null
-  purchasedAt: string | null
-  notes: string | null
+  costPerUnit: string
+  expiresAt: string
   createdAt: string
 }
 
@@ -47,10 +46,10 @@ export function StockBatchList({ ingredientId, ingredientName }: StockBatchListP
   const queryClient = useQueryClient()
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [formBatchNumber, setFormBatchNumber] = useState('')
   const [formQuantity, setFormQuantity] = useState('')
-  const [formUnitCost, setFormUnitCost] = useState('')
+  const [formCostPerUnit, setFormCostPerUnit] = useState('')
   const [formExpiresAt, setFormExpiresAt] = useState('')
-  const [formNotes, setFormNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const { data: batches = [] } = useQuery({
@@ -71,20 +70,24 @@ export function StockBatchList({ ingredientId, ingredientName }: StockBatchListP
   })
 
   function resetForm() {
+    setFormBatchNumber('')
     setFormQuantity('')
-    setFormUnitCost('')
+    setFormCostPerUnit('')
     setFormExpiresAt('')
-    setFormNotes('')
     setError(null)
   }
 
   function submit() {
+    if (!formBatchNumber || !formQuantity || !formCostPerUnit || !formExpiresAt) {
+      setError('Preencha número do lote, quantidade, custo unitário e validade')
+      return
+    }
     createBatch.mutate({
       ingredientId,
+      batchNumber: formBatchNumber,
       quantity: Number(formQuantity),
-      unitCost: Number(formUnitCost),
-      expiresAt: formExpiresAt || null,
-      notes: formNotes || undefined,
+      costPerUnit: Number(formCostPerUnit),
+      expiresAt: formExpiresAt,
     })
   }
 
@@ -111,6 +114,7 @@ export function StockBatchList({ ingredientId, ingredientName }: StockBatchListP
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-gray-50 text-left text-gray-500">
+                <th className="px-3 py-1.5 font-medium">Lote</th>
                 <th className="px-3 py-1.5 font-medium">Qtd original</th>
                 <th className="px-3 py-1.5 font-medium">Restante</th>
                 <th className="px-3 py-1.5 font-medium">Custo un.</th>
@@ -122,9 +126,10 @@ export function StockBatchList({ ingredientId, ingredientName }: StockBatchListP
                 const badge = getExpiryBadge(batch.expiresAt)
                 return (
                   <tr key={batch.id} className="border-t border-gray-100">
+                    <td className="px-3 py-1.5 text-gray-800">{batch.batchNumber}</td>
                     <td className="px-3 py-1.5 text-gray-800">{toNumber(batch.quantity).toFixed(4)}</td>
                     <td className="px-3 py-1.5 text-gray-600">{toNumber(batch.remainingQuantity).toFixed(4)}</td>
-                    <td className="px-3 py-1.5 text-gray-600">R$ {toNumber(batch.unitCost).toFixed(4)}</td>
+                    <td className="px-3 py-1.5 text-gray-600">R$ {toNumber(batch.costPerUnit).toFixed(4)}</td>
                     <td className="px-3 py-1.5">
                       {badge ? (
                         <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${badge.color}`}>
@@ -147,6 +152,16 @@ export function StockBatchList({ ingredientId, ingredientName }: StockBatchListP
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={`Entrada · ${ingredientName}`} size="sm">
         <div className="p-5 space-y-4">
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Número do lote</label>
+            <input
+              type="text"
+              value={formBatchNumber}
+              onChange={(e) => setFormBatchNumber(e.target.value)}
+              placeholder="Ex: LOTE-2026-001"
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade</label>
             <input
               type="number"
@@ -164,28 +179,18 @@ export function StockBatchList({ ingredientId, ingredientName }: StockBatchListP
               type="number"
               min="0"
               step="0.0001"
-              value={formUnitCost}
-              onChange={(e) => setFormUnitCost(e.target.value)}
+              value={formCostPerUnit}
+              onChange={(e) => setFormCostPerUnit(e.target.value)}
               placeholder="Ex: 4.50"
               className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Validade (opcional)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Validade</label>
             <input
               type="date"
               value={formExpiresAt}
               onChange={(e) => setFormExpiresAt(e.target.value)}
-              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notas (opcional)</label>
-            <input
-              type="text"
-              value={formNotes}
-              onChange={(e) => setFormNotes(e.target.value)}
-              placeholder="Ex: Comprado do fornecedor X"
               className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>

@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
-import { Pencil, Trash2, Plus } from 'lucide-react'
+import { Pencil, Trash2, Plus, ChevronDown, ChevronRight } from 'lucide-react'
+import { StockBatchList } from './StockBatchList'
 
 interface Ingredient {
   id: string
@@ -40,6 +41,7 @@ export function IngredientManager() {
   const queryClient = useQueryClient()
 
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [formName, setFormName] = useState('')
   const [formUnit, setFormUnit] = useState('un')
@@ -206,40 +208,52 @@ export function IngredientManager() {
               {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
             </div>
           ) : (
-            <div
-              key={ingredient.id}
-              className="bg-white rounded-lg border border-gray-200 px-3 py-2 flex items-center justify-between group"
-            >
-              <div className="min-w-0 flex-1">
-                <span className="text-sm font-medium text-gray-800">{ingredient.name}</span>
-                <span className="ml-2 text-xs text-gray-400">
-                  {UNIT_LABELS[ingredient.unit] ?? ingredient.unit}
-                </span>
-              </div>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <span className="text-xs text-gray-500">
-                  R$ {toNumber(ingredient.costPerUnit).toFixed(4)}/{ingredient.unit}
-                </span>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStockColor(ingredient.stockQuantity, ingredient.minimumStock)}`}>
-                  {toNumber(ingredient.stockQuantity).toFixed(2)}
-                </span>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div key={ingredient.id} className="bg-white rounded-lg border border-gray-200 group">
+              <div className="px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
                   <button
-                    onClick={() => startEdit(ingredient)}
-                    className="p-1 text-gray-400 hover:text-brand-600"
-                    title="Editar"
+                    onClick={() => setExpandedId(expandedId === ingredient.id ? null : ingredient.id)}
+                    className="flex items-center gap-1.5 min-w-0 flex-1 text-left"
                   >
-                    <Pencil className="h-3.5 w-3.5" />
+                    {expandedId === ingredient.id ? (
+                      <ChevronDown className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                    )}
+                    <span className="text-sm font-medium text-gray-800 truncate">{ingredient.name}</span>
+                    <span className="text-xs text-gray-400 flex-shrink-0">{UNIT_LABELS[ingredient.unit] ?? ingredient.unit}</span>
                   </button>
-                  <button
-                    onClick={() => deleteIngredient.mutate(ingredient.id)}
-                    className="p-1 text-gray-400 hover:text-red-500"
-                    title="Excluir"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    <button
+                      onClick={() => startEdit(ingredient)}
+                      className="p-1 text-gray-400 hover:text-brand-600"
+                      title="Editar"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => deleteIngredient.mutate(ingredient.id)}
+                      className="p-1 text-gray-400 hover:text-red-500"
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-1 pl-5">
+                  <span className="text-xs text-gray-500">
+                    R$ {toNumber(ingredient.costPerUnit).toFixed(4)}/{ingredient.unit}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStockColor(ingredient.stockQuantity, ingredient.minimumStock)}`}>
+                    {toNumber(ingredient.stockQuantity).toFixed(2)}
+                  </span>
                 </div>
               </div>
+              {expandedId === ingredient.id && (
+                <div className="px-3 pb-3 pt-1 border-t border-gray-100">
+                  <StockBatchList ingredientId={ingredient.id} ingredientName={ingredient.name} />
+                </div>
+              )}
             </div>
           )
         )}

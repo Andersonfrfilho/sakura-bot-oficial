@@ -44,6 +44,27 @@ export class StockBatchController {
     response.json(batch, 201)
   }
 
+  listByIngredient: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const { establishmentId } = request.user
+
+    const ingredientId = (request as { query?: Record<string, string> }).query?.['ingredientId']
+    if (!ingredientId) throw new ValidationError('Parâmetro ingredientId é obrigatório')
+
+    const batches = await this.db
+      .select()
+      .from(schema.stockBatches)
+      .where(
+        and(
+          eq(schema.stockBatches.establishmentId, establishmentId),
+          eq(schema.stockBatches.ingredientId, ingredientId)
+        )
+      )
+      .orderBy(asc(schema.stockBatches.expiresAt))
+
+    response.json(batches)
+  }
+
   listExpiring: RouteHandler = async (request, response) => {
     if (!request.user) throw new UnauthorizedError()
     const { establishmentId } = request.user

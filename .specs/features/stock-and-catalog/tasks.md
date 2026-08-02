@@ -98,7 +98,27 @@ R$ 0,00 e a "receita" do produto é decorativa.
 ## Fase 2 — Estoque na interface
 > 🤖 Modelo: `sonnet`
 
-- **T2.1** Tela de entrada de lote a partir do `IngredientManager`.
+- **T2.1** ✅ Tela de entrada de lote a partir do `IngredientManager`.
+  - Backend: `GET /stock-batches?ingredientId=` (`StockBatchController.listByIngredient`)
+    lista os lotes de um ingrediente ordenados por validade.
+  - Frontend: `StockBatchList.tsx` já existia mas estava dessincronizado do
+    schema atual (`unitCost` em vez de `costPerUnit`, sem `batchNumber`,
+    campos `notes`/`purchasedAt` removidos numa migration anterior) e nunca
+    era montado em lugar nenhum. Corrigido para usar os campos reais do
+    backend e conectado ao `IngredientManager` via linha expansível
+    (chevron por ingrediente) que revela a lista de lotes e o botão
+    "Entrada" (modal com número do lote, quantidade, custo unitário e
+    validade).
+  - Corrigido também um bug de layout pré-existente na lista de ingredientes
+    da sidebar: nome do ingrediente e badges de custo/estoque se sobrepunham
+    visualmente em telas estreitas (texto sem `truncate` vazando por cima do
+    irmão flex). Reestruturado em duas linhas (nome+ações / custo+estoque).
+  - *Verificação (feita ao vivo, via browser):* login como `gerente@orderhub.io`,
+    `/catalog` → expandir "Arroz" mostra o lote seedado `SEED-000`; "Entrada"
+    abre o modal, submeter lote `TESTE-UI-001` (3kg @ R$7,00, validade
+    31/12/2026) atualiza a lista, o estoque do ingrediente (20→23) e o custo
+    médio ponderado (6.50→6.5652) em tempo real. `vite build` sem erros.
+    Dados de teste revertidos via SQL após a verificação.
 - **T2.2** Painel de estoque: saldo, custo médio, mínimo, lotes com validade,
   e o histórico de movimentos do ingrediente (a auditoria só serve se for
   visível).
