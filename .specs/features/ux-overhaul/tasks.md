@@ -441,6 +441,21 @@ barato em seguida).
     `SectionManager.tsx` com add/edit/delete inline; select de seção no form
     de produto; badge de seção na listagem.
 - 🔶 **T6.8** (UX-CAT-01) Correções de categorias (Pasted #6/#7).
+  - *Parcial (2026-08-02):* usuário esclareceu que **"catálogo" é intencional**,
+    para casar com a nomenclatura do SDK — a sobreposição de nomes entre
+    catálogo e seção não deve ser mexida. O problema real era o bloco fiscal:
+    NCM/CFOP/CST pedidos crus, com a instrução "consultar contador", a quem
+    cadastra cardápio e não sabe o que os campos significam.
+  - *Implementação:* `constants/fiscalDefaults.ts` com os padrões de food
+    service (`21069090` / `5102` / `400`), uma linha de explicação por campo e
+    os rótulos da seção. No modal de catálogo os campos passaram de grid de 3
+    colunas apertadas para lista vertical com hint abaixo de cada um, a seção
+    ganhou a nota de que só serve para nota fiscal e pode ficar em branco, e um
+    botão "Usar padrão de restaurante" (ícone `Wand2`) preenche os três.
+  - *Verificação:* browser — modal exibe as três explicações, o botão preenche
+    `21069090 | 5102 | 400`. `npx tsc --noEmit` manteve a baseline de 5 erros.
+  - *Segue bloqueada* para o restante: sem os Pasteds #6/#7 não dá para saber se
+    havia outros problemas além dos campos fiscais.
 - ✅ **T6.9** (UX-PRD-11) Design doc do modelo estoque/ficha técnica
   (`design.md`): ingredientes, receitas, lotes, custeio — **antes** das
   migrations de T6.5/T6.10/T6.11. Benchmark com sistemas maduros do segmento.

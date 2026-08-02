@@ -3,7 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { Modal } from '@/components/ui/Modal'
-import { Plus } from 'lucide-react'
+import { Plus, Wand2 } from 'lucide-react'
+import {
+  FISCAL_DEFAULTS,
+  FISCAL_FIELD_HINTS,
+  FISCAL_SECTION_TITLE,
+  FISCAL_SECTION_HELP,
+  FISCAL_APPLY_DEFAULTS_LABEL,
+} from '@/constants/fiscalDefaults'
 import { SectionManager } from './components/SectionManager'
 import { IngredientManager } from './components/IngredientManager'
 import { RecipeManager, RecipeCostBadge } from './components/RecipeManager'
@@ -728,18 +735,30 @@ function CatalogPageContent() {
                     />
                   </div>
                   <div className="border-t border-gray-100 pt-3">
-                    <p className="text-xs font-medium text-gray-500 mb-2">Tributação fiscal (consultar contador)</p>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="flex items-start justify-between gap-3 mb-1">
+                      <p className="text-xs font-medium text-gray-500">{FISCAL_SECTION_TITLE}</p>
+                      <button
+                        type="button"
+                        onClick={() => setCatForm((prev) => ({ ...prev, ...FISCAL_DEFAULTS }))}
+                        className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 shrink-0"
+                      >
+                        <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        {FISCAL_APPLY_DEFAULTS_LABEL}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mb-2">{FISCAL_SECTION_HELP}</p>
+                    <div className="space-y-2">
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">NCM</label>
                         <input
                           type="text"
                           value={catForm.ncmCode}
                           onChange={(e) => setCatForm((prev) => ({ ...prev, ncmCode: e.target.value }))}
-                          placeholder="21069090"
+                          placeholder={FISCAL_DEFAULTS.ncmCode}
                           maxLength={8}
                           className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
                         />
+                        <p className="text-[11px] text-gray-400 mt-1">{FISCAL_FIELD_HINTS.ncmCode}</p>
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">CFOP</label>
@@ -747,10 +766,11 @@ function CatalogPageContent() {
                           type="text"
                           value={catForm.cfopCode}
                           onChange={(e) => setCatForm((prev) => ({ ...prev, cfopCode: e.target.value }))}
-                          placeholder="5102"
+                          placeholder={FISCAL_DEFAULTS.cfopCode}
                           maxLength={4}
                           className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
                         />
+                        <p className="text-[11px] text-gray-400 mt-1">{FISCAL_FIELD_HINTS.cfopCode}</p>
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">CST ICMS</label>
@@ -758,10 +778,11 @@ function CatalogPageContent() {
                           type="text"
                           value={catForm.cstIcms}
                           onChange={(e) => setCatForm((prev) => ({ ...prev, cstIcms: e.target.value }))}
-                          placeholder="400"
+                          placeholder={FISCAL_DEFAULTS.cstIcms}
                           maxLength={3}
                           className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
                         />
+                        <p className="text-[11px] text-gray-400 mt-1">{FISCAL_FIELD_HINTS.cstIcms}</p>
                       </div>
                     </div>
                   </div>
