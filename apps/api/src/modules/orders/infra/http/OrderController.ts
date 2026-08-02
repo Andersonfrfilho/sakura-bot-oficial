@@ -105,10 +105,15 @@ export class OrderController {
 
   list: RouteHandler = async (request, response) => {
     if (!request.user) throw new UnauthorizedError()
-    const { status, page, pageSize } = request.query
+    const { status, type, channel, search, dateFrom, dateTo, page, pageSize } = request.query
     const result = await this.listOrdersUseCase.execute({
       establishmentId: request.user.establishmentId,
       statuses: status ? (status.split(',') as never) : undefined,
+      types: type ? (type.split(',') as never) : undefined,
+      channels: channel ? (channel.split(',') as never) : undefined,
+      search: search || undefined,
+      dateFrom: dateFrom ? new Date(dateFrom) : undefined,
+      dateTo: dateTo ? new Date(dateTo) : undefined,
       page: page ? parseInt(page) : undefined,
       pageSize: pageSize ? parseInt(pageSize) : undefined,
     })

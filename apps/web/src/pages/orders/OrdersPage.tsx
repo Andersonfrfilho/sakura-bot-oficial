@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
@@ -11,8 +11,29 @@ import {
   type OrderStatus,
 } from '@/constants/orderLabels'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { Link, useNavigate } from 'react-router-dom'
-import { Plus, ChevronRight } from 'lucide-react'
+import { Select, type SelectOption } from '@/components/ui/Select'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Plus, ChevronRight, X } from 'lucide-react'
+
+type OrderTypeValue = 'table' | 'delivery' | 'pickup'
+type OrderChannelValue = 'whatsapp' | 'ifood' | 'manual'
+
+const TYPE_OPTIONS: SelectOption<OrderTypeValue>[] = [
+  { value: 'table', label: ORDER_TYPE_LABELS.table },
+  { value: 'delivery', label: ORDER_TYPE_LABELS.delivery },
+  { value: 'pickup', label: ORDER_TYPE_LABELS.pickup },
+]
+
+const CHANNEL_OPTIONS: SelectOption<OrderChannelValue>[] = [
+  { value: 'whatsapp', label: ORDER_CHANNEL_LABELS.whatsapp ?? 'WhatsApp' },
+  { value: 'ifood', label: ORDER_CHANNEL_LABELS.ifood ?? 'iFood' },
+  { value: 'manual', label: ORDER_CHANNEL_LABELS.manual ?? 'Manual' },
+]
+
+function parseCsvParam<TValue extends string>(value: string | null): TValue[] {
+  if (!value) return []
+  return value.split(',').filter(Boolean) as TValue[]
+}
 
 interface Order {
   id: string
@@ -76,9 +97,19 @@ const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
 export function OrdersPage() {
   const accessToken = useAuthStore((state) => state.accessToken)
   const queryClient = useQueryClient()
-  const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active')
-  const [page, setPage] = useState(1)
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const statusFilter = searchParams.get('status') === 'all' ? 'all' : 'active'
+  const typeFilter = parseCsvParam<OrderTypeValue>(searchParams.get('type'))
+  const channelFilter = parseCsvParam<OrderChannelValue>(searchParams.get('channel'))
+  const dateFrom = searchParams.get('dateFrom') ?? ''
+  const dateTo = searchParams.get('dateTo') ?? ''
+  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1)
+
+  const [searchInput, setSearchInput] = useState(searchParams.get('search') ?? '')
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') ?? '')
+
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null)
   const [editingNotesText, setEditingNotesText] = useState('')
   const [emittingOrderId, setEmitiringOrderId] = useState<string | null>(null)
@@ -86,13 +117,60 @@ export function OrdersPage() {
 
   const statuses = statusFilter === 'active' ? ACTIVE_STATUSES : ALL_STATUSES
 
+  // Debounce da busca textual — evita disparar uma request a cada tecla digitada.
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(searchInput), 400)
+    return () => clearTimeout(timeout)
+  }, [searchInput])
+
+  useEffect(() => {
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous)
+        if (debouncedSearch) next.set('search', debouncedSearch)
+        else next.delete('search')
+        next.delete('page')
+        return next
+      },
+      { replace: true }
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch])
+
+  function updateFilters(updates: Record<string, string | null>) {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous)
+      for (const [key, value] of Object.entries(updates)) {
+        if (value) next.set(key, value)
+        else next.delete(key)
+      }
+      if (!('page' in updates)) next.delete('page')
+      return next
+    })
+  }
+
+  function clearFilters() {
+    setSearchInput('')
+    setDebouncedSearch('')
+    setSearchParams({})
+  }
+
+  const hasActiveFilters =
+    statusFilter === 'all' || typeFilter.length > 0 || channelFilter.length > 0 || !!dateFrom || !!dateTo || !!debouncedSearch
+
+  const queryParams = new URLSearchParams()
+  queryParams.set('status', statuses.join(','))
+  if (typeFilter.length) queryParams.set('type', typeFilter.join(','))
+  if (channelFilter.length) queryParams.set('channel', channelFilter.join(','))
+  if (debouncedSearch) queryParams.set('search', debouncedSearch)
+  if (dateFrom) queryParams.set('dateFrom', `${dateFrom}T00:00:00`)
+  if (dateTo) queryParams.set('dateTo', `${dateTo}T23:59:59`)
+  queryParams.set('page', String(page))
+  queryParams.set('pageSize', '20')
+
   const { data, isLoading } = useQuery({
-    queryKey: ['orders', statusFilter, page],
-    queryFn: () =>
-      api.get<OrdersResponse>(
-        `/orders?status=${statuses.join(',')}&page=${page}&pageSize=20`,
-        accessToken ?? undefined
-      ),
+    queryKey: ['orders', queryParams.toString()],
+    queryFn: () => api.get<OrdersResponse>(`/orders?${queryParams.toString()}`, accessToken ?? undefined),
     refetchInterval: 15_000,
   })
 
@@ -189,15 +267,15 @@ export function OrdersPage() {
             Novo pedido
           </button>
           <button
-            onClick={() => { setStatusFilter('active'); setPage(1) }}
+            onClick={() => updateFilters({ status: null })}
             className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors active:scale-95 ${
               statusFilter === 'active' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 border border-gray-300'
             }`}
           >
-            Ativos ({total})
+            Ativos ({statusFilter === 'active' ? total : ''})
           </button>
           <button
-            onClick={() => { setStatusFilter('all'); setPage(1) }}
+            onClick={() => updateFilters({ status: 'all' })}
             className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors active:scale-95 ${
               statusFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 border border-gray-300'
             }`}
@@ -205,6 +283,66 @@ export function OrdersPage() {
             Todos
           </button>
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm p-3 mb-4 flex flex-wrap items-end gap-3">
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Buscar</label>
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Nº do pedido, nome ou telefone do cliente"
+            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <div className="w-40">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
+          <Select
+            multiple
+            options={TYPE_OPTIONS}
+            value={typeFilter}
+            onChange={(value) => updateFilters({ type: value.join(',') || null })}
+            placeholder="Todos"
+          />
+        </div>
+        <div className="w-40">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Canal</label>
+          <Select
+            multiple
+            options={CHANNEL_OPTIONS}
+            value={channelFilter}
+            onChange={(value) => updateFilters({ channel: value.join(',') || null })}
+            placeholder="Todos"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">De</label>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => updateFilters({ dateFrom: e.target.value || null })}
+            className="text-sm border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Até</label>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => updateFilters({ dateTo: e.target.value || null })}
+            className="text-sm border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        {hasActiveFilters && (
+          <button
+            onClick={clearFilters}
+            className="flex items-center gap-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <X className="h-4 w-4" />
+            Limpar filtros
+          </button>
+        )}
       </div>
 
       {fiscalError && (
@@ -402,7 +540,7 @@ export function OrdersPage() {
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-6">
           <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => updateFilters({ page: String(Math.max(1, page - 1)) })}
             disabled={page === 1}
             className="px-4 py-2 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-100 transition-colors active:scale-95"
           >
@@ -410,7 +548,7 @@ export function OrdersPage() {
           </button>
           <span className="px-3 py-1 text-sm text-gray-600">{page} / {totalPages}</span>
           <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => updateFilters({ page: String(Math.min(totalPages, page + 1)) })}
             disabled={page === totalPages}
             className="px-4 py-2 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-100 transition-colors active:scale-95"
           >

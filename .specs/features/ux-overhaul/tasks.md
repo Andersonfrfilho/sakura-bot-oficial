@@ -209,8 +209,36 @@ barato em seguida).
       renderiza corretamente as seções "Pagamento" e "Histórico de status"
       (vazias para pedidos sem esses dados, conforme esperado), sem erros
       no console.
-- ⬜ **T2.4** (UX-ORD-08) Busca textual, filtros multi-select, calendário
+- ✅ **T2.4** (UX-ORD-08) Busca textual, filtros multi-select, calendário
   (range), busca por cliente, estado na URL. 🔗 T1.1.
+  - *Implementação:* `ListOrdersUseCase.ts` reescrito com pipeline em duas
+    fases: (1) `select` + `leftJoin` em `customers` + `where` (status, type,
+    channel, busca, range de data) + `orderBy` + `limit/offset` para achar os
+    IDs da página e o `count()` total; (2) `db.query.orders.findMany` com
+    `inArray(id, ids)` e `with: {items, customer, payments}` para montar os
+    dados relacionais completos, preservando a mesma ordenação. Busca textual
+    usa `ilike` em nome/telefone do cliente (via join) e no `id` do pedido
+    (cast para texto), combinados com `or()`. `OrderController.list` decodifica
+    `status/type/channel` (CSV → array), `search`, `dateFrom/dateTo` (ISO) e
+    `page/pageSize` da query string. No frontend, `OrdersPage.tsx` passou a
+    usar `useSearchParams` como fonte única de verdade dos filtros: busca
+    textual com debounce de 400ms (`useState` local + `useEffect` com
+    `setTimeout`), Tipo e Canal como `Select` em modo `multiple` (reaproveitado
+    de `Select.tsx`, sem novo componente), range de data com dois
+    `<input type="date">` (sem lib nova), e um `updateFilters()`/
+    `clearFilters()` centralizando a escrita nos search params — qualquer
+    mudança de filtro reseta a página para 1, exceto quando o próprio update é
+    de página. Botão "Limpar filtros" só aparece quando há filtro ativo.
+  - *Verificação:* `npx tsc --noEmit` limpo nos dois pacotes (baseline mantida:
+    21 erros pré-existentes na API, 5 no frontend). Testado via curl contra
+    `order_hub_api` (hot-reload confirmado nos logs): busca por nome de
+    cliente (`search=Maria`) retornou o pedido correto; filtro `type=delivery`
+    retornou só pedidos de entrega; filtro `channel=whatsapp` retornou
+    `total: 8` e página com 2 itens, ambos `whatsapp`; busca sem match
+    (`search=zzznotfound`) retornou `{data: [], total: 0}` corretamente; busca
+    por telefone parcial que não existe nos dados de seed (`5511`) retornou
+    `total: 0` como esperado (confirmado via `psql` que nenhum cliente seed
+    tem esse prefixo — não é bug).
 
 ## Fase 3 — Mesas, comandas e salão
 > 🤖 Modelo: `sonnet` (T3.2 junção de mesas é 🧠 — validar modelagem com `opus` antes de implementar)
