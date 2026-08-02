@@ -369,9 +369,42 @@ estabelecimento vende junto; o histórico de pedidos sabe, e ele já está no ba
   *Não verificado:* o isolamento por estabelecimento está no `WHERE` das duas consultas,
   mas o seed tem um único estabelecimento — não houve como provar ao vivo que produto de
   outro tenant devolve 404.
-- **T4.7** Kit/combo como produto composto: um produto que agrega outros com
+- ✅ **T4.7** Kit/combo como produto composto: um produto que agrega outros com
   preço próprio, que ao ser vendido baixa a receita de cada componente
   (reaproveita T1.2 direto).
+
+  *Implementação:* `products.is_kit` + tabela `product_components` (migration `0030`).
+  O kit tem preço próprio — é o motivo de existir, combo custa menos que a soma — mas
+  **não** tem receita própria: `DeductStockForOrderUseCase` expande o kit nos
+  componentes e aplica a receita de cada um, reaproveitando a T1.2 sem duplicar regra
+  de consumo. O use case foi refatorado em `resolveConsumptionLines` +
+  `consumeRecipe`, porque o método único já passava de 100 linhas e a expansão o
+  faria crescer mais.
+
+  **Kit não pode conter kit.** A expansão é de um nível só, e é o cadastro que garante
+  isso: sem a regra, um ciclo (A contém B, B contém A) travaria a baixa de um pedido —
+  justamente o caminho onde há dinheiro em jogo. Guardas no cadastro: componente
+  inexistente ou de outro estabelecimento, kit contendo a si mesmo, produto que não é
+  kit, quantidade ≤ 0. No banco, `CHECK` de auto-referência e de quantidade positiva,
+  `UNIQUE` do par e `ON DELETE restrict` no componente — apagar item que compõe kit
+  deve falhar, não corromper o kit em silêncio. `PUT /components` substitui a
+  composição inteira **em transação**: a composição salva é a que o usuário viu, sem
+  janela com o kit pela metade.
+
+  *Verificação:* migration conferida com `\d product_components`. Kit "Combo Almoço"
+  criado com Prato Feito Carne ×1 e Refrigerante Lata ×2; pedido de **2 unidades do
+  kit** movido para `in_production` baixou exatamente o esperado — arroz
+  `0,3 × 1 × 2 = 0,6 kg` e refrigerante `1 × 2 × 2 = 4 un` — com um `stock_movement`
+  por ingrediente. As cinco guardas de cadastro retornaram `validation_error` e a
+  composição sobreviveu intacta às tentativas falhas. Estoque insuficiente **no
+  componente** devolve 409 nomeando o componente ("Refrigerante Lata"), não o kit, e
+  o rollback da transação preservou o arroz que já tinha sido processado antes na
+  mesma baixa. Repetir a transição não duplica movimento. `DELETE` do kit remove os
+  componentes em cascade sem deixar órfão.
+
+  *Corrigido no caminho:* o `ON DELETE restrict` protegia o dado mas estourava como
+  **500**. Apagar produto usado em kit é condição de negócio previsível: `deleteProduct`
+  agora checa antes e devolve 409 nomeando o kit que está no caminho.
 - **T4.8** Sugestão de itens que faltam no catálogo, a partir do que a região
   vende e o estabelecimento não tem. **Depende de 4B** e só é honesto no estado
   com cobertura. Último da fila.

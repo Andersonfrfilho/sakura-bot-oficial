@@ -19,6 +19,8 @@ export const products = pgTable('products', {
   barcode: varchar('barcode', { length: 20 }),
   preparationTimeMinutes: integer('preparation_time_minutes'),
   preparationInstructions: text('preparation_instructions'),
+  /** Kit/combo: não tem receita própria, a baixa expande nos componentes. */
+  isKit: boolean('is_kit').default(false).notNull(),
   active: boolean('active').default(true).notNull(),
   allowNegativeStock: boolean('allow_negative_stock').default(false).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),

@@ -9,6 +9,7 @@ import { catalogs } from './catalogs'
 import { products } from './products'
 import { productPriceHistory } from './product-price-history'
 import { productAffinities } from './product-affinities'
+import { productComponents } from './product-components'
 import { restaurantTables } from './tables'
 import { comandas } from './comandas'
 import { orders } from './orders'
@@ -137,6 +138,17 @@ export const productAffinitiesRelations = relations(productAffinities, ({ one })
   }),
   suggestedProduct: one(products, {
     fields: [productAffinities.suggestedProductId],
+    references: [products.id],
+  }),
+}))
+
+export const productComponentsRelations = relations(productComponents, ({ one }) => ({
+  kit: one(products, {
+    fields: [productComponents.kitProductId],
+    references: [products.id],
+  }),
+  component: one(products, {
+    fields: [productComponents.componentProductId],
     references: [products.id],
   }),
 }))

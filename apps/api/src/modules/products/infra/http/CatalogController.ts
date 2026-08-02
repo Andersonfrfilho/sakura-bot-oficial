@@ -1,4 +1,4 @@
-import { eq, and, asc } from 'drizzle-orm'
+import { eq, and, asc, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import type { RouteHandler } from '@/infra/http/router'
@@ -34,8 +34,20 @@ const productSchema = z.object({
   preparationTimeMinutes: z.number().int().positive().nullable().optional(),
   preparationInstructions: z.string().nullable().optional(),
   active: z.boolean().optional(),
+  isKit: z.boolean().optional(),
   allowNegativeStock: z.boolean().optional(),
   sortOrder: z.number().int().min(0).optional(),
+})
+
+const kitComponentsSchema = z.object({
+  components: z
+    .array(
+      z.object({
+        productId: z.string().uuid(),
+        quantity: z.number().int().positive(),
+      })
+    )
+    .max(20),
 })
 
 function toSlug(name: string): string {
@@ -232,6 +244,7 @@ export class CatalogController {
         ...(parsed.data.preparationTimeMinutes !== undefined && { preparationTimeMinutes: parsed.data.preparationTimeMinutes }),
         ...(parsed.data.preparationInstructions !== undefined && { preparationInstructions: parsed.data.preparationInstructions }),
         ...(parsed.data.active !== undefined && { active: parsed.data.active }),
+        ...(parsed.data.isKit !== undefined && { isKit: parsed.data.isKit }),
         ...(parsed.data.allowNegativeStock !== undefined && { allowNegativeStock: parsed.data.allowNegativeStock }),
         ...(parsed.data.sortOrder !== undefined && { sortOrder: parsed.data.sortOrder }),
       })
@@ -286,6 +299,7 @@ export class CatalogController {
         ...(parsed.data.preparationTimeMinutes !== undefined && { preparationTimeMinutes: parsed.data.preparationTimeMinutes }),
         ...(parsed.data.preparationInstructions !== undefined && { preparationInstructions: parsed.data.preparationInstructions }),
         ...(parsed.data.active !== undefined && { active: parsed.data.active }),
+        ...(parsed.data.isKit !== undefined && { isKit: parsed.data.isKit }),
         ...(parsed.data.allowNegativeStock !== undefined && { allowNegativeStock: parsed.data.allowNegativeStock }),
         ...(parsed.data.sortOrder !== undefined && { sortOrder: parsed.data.sortOrder }),
       })
@@ -329,6 +343,91 @@ export class CatalogController {
     })
 
     response.json(history)
+  }
+
+  // ── Kits ──────────────────────────────────────────────────────────────────
+
+  private async findOwnedProduct(id: string, establishmentId: string) {
+    const product = await this.db.query.products.findFirst({
+      where: and(eq(schema.products.id, id), eq(schema.products.establishmentId, establishmentId)),
+    })
+    if (!product) throw new NotFoundError('Produto')
+    return product
+  }
+
+  listKitComponents: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const { establishmentId } = request.user
+    const id = request.params['id']!
+
+    await this.findOwnedProduct(id, establishmentId)
+
+    const components = await this.db.query.productComponents.findMany({
+      where: eq(schema.productComponents.kitProductId, id),
+      with: { component: { columns: { id: true, name: true, price: true, active: true } } },
+    })
+
+    response.json(components)
+  }
+
+  setKitComponents: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const { establishmentId } = request.user
+    const id = request.params['id']!
+
+    const parsed = kitComponentsSchema.safeParse(request.body)
+    if (!parsed.success) throw new ValidationError('Dados inválidos', parsed.error.flatten())
+
+    const kit = await this.findOwnedProduct(id, establishmentId)
+    if (!kit.isKit) throw new ValidationError('Produto não é um kit')
+
+    const componentIds = parsed.data.components.map((component) => component.productId)
+    if (componentIds.includes(id)) throw new ValidationError('Kit não pode conter a si mesmo')
+
+    const found = await this.db.query.products.findMany({
+      where: and(
+        inArray(schema.products.id, componentIds),
+        eq(schema.products.establishmentId, establishmentId)
+      ),
+      columns: { id: true, isKit: true, name: true },
+    })
+
+    if (found.length !== componentIds.length) {
+      throw new ValidationError('Componente inexistente neste estabelecimento')
+    }
+
+    // Sem isso a expansão da baixa de estoque seria recursiva, e um ciclo
+    // (A contém B, B contém A) travaria o fechamento de um pedido.
+    const nestedKit = found.find((component) => component.isKit)
+    if (nestedKit) {
+      throw new ValidationError(`Componente "${nestedKit.name}" é um kit; kit não pode conter kit`)
+    }
+
+    // Substituição atômica: a composição salva é a que o usuário viu na tela, e não
+    // existe janela em que o kit fique com metade dos componentes.
+    await this.db.transaction(async (transaction) => {
+      await transaction
+        .delete(schema.productComponents)
+        .where(eq(schema.productComponents.kitProductId, id))
+
+      if (parsed.data.components.length > 0) {
+        await transaction.insert(schema.productComponents).values(
+          parsed.data.components.map((component) => ({
+            kitProductId: id,
+            componentProductId: component.productId,
+            quantity: component.quantity,
+          }))
+        )
+      }
+    })
+
+    const components = await this.db.query.productComponents.findMany({
+      where: eq(schema.productComponents.kitProductId, id),
+      with: { component: { columns: { id: true, name: true, price: true, active: true } } },
+    })
+
+    await this.invalidateCache(establishmentId)
+    response.json(components)
   }
 
   getProductAffinities: RouteHandler = async (request, response) => {
@@ -399,6 +498,19 @@ export class CatalogController {
       columns: { id: true },
     })
     if (!existing) throw new NotFoundError('Produto')
+
+    // O `ON DELETE restrict` do banco já impede apagar um item que compõe kit, mas
+    // sozinho ele estoura como 500. Apagar produto usado em kit é condição de negócio
+    // previsível, e quem chamou precisa saber qual kit está no caminho.
+    const usedInKit = await this.db.query.productComponents.findFirst({
+      where: eq(schema.productComponents.componentProductId, id),
+      with: { kit: { columns: { name: true } } },
+    })
+    if (usedInKit) {
+      throw new ConflictError(
+        `Produto compõe o kit "${usedInKit.kit?.name ?? 'sem nome'}"; remova-o do kit antes de apagar`
+      )
+    }
 
     await this.db
       .delete(schema.products)

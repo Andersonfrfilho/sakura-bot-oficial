@@ -21,6 +21,8 @@ export function registerCatalogRoutes(router: Router, controller: CatalogControl
   router.delete('/catalog/products/:id', ...del, controller.deleteProduct)
   router.get('/catalog/products/:id/price-history', ...read, controller.getProductPriceHistory)
   router.get('/catalog/products/:id/affinities', ...read, controller.getProductAffinities)
+  router.get('/catalog/products/:id/components', ...read, controller.listKitComponents)
+  router.put('/catalog/products/:id/components', ...write, controller.setKitComponents)
 
   router.get('/catalog/product-search', ...read, controller.productSearch)
   router.get('/catalog/product-lookup/:barcode', ...read, controller.productLookup)
