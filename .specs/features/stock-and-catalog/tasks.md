@@ -55,8 +55,11 @@ R$ 0,00 e a "receita" do produto é decorativa.
   a tentativa de apagar a auditoria foi barrada pela trigger
   `fn_audit_logs_immutable`, que é o comportamento correto.
 
-  *Achado fora do escopo:* `GET /ingredients?search=` ignora o parâmetro e
-  devolve a lista inteira — não afeta esta task, mas quebra a busca da tela.
+  *Nota:* `GET /ingredients` não tem parâmetro de busca — devolve a lista
+  inteira do estabelecimento, ordenada por nome. Não é defeito: nenhuma tela
+  envia `search`, e o `IngredientManager` filtra no cliente. Vira dívida real
+  só quando a lista de ingredientes de algum estabelecimento crescer a ponto
+  de a paginação importar.
 
 - **T1.2** ✅ 🧠 Baixa por receita no fechamento do pedido. Concluído: gatilho é a
   transição `received → in_production` (kitchen começa a produzir), via
