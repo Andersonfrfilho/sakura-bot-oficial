@@ -468,6 +468,27 @@ estabelecimento vende junto; o histórico de pedidos sabe, e ele já está no ba
   *Não verificado:* o isolamento por estabelecimento está no `WHERE` das duas consultas,
   mas o seed tem um único estabelecimento — não houve como provar ao vivo que produto de
   outro tenant devolve 404.
+
+  *UI entregue depois:* `RelatedProductsHint` no `@adatechnology/products-ui`, exposto
+  ao host pela prop opcional `onFetchRelatedProducts` do `ProductForm` — mesmo padrão de
+  `onFetchPriceHistory`: sem a prop o formulário não muda em nada. Renderiza só na
+  **edição** (guarda `initialValues?.id`), porque produto que ainda não existe não foi
+  vendido com ninguém, e a busca é **sob demanda** (botão "Ver o que costuma sair
+  junto"), para não pendurar uma requisição por produto na abertura do formulário. A
+  linha mostra confiança **e** número de pedidos: confiança sozinha engana em amostra
+  pequena. Sem par, o texto é "Ainda não há venda suficiente para apontar um par com
+  segurança" — não um vazio mudo. Colocado no cadastro do produto porque não existe tela
+  de montagem de kit em `apps/web` (T4.7 é só API), e é quem cadastra que decide o combo.
+  Host em `CatalogPage.fetchRelatedProducts`, traduzindo a linha da API
+  (`confidence` decimal em string → percentual inteiro).
+
+  *Verificação (UI):* logado no navegador, editando "Marmita Executiva" — o botão
+  aparece, e ao clicar a lista renderiza "Prato Feito Carne · 80% · 4 pedido(s)", batendo
+  com os pares materializados. `tsc --noEmit` em `apps/web` segue nos 5 erros de baseline.
+
+  *Dívida:* falha de rede e "sem dado" são indistinguíveis para o usuário — o host
+  captura o erro e devolve lista vazia, então token expirado exibe a mesma frase de
+  amostra insuficiente. Vale o mesmo para o histórico de preço (T3.4).
 - ✅ **T4.7** Kit/combo como produto composto: um produto que agrega outros com
   preço próprio, que ao ser vendido baixa a receita de cada componente
   (reaproveita T1.2 direto).

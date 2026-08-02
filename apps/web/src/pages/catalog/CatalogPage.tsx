@@ -21,6 +21,7 @@ import {
   type ProductSuggestion,
   type PriceReference,
   type PriceHistoryEntry,
+  type RelatedProduct,
 } from '@adatechnology/products-ui'
 import { productsApiAdapter } from '@/lib/productsApiAdapter'
 
@@ -79,6 +80,13 @@ interface Product {
 }
 
 // Linha crua de `GET /catalog/products/:id/price-history` — preço em reais, autor aninhado.
+// Linha crua de `GET /catalog/products/:id/affinities`.
+type ProductAffinityRow = {
+  confidence: string
+  coOccurrenceCount: number
+  suggestedProduct: { id: string; name: string }
+}
+
 type PriceHistoryRow = {
   id: string
   previousPrice: string
@@ -411,6 +419,25 @@ function CatalogPageContent() {
         newPriceInCents: toCents(row.newPrice),
         changedAt: row.createdAt,
         ...(row.user?.name ? { authorName: row.user.name } : {}),
+      }))
+    } catch {
+      return []
+    }
+  }
+
+  // Pares "comprados juntos" já calculados pelo job de afinidade. `confidence` vem como decimal
+  // em string (0.4000 = 40% de quem levou este item levou aquele).
+  async function fetchRelatedProducts(productId: string): Promise<readonly RelatedProduct[]> {
+    try {
+      const rows = await api.get<ProductAffinityRow[]>(
+        `/catalog/products/${productId}/affinities`,
+        accessToken ?? undefined
+      )
+      return rows.map((row) => ({
+        id: row.suggestedProduct.id,
+        name: row.suggestedProduct.name,
+        confidencePercent: Math.round(Number(row.confidence) * 100),
+        coOccurrenceCount: row.coOccurrenceCount,
       }))
     } catch {
       return []
@@ -773,6 +800,7 @@ function CatalogPageContent() {
                     onSearchSuggestions={searchSuggestions}
                     onFetchPriceReference={fetchPriceReference}
                     onFetchPriceHistory={fetchPriceHistory}
+                    onFetchRelatedProducts={fetchRelatedProducts}
                   />
                   {prodModal === 'edit' && selectedProd && (
                     <RecipeManager productId={selectedProd.id} />
