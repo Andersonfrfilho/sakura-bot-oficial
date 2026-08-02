@@ -128,7 +128,7 @@ db-reset:
 	$(COMPOSE) exec -T postgres psql \
 	  -U $$(grep ^POSTGRES_USER $(ENV_FILE) | cut -d= -f2) \
 	  -d $$(grep ^POSTGRES_DB $(ENV_FILE) | cut -d= -f2) \
-	  -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; DROP SCHEMA IF EXISTS drizzle CASCADE;"
+	  -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; DROP SCHEMA IF EXISTS drizzle CASCADE; DROP SCHEMA IF EXISTS meta_whatsapp CASCADE;"
 	@echo "  📦 Rodando migrations do Drizzle (Order Hub)..."
 	docker exec order_hub_api npx drizzle-kit migrate 2>/dev/null || \
 	  docker compose -f infra/docker-compose.yml -p ada-technology exec order-hub-api npx drizzle-kit migrate

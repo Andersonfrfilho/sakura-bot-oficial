@@ -37,6 +37,13 @@ const BLUEPRINTS: OrderBlueprint[] = [
   { type: 'pickup', channel: 'whatsapp', status: 'received', customerIndex: 2, daysAgo: 0 },
   { type: 'table', channel: 'manual', status: 'ready', tableIndex: 6, daysAgo: 0 },
   { type: 'delivery', channel: 'whatsapp', status: 'completed', customerIndex: 4, daysAgo: 10 },
+  // Pareados com as comandas fechadas do comandas.seed: mesa com comanda
+  // contabilizada precisa ter receita, senão o ticket/comanda vira zero.
+  { type: 'table', channel: 'manual', status: 'completed', tableIndex: 1, daysAgo: 2 },
+  { type: 'table', channel: 'manual', status: 'completed', tableIndex: 3, daysAgo: 3 },
+  { type: 'table', channel: 'manual', status: 'completed', tableIndex: 4, daysAgo: 4 },
+  { type: 'table', channel: 'manual', status: 'completed', tableIndex: 5, daysAgo: 5 },
+  { type: 'table', channel: 'manual', status: 'completed', tableIndex: 9, daysAgo: 6 },
 ]
 
 // Duração média de cada etapa, em minutos, por tipo de pedido. Sem essa

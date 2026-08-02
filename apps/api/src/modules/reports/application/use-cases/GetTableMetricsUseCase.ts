@@ -25,9 +25,27 @@ export interface TableMetrics {
   averageSpendPerComanda: string
   averageSpendPerTable: string
   occupancyRatePercent: string
+  operatingMinutesPerDay: number
   totalTables: number
   totalComandasClosed: number
   tables: TableBreakdown[]
+}
+
+export const OPERATING_HOURS_SETTING_KEY = 'operating_hours'
+
+// Ocupação medida contra as 24h do dia é estruturalmente inútil: mesmo um
+// salão lotado no horário de funcionamento não passa de ~5%. O denominador
+// tem que ser o tempo em que o restaurante está aberto.
+const DEFAULT_OPERATING_MINUTES_PER_DAY = 720
+
+function readOperatingMinutes(value: unknown): number {
+  if (typeof value !== 'object' || value === null) return DEFAULT_OPERATING_MINUTES_PER_DAY
+  const minutes = (value as { dailyMinutes?: unknown }).dailyMinutes
+  const parsed = typeof minutes === 'number' ? minutes : Number(minutes)
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 1440) {
+    return DEFAULT_OPERATING_MINUTES_PER_DAY
+  }
+  return parsed
 }
 
 export class GetTableMetricsUseCase {
@@ -144,8 +162,19 @@ export class GetTableMetricsUseCase {
       ? totalRevenue / totalTables
       : 0
 
+    const [operatingSetting] = await this.db
+      .select({ value: schema.settings.value })
+      .from(schema.settings)
+      .where(and(
+        eq(schema.settings.establishmentId, establishmentId),
+        eq(schema.settings.key, OPERATING_HOURS_SETTING_KEY),
+      ))
+      .limit(1)
+
+    const operatingMinutesPerDay = readOperatingMinutes(operatingSetting?.value)
+
     const totalOccupiedMinutes = closedComandas.reduce((acc, c) => acc + toNumber(c.durationMinutes), 0)
-    const totalPeriodMinutes = totalTables * days * 24 * 60
+    const totalPeriodMinutes = totalTables * days * operatingMinutesPerDay
     const occupancyRate = totalPeriodMinutes > 0
       ? (totalOccupiedMinutes / totalPeriodMinutes) * 100
       : 0
@@ -156,6 +185,7 @@ export class GetTableMetricsUseCase {
       averageSpendPerComanda: avgSpendPerComanda.toFixed(2),
       averageSpendPerTable: avgSpendPerTable.toFixed(2),
       occupancyRatePercent: Math.min(occupancyRate, 100).toFixed(1),
+      operatingMinutesPerDay,
       totalTables,
       totalComandasClosed,
       tables,

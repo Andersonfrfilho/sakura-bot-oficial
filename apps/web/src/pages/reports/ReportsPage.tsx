@@ -64,6 +64,7 @@ interface TableMetrics {
   averageSpendPerComanda: string
   averageSpendPerTable: string
   occupancyRatePercent: string
+  operatingMinutesPerDay: number
   totalTables: number
   totalComandasClosed: number
   tables: TableBreakdown[]
@@ -573,6 +574,9 @@ export function ReportsPage() {
               <div className="bg-white rounded-2xl p-4 shadow-sm">
                 <p className="text-xs text-gray-400 mb-1">Taxa de ocupação</p>
                 <p className="text-xl font-bold text-gray-900">{tableMetrics.occupancyRatePercent}%</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  sobre {Math.round(tableMetrics.operatingMinutesPerDay / 60)}h de salão por dia
+                </p>
               </div>
               <div className="bg-white rounded-2xl p-4 shadow-sm">
                 <p className="text-xs text-gray-400 mb-1">Comandas fechadas</p>

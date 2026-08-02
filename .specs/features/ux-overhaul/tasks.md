@@ -694,6 +694,39 @@ datalake por último (dependem do core estável).
   - *Pendente:* o banco de dev só reflete isso após `make db-reset` + seed —
     ação destrutiva, deixada a critério do usuário.
 
+- ✅ **TX.4** Taxa de ocupação media contra 24h/dia.
+  - *Sintoma:* "Taxa de ocupação 0.0%" em qualquer cenário.
+  - *Causa:* o denominador era `totalTables * days * 24 * 60` — o salão contado
+    como aberto 24h por dia, 30 dias. Mesmo lotado no horário real de
+    funcionamento, a métrica não passaria de ~5%; era estruturalmente inútil.
+  - *Implementação:* `GetTableMetricsUseCase` passou a ler a chave
+    `operating_hours` de `settings` (`{ dailyMinutes }`), com validação de
+    faixa (1..1440) e fallback documentado de 720 min (12h). O valor usado sai
+    no payload como `operatingMinutesPerDay` e a tela exibe "sobre 12h de salão
+    por dia" sob a porcentagem — sem isso a taxa não é interpretável.
+    `settings.seed.ts` passou a semear a chave.
+  - *Também:* `comandas.seed.ts` ganhou 5 comandas fechadas em mesas distintas
+    (41 a 96 min) e `orders.seed.ts` os 5 pedidos de mesa correspondentes —
+    comanda sem pedido pareado zeraria o ticket/comanda e faria a tela mentir
+    de novo, exatamente o que o TX.2 corrigiu.
+  - *Verificação:* após reset + seed, `GET /reports/table-metrics?days=30`
+    devolveu `operatingMinutesPerDay: 720`, 6 comandas fechadas e tempo médio
+    78.7 min (era 1 comanda e 120.0 min); a tela renderizou "0.2% · sobre 12h
+    de salão por dia". Baselines de tsc mantidas (API 11, web 5).
+
+- ✅ **TX.5** `make db-reset` deixava a API sem subir.
+  - *Sintoma:* após `make db-reset`, o container `order_hub_api` morria no boot
+    com `schema "meta_whatsapp" already exists`. Só aparecia no restart
+    seguinte, o que mascarava a causa.
+  - *Causa:* o alvo derrubava `public` e `drizzle` mas não `meta_whatsapp`. O
+    journal de migrations ia junto com o `drizzle`, então o módulo
+    `@adatechnology/meta-whatsapp-module` replicava do zero e esbarrava no
+    schema que sobrou.
+  - *Implementação:* `DROP SCHEMA IF EXISTS meta_whatsapp CASCADE` somado ao
+    comando de reset no `Makefile`.
+  - *Verificação:* schema derrubado à mão e container reiniciado —
+    `[DB] Migrations applied` e `[API] Listening on port 3333`.
+
 ## Riscos
 
 - **R1**: pacote compartilhado de conversas exige alinhamento de versões React
