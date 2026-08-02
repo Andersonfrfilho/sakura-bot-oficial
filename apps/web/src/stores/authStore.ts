@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { api } from '@/lib/api'
+import { api, configureAuthBridge } from '@/lib/api'
 
 interface AuthUser {
   id: string
@@ -97,3 +97,19 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
+
+// Permite ao cliente HTTP renovar o token em qualquer 401 e, se a renovação
+// falhar, encerrar a sessão — sem isso a tela ficava vazia em silêncio, como se
+// os dados tivessem sumido.
+configureAuthBridge({
+  getAccessToken: () => useAuthStore.getState().accessToken,
+  refresh: () => useAuthStore.getState().refresh(),
+  onSessionExpired: () => {
+    useAuthStore.setState({
+      user: null,
+      accessToken: null,
+      refreshToken: null,
+      isAuthenticated: false,
+    })
+  },
+})

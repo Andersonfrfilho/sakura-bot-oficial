@@ -627,6 +627,27 @@ de relatórios analíticos e financeiro (que dependem do custeio), conversas em
 paralelo possível (repo externo `adatechnology-packages`), integrações e
 datalake por último (dependem do core estável).
 
+## Correções transversais (fora de fase)
+
+- ✅ **TX.1** Sessão expirada deixava a tela vazia em silêncio.
+  - *Sintoma:* com o access token vencido (15 min), qualquer tela renderizava o
+    estado vazio — o catálogo mostrava "Todos 0" e "Nenhum produto neste
+    catálogo", como se o cadastro tivesse sumido. Descoberto durante a auditoria
+    de relatórios: as requisições voltavam 401 e ninguém tratava.
+  - *Causa:* `lib/api.ts` só lançava `ApiError`; o `refresh()` do `authStore`
+    existia mas nunca era chamado fora do boot. O `AuthGuard` já cobria o reload
+    (o `accessToken` não é persistido pelo `partialize`), mas não o token que
+    vence com a aba aberta.
+  - *Implementação:* `configureAuthBridge` injeta o store no cliente HTTP em
+    runtime (evita ciclo de import, já que o store importa o `api`). Em 401 fora
+    de `/auth/*`, renova e repete a requisição uma vez; se a renovação falhar,
+    limpa a sessão e o `AuthGuard` leva ao login. O refresh é compartilhado numa
+    promise única — sem isso cada query da tela dispararia o seu, e o refresh
+    token rotativo invalidaria os demais.
+  - *Verificação:* browser — com access token inválido o catálogo carregou os 5
+    produtos após um único `POST /auth/refresh` (200); com refresh token também
+    inválido, a aplicação foi para `/login`. `npx tsc --noEmit` na baseline de 5.
+
 ## Riscos
 
 - **R1**: pacote compartilhado de conversas exige alinhamento de versões React
