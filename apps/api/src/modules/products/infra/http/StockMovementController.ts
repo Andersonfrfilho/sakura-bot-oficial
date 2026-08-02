@@ -1,7 +1,12 @@
+import { and, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import type { RouteHandler } from '@/infra/http/router'
+import * as schema from '@/infra/database/schema'
 import { UnauthorizedError, ValidationError } from '@/shared/errors/AppError'
 import type { CreateStockMovementUseCase } from '@/modules/products/application/use-cases/CreateStockMovementUseCase'
+
+type Database = NodePgDatabase<typeof schema>
 
 const createStockMovementSchema = z.object({
   ingredientId: z.string().uuid(),
@@ -12,7 +17,10 @@ const createStockMovementSchema = z.object({
 })
 
 export class StockMovementController {
-  constructor(private readonly createStockMovementUseCase: CreateStockMovementUseCase) {}
+  constructor(
+    private readonly db: Database,
+    private readonly createStockMovementUseCase: CreateStockMovementUseCase
+  ) {}
 
   create: RouteHandler = async (request, response) => {
     if (!request.user) throw new UnauthorizedError()
@@ -36,5 +44,36 @@ export class StockMovementController {
     })
 
     response.json(movement, 201)
+  }
+
+  listByIngredient: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const { establishmentId } = request.user
+
+    const ingredientId = (request as { query?: Record<string, string> }).query?.['ingredientId']
+    if (!ingredientId) throw new ValidationError('Parâmetro ingredientId é obrigatório')
+
+    const movements = await this.db
+      .select({
+        id: schema.stockMovements.id,
+        movementType: schema.stockMovements.movementType,
+        quantity: schema.stockMovements.quantity,
+        reason: schema.stockMovements.reason,
+        userName: schema.users.name,
+        orderId: schema.stockMovements.orderId,
+        createdAt: schema.stockMovements.createdAt,
+      })
+      .from(schema.stockMovements)
+      .leftJoin(schema.users, eq(schema.stockMovements.userId, schema.users.id))
+      .where(
+        and(
+          eq(schema.stockMovements.establishmentId, establishmentId),
+          eq(schema.stockMovements.ingredientId, ingredientId)
+        )
+      )
+      .orderBy(desc(schema.stockMovements.createdAt))
+      .limit(50)
+
+    response.json(movements)
   }
 }

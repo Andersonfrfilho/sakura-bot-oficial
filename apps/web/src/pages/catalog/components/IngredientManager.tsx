@@ -4,6 +4,8 @@ import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { Pencil, Trash2, Plus, ChevronDown, ChevronRight } from 'lucide-react'
 import { StockBatchList } from './StockBatchList'
+import { StockMovementHistory } from './StockMovementHistory'
+import { StockAdjustmentForm } from './StockAdjustmentForm'
 
 interface Ingredient {
   id: string
@@ -247,11 +249,18 @@ export function IngredientManager() {
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStockColor(ingredient.stockQuantity, ingredient.minimumStock)}`}>
                     {toNumber(ingredient.stockQuantity).toFixed(2)}
                   </span>
+                  {ingredient.minimumStock && (
+                    <span className="text-xs text-gray-400">mín. {toNumber(ingredient.minimumStock).toFixed(2)}</span>
+                  )}
                 </div>
               </div>
               {expandedId === ingredient.id && (
                 <div className="px-3 pb-3 pt-1 border-t border-gray-100">
+                  <div className="flex justify-end mb-1">
+                    <StockAdjustmentForm ingredientId={ingredient.id} ingredientName={ingredient.name} />
+                  </div>
                   <StockBatchList ingredientId={ingredient.id} ingredientName={ingredient.name} />
+                  <StockMovementHistory ingredientId={ingredient.id} />
                 </div>
               )}
             </div>

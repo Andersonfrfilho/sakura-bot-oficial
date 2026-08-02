@@ -119,10 +119,28 @@ R$ 0,00 e a "receita" do produto é decorativa.
     31/12/2026) atualiza a lista, o estoque do ingrediente (20→23) e o custo
     médio ponderado (6.50→6.5652) em tempo real. `vite build` sem erros.
     Dados de teste revertidos via SQL após a verificação.
-- **T2.2** Painel de estoque: saldo, custo médio, mínimo, lotes com validade,
+- **T2.2** ✅ Painel de estoque: saldo, custo médio, mínimo, lotes com validade,
   e o histórico de movimentos do ingrediente (a auditoria só serve se for
   visível).
-- **T2.3** Ajuste e perda com motivo obrigatório no formulário.
+  - Backend: `GET /stock-movements?ingredientId=` (`StockMovementController.listByIngredient`)
+    lista as últimas 50 movimentações do ingrediente (tipo, quantidade,
+    motivo, usuário via join, pedido, data), mais recentes primeiro.
+  - Frontend: `StockMovementHistory.tsx` (tabela com badge colorido por tipo
+    — entrada/saída/ajuste/perda) e badge de estoque mínimo direto na linha
+    do ingrediente (`mín. X.XX`), ambos conectados ao `IngredientManager`.
+  - *Verificação (feita ao vivo, via browser):* `/catalog` → expandir "Arroz"
+    mostra "mín. 5.00" ao lado do saldo e a tabela "Histórico de
+    movimentações" com a entrada de lote seedada.
+- **T2.3** ✅ Ajuste e perda com motivo obrigatório no formulário.
+  - Frontend: `StockAdjustmentForm.tsx` — botão "Ajuste / perda" no
+    `IngredientManager` abre modal com Tipo (ajuste/perda), Direção
+    (aumentar/diminuir, só para ajuste), Quantidade e Motivo (obrigatório,
+    valida antes de enviar). Usa `POST /stock-movements` (backend já existia
+    desde a T1.3).
+  - *Verificação (feita ao vivo, via browser):* registrar um ajuste de +1kg
+    em "Arroz" atualiza o badge de estoque (20→21) e a linha aparece no
+    histórico de movimentações em tempo real. Dados de teste revertidos via
+    SQL após a verificação.
 
 ## Fase 3 — Gestão de produto que falta
 > 🤖 Modelo: `sonnet`

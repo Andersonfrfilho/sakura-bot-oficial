@@ -215,7 +215,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const createStockBatchUseCase = new CreateStockBatchUseCase(db, createAuditLogUseCase)
   const stockBatchController = new StockBatchController(db, createStockBatchUseCase)
   const createStockMovementUseCase = new CreateStockMovementUseCase(db, createAuditLogUseCase)
-  const stockMovementController = new StockMovementController(createStockMovementUseCase)
+  const stockMovementController = new StockMovementController(db, createStockMovementUseCase)
   const deductStockForOrderUseCase = new DeductStockForOrderUseCase(db)
   const triggerFiscalEmissionUseCase = new TriggerFiscalEmissionUseCase(db, wsHub)
   const updateOrderStatusUseCase = new UpdateOrderStatusUseCase(db, wsHub, triggerFiscalEmissionUseCase, deductStockForOrderUseCase)
