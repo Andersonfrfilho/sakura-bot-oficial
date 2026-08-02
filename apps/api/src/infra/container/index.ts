@@ -76,6 +76,12 @@ import { UpdateOrderNotesUseCase } from '@/modules/orders/application/use-cases/
 import { GetOrderUseCase } from '@/modules/orders/application/use-cases/GetOrderUseCase'
 import { ListOrdersUseCase } from '@/modules/orders/application/use-cases/ListOrdersUseCase'
 import { OrderController } from '@/modules/orders/infra/http/OrderController'
+import { RequestPartialOrderConfirmationUseCase } from '@/modules/orders/application/use-cases/RequestPartialOrderConfirmationUseCase'
+import type { CustomerMessageProvider } from '@/shared/providers/CustomerMessageProvider'
+import {
+  CONVERSATION_AGENT_SENDER,
+  CONVERSATION_START_STATE,
+} from '@/modules/conversations/shared/conversations.constant'
 
 // Kitchen
 import { GetKitchenQueueUseCase } from '@/modules/kitchen/application/use-cases/GetKitchenQueueUseCase'
@@ -244,12 +250,34 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const updateOrderNotesUseCase = new UpdateOrderNotesUseCase(db)
   const getOrderUseCase = new GetOrderUseCase(db)
   const listOrdersUseCase = new ListOrdersUseCase(db)
+
+  // Único caminho de envio ao cliente: o mesmo módulo que a inbox usa, só que atrás de uma
+  // interface, para o módulo de pedidos não conhecer o registry.
+  const customerMessages: CustomerMessageProvider = {
+    async sendText(params): Promise<void> {
+      await metaWhatsAppModules.forEstablishment(params.establishmentId).conversations.send.sendText({
+        companyId: params.establishmentId,
+        whatsappNumber: params.whatsappNumber,
+        body: params.body,
+        sender: CONVERSATION_AGENT_SENDER,
+        agentUserId: params.agentUserId,
+        startState: CONVERSATION_START_STATE,
+      })
+    },
+  }
+
+  const requestPartialOrderConfirmationUseCase = new RequestPartialOrderConfirmationUseCase(
+    db,
+    customerMessages,
+    createAuditLogUseCase
+  )
   const orderController = new OrderController(
     createOrderUseCase,
     updateOrderStatusUseCase,
     updateOrderNotesUseCase,
     getOrderUseCase,
-    listOrdersUseCase
+    listOrdersUseCase,
+    requestPartialOrderConfirmationUseCase
   )
 
   // Kitchen

@@ -12,7 +12,8 @@ import {
 } from '@/constants/orderLabels'
 import { CreateOrderModal } from './CreateOrderModal'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { Plus } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Plus, ChevronRight } from 'lucide-react'
 
 interface Order {
   id: string
@@ -248,9 +249,19 @@ export function OrdersPage() {
                     </span>
                   )}
                 </div>
-                <span className="text-sm font-bold text-gray-900">
-                  R$ {parseFloat(order.totalAmount).toFixed(2)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-gray-900">
+                    R$ {parseFloat(order.totalAmount).toFixed(2)}
+                  </span>
+                  {/* Link só no cabeçalho: o card inteiro navegável engoliria os botões de ação. */}
+                  <Link
+                    to={`/orders/${order.id}`}
+                    aria-label="Abrir detalhe do pedido"
+                    className="inline-flex items-center text-gray-400 transition-colors hover:text-brand-600"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </Link>
+                </div>
               </div>
 
               {order.customer && (

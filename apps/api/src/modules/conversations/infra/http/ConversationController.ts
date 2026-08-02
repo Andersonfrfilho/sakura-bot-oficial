@@ -13,10 +13,12 @@ import type { MessageRow } from '@adatechnology/meta-whatsapp-module'
 import type { RouteHandler } from '@/infra/http/router'
 import { ValidationError, UnauthorizedError, NotFoundError } from '@/shared/errors/AppError'
 import type { MetaWhatsAppModuleRegistry } from '../whatsapp/metaWhatsAppModule'
+import {
+  CONVERSATION_AGENT_SENDER as AGENT_SENDER,
+  CONVERSATION_START_STATE as START_STATE,
+} from '../../shared/conversations.constant'
 
-/** Estado inicial do fluxo do bot (o n8n é quem o conduz daqui em diante). */
-const START_STATE = 'start'
-const AGENT_SENDER = 'agent' as const
+
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 100
 const DEFAULT_HISTORY_LIMIT = 50

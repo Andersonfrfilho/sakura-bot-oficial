@@ -5,6 +5,7 @@
  */
 
 import { useState, type RefObject } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import '@adatechnology/conversations-ui/styles.css'
 import {
   CHANNEL_FILTER_ALL,
@@ -28,6 +29,7 @@ import {
   type ConversationSummary,
 } from '@adatechnology/conversations-ui'
 
+import { CONVERSATION_QUERY_PARAM } from '@/constants/conversationLinks'
 import { conversationsSdkApi } from '@/lib/conversationsSdkApi'
 import { conversationsSdkRealtime } from '@/lib/conversationsSdkRealtime'
 import { fileToAttachment } from '@/lib/fileToAttachment'
@@ -170,7 +172,12 @@ function ConversationPane({
 }
 
 function Inbox() {
-  const inbox = useConversationsInbox()
+  const [searchParams] = useSearchParams()
+  // Lido uma vez: o hook usa como estado inicial, e reagir a mudanças depois roubaria a conversa
+  // que o atendente tivesse aberto na mão.
+  const inbox = useConversationsInbox({
+    initialWhatsappNumber: searchParams.get(CONVERSATION_QUERY_PARAM) ?? undefined,
+  })
   const selectedConversation = inbox.selectedConversation
 
   return (

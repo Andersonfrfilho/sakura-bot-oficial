@@ -86,14 +86,29 @@ function describeInboxFailure(error: Error | undefined): string | undefined {
     : 'Não foi possível carregar as conversas.'
 }
 
-export function useConversationsInbox(): UseConversationsInboxResult {
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+export interface UseConversationsInboxParams {
+  /**
+   * Conversa a abrir já na montagem, vinda de fora da inbox (o botão da tela de pedido).
+   *
+   * Entra como busca **e** como seleção: a listagem é paginada no servidor, então um número que
+   * caia na página 3 não estaria na lista e a seleção seria descartada pelo efeito de limpeza.
+   */
+  readonly initialWhatsappNumber?: string | undefined
+}
+
+export function useConversationsInbox(params: UseConversationsInboxParams = {}): UseConversationsInboxResult {
+  const initialNumber = params.initialWhatsappNumber ?? ''
+  const [search, setSearch] = useState(initialNumber)
+  const [debouncedSearch, setDebouncedSearch] = useState(initialNumber)
   const [waitingOnly, setWaitingOnly] = useState(false)
   const [windowFilter, setWindowFilter] = useState<ConversationWindow>(CONVERSATION_WINDOW.ALL)
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>(CHANNEL_FILTER_ALL)
   const [page, setPage] = useState(1)
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
+  // Seleção que ainda não pôde acontecer: a lista chega depois da montagem. Fica pendente até a
+  // conversa aparecer, e é descartada na primeira resposta que não a contenha — senão o efeito de
+  // limpeza a apagaria antes da primeira resposta, e o link abriria a inbox sem abrir a conversa.
+  const pendingSelection = useRef<string | undefined>(params.initialWhatsappNumber)
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set())
   const [busy, setBusy] = useState(false)
 
@@ -143,10 +158,27 @@ export function useConversationsInbox(): UseConversationsInboxResult {
   }, [debouncedSearch, waitingOnly, windowFilter, channelFilter])
 
   useEffect(() => {
+    // Durante o carregamento a lista está vazia por não ter chegado ainda, não por não conter a
+    // conversa — sem esta guarda a seleção que veio da URL some antes da primeira resposta.
+    if (loading) return
+
+    const pending = pendingSelection.current
+    // Lista vazia com `loading` falso é o estado anterior à primeira busca, não uma resposta: se a
+    // pendência morresse aqui, o link abriria a inbox sem abrir a conversa.
+    if (pending && conversations.length > 0) {
+      // Resolvida ou não, a pendência morre aqui: mantê-la reabriria a conversa toda vez que a
+      // lista fosse recarregada, roubando a que o atendente tivesse aberto na mão.
+      pendingSelection.current = undefined
+      if (conversations.some((conversation) => conversation.id === pending)) {
+        setSelectedId(pending)
+        return
+      }
+    }
+
     if (selectedId && !conversations.some((conversation) => conversation.id === selectedId)) {
       setSelectedId(undefined)
     }
-  }, [conversations, selectedId])
+  }, [conversations, selectedId, loading])
 
   /**
    * Última tentativa de marcar como lida, como `id:unread`.

@@ -10,8 +10,14 @@ import {
   type OrderStatus,
 } from '@/constants/orderLabels'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, MessageCircle } from 'lucide-react'
+import { buildConversationLink } from '@/constants/conversationLinks'
+import { CONVERSATION_LINK_LABEL } from '@/constants/partialConfirmation'
 import { OrderProgressBar } from './OrderProgressBar'
+import { OrderPartialConfirmation } from './OrderPartialConfirmation'
+
+/** Pedido encerrado não negocia mais itens com o cliente — a API recusa, a tela nem oferece. */
+const CLOSED_ORDER_STATUSES: readonly OrderStatus[] = ['completed', 'cancelled']
 
 interface OrderItem {
   id: string
@@ -63,10 +69,12 @@ interface OrderDetail {
   receivedAt: string
   customer: { name: string; whatsappNumber: string } | null
   items: OrderItem[]
-  payments: OrderPayment[]
-  delivery: OrderDelivery[]
-  fiscalDocument: FiscalDocument | null
-  statusLogs: OrderStatusLog[]
+  // `GET /orders/:id` ainda não devolve pagamentos, nota e histórico — as relações não existem no
+  // schema. Opcionais aqui para a tela renderizar em vez de estourar no `.map`.
+  payments?: OrderPayment[]
+  delivery?: OrderDelivery[]
+  fiscalDocument?: FiscalDocument | null
+  statusLogs?: OrderStatusLog[]
 }
 
 const FISCAL_STATUS_LABELS: Record<FiscalDocStatus, string> = {
@@ -130,9 +138,20 @@ export function OrderDetailPage() {
               Recebido em {new Date(order.receivedAt).toLocaleString('pt-BR')}
             </p>
             {order.customer && (
-              <p className="text-sm text-gray-600 mt-2">
-                {order.customer.name} · {order.customer.whatsappNumber}
-              </p>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-gray-600">
+                  {order.customer.name} · {order.customer.whatsappNumber}
+                </p>
+                {order.customer.whatsappNumber && (
+                  <Link
+                    to={buildConversationLink(order.customer.whatsappNumber)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-brand-600 px-3 py-1.5 text-sm font-medium text-brand-600 transition-colors hover:bg-brand-50"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    {CONVERSATION_LINK_LABEL}
+                  </Link>
+                )}
+              </div>
             )}
             {order.notes && (
               <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1 mt-2 italic">
@@ -146,7 +165,7 @@ export function OrderDetailPage() {
               <OrderProgressBar
                 type={order.type}
                 status={order.status}
-                statusLogs={order.statusLogs}
+                statusLogs={order.statusLogs ?? []}
                 variant="full"
               />
             </section>
@@ -169,10 +188,18 @@ export function OrderDetailPage() {
             </div>
           </section>
 
+          {order.items.length > 0 && !CLOSED_ORDER_STATUSES.includes(order.status) && (
+            <OrderPartialConfirmation
+              orderId={order.id}
+              items={order.items}
+              customerWhatsappNumber={order.customer?.whatsappNumber}
+            />
+          )}
+
           <section className="bg-white rounded-xl shadow-sm p-4 mb-4">
             <h2 className="text-sm font-semibold text-gray-900 mb-3">Pagamento</h2>
             <div className="space-y-2">
-              {order.payments.map((payment) => (
+              {(order.payments ?? []).map((payment) => (
                 <div key={payment.id} className="flex items-center justify-between text-sm">
                   <span className="text-gray-800">
                     {payment.paymentTypeName}
@@ -229,7 +256,7 @@ export function OrderDetailPage() {
           <section className="bg-white rounded-xl shadow-sm p-4">
             <h2 className="text-sm font-semibold text-gray-900 mb-3">Histórico de status</h2>
             <div className="space-y-3">
-              {order.statusLogs.map((log) => (
+              {(order.statusLogs ?? []).map((log) => (
                 <div key={log.id} className="flex items-start gap-3">
                   <span
                     className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${ORDER_STATUS_COLORS[log.status]}`}

@@ -8,6 +8,12 @@ export function registerOrderRoutes(router: Router, controller: OrderController)
   router.get('/orders/:id', authenticate, authorize('orders', 'read'), controller.get)
   router.patch('/orders/:id/status', authenticate, authorize('orders', 'write'), controller.updateStatus)
   router.patch('/orders/:id/notes', authenticate, authorize('orders', 'write'), controller.updateNotes)
+  router.post(
+    '/orders/:id/partial-confirmation',
+    authenticate,
+    authorize('orders', 'write'),
+    controller.requestPartialConfirmation
+  )
   router.post('/orders/:id/ifood/accept', authenticate, authorize('orders', 'write'), controller.ifoodAccept)
   router.post('/orders/:id/ifood/reject', authenticate, authorize('orders', 'write'), controller.ifoodReject)
 }

@@ -5,6 +5,7 @@ import type { UpdateOrderStatusUseCase } from '../../application/use-cases/Updat
 import type { UpdateOrderNotesUseCase } from '../../application/use-cases/UpdateOrderNotesUseCase'
 import type { GetOrderUseCase } from '../../application/use-cases/GetOrderUseCase'
 import type { ListOrdersUseCase } from '../../application/use-cases/ListOrdersUseCase'
+import type { RequestPartialOrderConfirmationUseCase } from '../../application/use-cases/RequestPartialOrderConfirmationUseCase'
 import { ValidationError, UnauthorizedError } from '@/shared/errors/AppError'
 import { IfoodProvider } from '@/shared/providers/IfoodProvider'
 
@@ -34,6 +35,10 @@ const updateStatusSchema = z.object({
 
 const updateNotesSchema = z.object({
   notes: z.string().max(1000).nullable(),
+})
+
+const partialConfirmationSchema = z.object({
+  unavailableItemIds: z.array(z.string().uuid()).min(1),
 })
 
 const ifoodRejectSchema = z.object({
@@ -78,7 +83,8 @@ export class OrderController {
     private readonly updateStatusUseCase: UpdateOrderStatusUseCase,
     private readonly updateNotesUseCase: UpdateOrderNotesUseCase,
     private readonly getOrderUseCase: GetOrderUseCase,
-    private readonly listOrdersUseCase: ListOrdersUseCase
+    private readonly listOrdersUseCase: ListOrdersUseCase,
+    private readonly requestPartialConfirmationUseCase: RequestPartialOrderConfirmationUseCase
   ) {}
 
   list: RouteHandler = async (request, response) => {
@@ -143,6 +149,22 @@ export class OrderController {
       notes: parsed.data.notes,
     })
     response.json(order)
+  }
+
+  /** Dispara a mensagem de confirmação parcial. Só roda por clique do atendente — nunca em fluxo automático. */
+  requestPartialConfirmation: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const parsed = partialConfirmationSchema.safeParse(request.body)
+    if (!parsed.success) {
+      throw new ValidationError('Validation failed', parsed.error.flatten().fieldErrors)
+    }
+    const result = await this.requestPartialConfirmationUseCase.execute({
+      orderId: request.params['id']!,
+      establishmentId: request.user.establishmentId,
+      userId: request.user.id,
+      unavailableItemIds: parsed.data.unavailableItemIds,
+    })
+    response.json(result)
   }
 
   ifoodAccept: RouteHandler = async (request, response) => {
