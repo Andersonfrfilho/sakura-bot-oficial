@@ -242,7 +242,7 @@ R$ 0,00 e a "receita" do produto é decorativa.
     descrição, preço R$ 6,00 e catálogo/seção "Bebidas" pré-preenchidos e
     código de barras vazio; salvar criou o produto (6 produtos na lista),
     depois excluído para limpar o dado de teste (voltou a 5).
-- ✅ **T3.4** Histórico de preço (`product_price_history`: produto, preço anterior,
+- ✅ **T3.4** *(UI entregue depois — ver nota ao fim da task)* Histórico de preço (`product_price_history`: produto, preço anterior,
   novo, autor, data). Sem ele não há como responder "quando esse item subiu",
   e retroagir depois é impossível: o dado não existe em lugar nenhum.
   - *Implementação:* tabela `product_price_history` (migration
@@ -266,6 +266,19 @@ R$ 0,00 e a "receita" do produto é decorativa.
     lista de histórico continuou com 1 item. Preço e descrição revertidos
     ao valor original e as 2 linhas de teste (subida e volta) apagadas do
     banco ao final.
+  - *UI entregue depois:* `PriceHistoryList` no SDK
+    (`@adatechnology/products-ui`, branch `feat/products-price-reference`,
+    commit `94c2faf`) + prop opcional `onFetchPriceHistory` no `ProductForm`.
+    Aparece só na edição de produto existente — produto novo não tem passado —
+    e a consulta é sob demanda, porque abrir o formulário não significa querer
+    auditar preço. Cada linha mostra data, autor, preço anterior riscado e o
+    novo. Autor some quando o usuário que alterou foi removido. No host,
+    `CatalogPage` traduz as linhas cruas (preço em reais, autor aninhado).
+    *Verificação (feita ao vivo):* com duas alterações registradas em "Pudim de
+    Leite", a lista exibiu "02/08/2026 · Gerente Demo — R$ 9,50 → R$ 8,50" e a
+    anterior, mais recente primeiro; "Novo produto" não mostra o botão;
+    produto sem histórico exibe "Nenhuma alteração de preço registrada". Preço
+    restaurado para R$ 8,50 e as linhas de teste apagadas ao final.
 - **T3.5** Upload de imagem — **bloqueado**. Depende de storage de objetos, que
   o `apps/api` não tem (mesmo bloqueio dos documentos das conversas). Fica aqui
   registrado para não ser redescoberto.
