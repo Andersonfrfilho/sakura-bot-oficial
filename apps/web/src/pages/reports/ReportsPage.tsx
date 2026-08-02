@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { ORDER_CHANNEL_LABELS, ORDER_TYPE_LABELS, ORDER_STATUS_LABELS } from '@/constants/orderLabels'
 import { Select } from '@/components/ui/Select'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Info } from 'lucide-react'
 
 interface DailyBreakdown {
   day: number
@@ -860,6 +860,17 @@ export function ReportsPage() {
               </p>
               <p className="text-xs text-gray-400">{prepTimeReport.totalProductsCompared} produtos comparados</p>
             </div>
+
+            {prepTimeReport.products.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-2">
+                <Info className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" aria-hidden="true" />
+                <p className="text-xs text-blue-800">
+                  O tempo real é medido por pedido, não por item. Produto que dividiu comanda
+                  com um prato mais demorado carrega o tempo do pedido inteiro — por isso
+                  bebidas e sobremesas costumam aparecer muito acima do cadastrado.
+                </p>
+              </div>
+            )}
 
             {prepTimeReport.products.length > 0 && (
               <div className="bg-white rounded-2xl p-5 shadow-sm">

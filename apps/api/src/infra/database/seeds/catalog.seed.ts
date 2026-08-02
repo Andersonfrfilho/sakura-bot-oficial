@@ -42,6 +42,7 @@ type ProductBlueprint = {
   description: string
   price: number
   costPrice: number
+  preparationTimeMinutes: number
   unit: string
 }
 
@@ -50,11 +51,11 @@ type ProductBlueprint = {
 // margens abaixo são deliberadamente diferentes entre si, para que o ranking
 // de melhor margem tenha o que ordenar.
 const PRODUCTS: ProductBlueprint[] = [
-  { catalogIndex: 0, sectionIndex: 0, name: 'Marmita Executiva', slug: 'marmita-executiva', description: 'Arroz, feijão, frango grelhado e salada', price: 24.9, costPrice: 11.2, unit: 'un' },
-  { catalogIndex: 0, sectionIndex: 0, name: 'Prato Feito Carne', slug: 'prato-feito-carne', description: 'Arroz, feijão, bife acebolado e farofa', price: 26.9, costPrice: 14.6, unit: 'un' },
-  { catalogIndex: 0, sectionIndex: 1, name: 'Pudim de Leite', slug: 'pudim-de-leite', description: 'Fatia de pudim caseiro', price: 8.5, costPrice: 2.4, unit: 'un' },
-  { catalogIndex: 1, sectionIndex: 2, name: 'Suco Natural Laranja', slug: 'suco-natural-laranja', description: 'Copo 500ml', price: 7.0, costPrice: 2.1, unit: 'un' },
-  { catalogIndex: 1, sectionIndex: 2, name: 'Refrigerante Lata', slug: 'refrigerante-lata', description: 'Lata 350ml', price: 6.0, costPrice: 3.3, unit: 'un' },
+  { catalogIndex: 0, sectionIndex: 0, name: 'Marmita Executiva', slug: 'marmita-executiva', description: 'Arroz, feijão, frango grelhado e salada', price: 24.9, costPrice: 11.2, preparationTimeMinutes: 14, unit: 'un' },
+  { catalogIndex: 0, sectionIndex: 0, name: 'Prato Feito Carne', slug: 'prato-feito-carne', description: 'Arroz, feijão, bife acebolado e farofa', price: 26.9, costPrice: 14.6, preparationTimeMinutes: 18, unit: 'un' },
+  { catalogIndex: 0, sectionIndex: 1, name: 'Pudim de Leite', slug: 'pudim-de-leite', description: 'Fatia de pudim caseiro', price: 8.5, costPrice: 2.4, preparationTimeMinutes: 3, unit: 'un' },
+  { catalogIndex: 1, sectionIndex: 2, name: 'Suco Natural Laranja', slug: 'suco-natural-laranja', description: 'Copo 500ml', price: 7.0, costPrice: 2.1, preparationTimeMinutes: 4, unit: 'un' },
+  { catalogIndex: 1, sectionIndex: 2, name: 'Refrigerante Lata', slug: 'refrigerante-lata', description: 'Lata 350ml', price: 6.0, costPrice: 3.3, preparationTimeMinutes: 1, unit: 'un' },
 ]
 
 type IngredientBlueprint = {
@@ -112,6 +113,7 @@ export async function seedCatalog(establishmentId: string): Promise<CatalogSeedR
     description: product.description,
     price: String(product.price),
     costPrice: String(product.costPrice),
+    preparationTimeMinutes: product.preparationTimeMinutes,
     unit: product.unit,
   }))
   await db.insert(schema.products).values(products).onConflictDoNothing()

@@ -1,6 +1,8 @@
 import { eq, and, gte, sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
+import { alias } from 'drizzle-orm/pg-core'
 import * as schema from '@/infra/database/schema'
+import { toNumber } from '../../shared/numeric.util'
 
 type Database = NodePgDatabase<typeof schema>
 
@@ -66,58 +68,50 @@ export class GetPreparationTimeComparisonUseCase {
       }
     }
 
+    // Auto-join entre o log de entrada em produção e o de "pronto" do mesmo
+    // pedido. A versão anterior usava subquery correlacionada num `innerJoin`
+    // comum — sem `LATERAL` o Postgres recusa a referência à tabela externa, e
+    // o erro só aparecia quando havia log para comparar.
+    const productionLogs = alias(schema.orderStatusLogs, 'production_logs')
+    const readyLogs = alias(schema.orderStatusLogs, 'ready_logs')
+
+    const durationMinutes = sql<number>`
+      AVG(EXTRACT(EPOCH FROM (${readyLogs.createdAt} - ${productionLogs.createdAt})) / 60)
+    `
+
     const logsByProduct = await this.db
       .select({
         productId: schema.orderItems.productId,
-        realDurationMinutes: sql<number>`
-          AVG(
-            EXTRACT(EPOCH FROM (
-              ${schema.orderStatusLogs.createdAt} - lag_logs.created_at
-            )) / 60
-          )
-        `,
+        realDurationMinutes: durationMinutes,
         sampleSize: sql<number>`COUNT(DISTINCT ${schema.orders.id})`,
       })
-      .from(schema.orderStatusLogs)
-      .innerJoin(
-        schema.orders,
-        eq(schema.orderStatusLogs.orderId, schema.orders.id),
-      )
-      .innerJoin(
-        schema.orderItems,
-        eq(schema.orders.id, schema.orderItems.orderId),
-      )
-      .innerJoin(
-        sql`(
-          SELECT order_id, created_at
-          FROM order_status_logs osl
-          WHERE osl.status = 'in_production'
-            AND osl.order_id = ${schema.orderStatusLogs.orderId}
-            AND osl.created_at < ${schema.orderStatusLogs.createdAt}
-          ORDER BY osl.created_at DESC
-          LIMIT 1
-        ) AS lag_logs`,
-        sql`TRUE`,
-      )
+      .from(schema.orders)
+      .innerJoin(schema.orderItems, eq(schema.orders.id, schema.orderItems.orderId))
+      .innerJoin(productionLogs, and(
+        eq(productionLogs.orderId, schema.orders.id),
+        eq(productionLogs.status, 'in_production'),
+      ))
+      .innerJoin(readyLogs, and(
+        eq(readyLogs.orderId, schema.orders.id),
+        eq(readyLogs.status, 'ready'),
+        sql`${readyLogs.createdAt} > ${productionLogs.createdAt}`,
+      ))
       .where(and(
         eq(schema.orders.establishmentId, establishmentId),
         gte(schema.orders.receivedAt, from),
         eq(schema.orders.status, 'completed'),
-        eq(schema.orderStatusLogs.status, 'ready'),
       ))
       .groupBy(schema.orderItems.productId)
-      .having(sql`AVG(
-        EXTRACT(EPOCH FROM (
-          ${schema.orderStatusLogs.createdAt} - lag_logs.created_at
-        )) / 60
-      ) IS NOT NULL`)
+      .having(sql`${durationMinutes} IS NOT NULL`)
 
     const comparisonMap = new Map<string, { realMin: number; sampleSize: number }>()
     for (const log of logsByProduct) {
       if (log.productId) {
+        // AVG volta como string do driver — sem converter, o `.toFixed` abaixo
+        // quebra assim que existir amostra.
         comparisonMap.set(log.productId, {
-          realMin: log.realDurationMinutes ?? 0,
-          sampleSize: log.sampleSize,
+          realMin: toNumber(log.realDurationMinutes),
+          sampleSize: toNumber(log.sampleSize),
         })
       }
     }

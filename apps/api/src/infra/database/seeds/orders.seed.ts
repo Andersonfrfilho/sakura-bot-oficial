@@ -127,6 +127,7 @@ export async function seedOrders({ establishmentId, customerIds, tableIds }: See
   const orders: SeededOrder[] = []
   const orderRows: (typeof schema.orders.$inferInsert)[] = []
   const orderItems: (typeof schema.orderItems.$inferInsert)[] = []
+  const statusLogs: (typeof schema.orderStatusLogs.$inferInsert)[] = []
   let orderItemIndex = 0
 
   BLUEPRINTS.forEach((blueprint, index) => {
@@ -160,6 +161,13 @@ export async function seedOrders({ establishmentId, customerIds, tableIds }: See
       daysAgo: blueprint.daysAgo,
     })
 
+    const lifecycle = buildLifecycleTimestamps({
+      status: blueprint.status,
+      type: blueprint.type,
+      baseDaysAgo: blueprint.daysAgo,
+      index,
+    })
+
     orderRows.push({
       id: orderId(index),
       establishmentId,
@@ -170,17 +178,44 @@ export async function seedOrders({ establishmentId, customerIds, tableIds }: See
       type: blueprint.type,
       totalAmount: money(totalAmount),
       fiscalEnabled: true,
-      ...buildLifecycleTimestamps({
-        status: blueprint.status,
-        type: blueprint.type,
-        baseDaysAgo: blueprint.daysAgo,
-        index,
-      }),
+      ...lifecycle,
     })
+
+    // O relatório de tempo de preparo mede `ready - in_production` a partir
+    // destes logs; sem eles a tela fica em "0 produtos comparados".
+    statusLogs.push({ orderId: orderId(index), establishmentId, status: 'received', createdAt: lifecycle.receivedAt })
+    if (lifecycle.productionStartedAt) {
+      statusLogs.push({
+        orderId: orderId(index),
+        establishmentId,
+        status: 'in_production',
+        previousStatus: 'received',
+        createdAt: lifecycle.productionStartedAt,
+      })
+    }
+    if (lifecycle.readyAt) {
+      statusLogs.push({
+        orderId: orderId(index),
+        establishmentId,
+        status: 'ready',
+        previousStatus: 'in_production',
+        createdAt: lifecycle.readyAt,
+      })
+    }
+    if (lifecycle.completedAt) {
+      statusLogs.push({
+        orderId: orderId(index),
+        establishmentId,
+        status: 'completed',
+        previousStatus: 'ready',
+        createdAt: lifecycle.completedAt,
+      })
+    }
   })
 
   await db.insert(schema.orders).values(orderRows).onConflictDoNothing()
   await db.insert(schema.orderItems).values(orderItems).onConflictDoNothing()
+  await db.insert(schema.orderStatusLogs).values(statusLogs).onConflictDoNothing()
 
   return orders
 }

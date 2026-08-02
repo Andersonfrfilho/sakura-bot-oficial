@@ -727,6 +727,33 @@ datalake por último (dependem do core estável).
   - *Verificação:* schema derrubado à mão e container reiniciado —
     `[DB] Migrations applied` e `[API] Listening on port 3333`.
 
+- ✅ **TX.6** Tempo de Preparo nunca comparava nada — e a query quebrava.
+  - *Sintoma:* "Acurácia média 0% · 0 produtos comparados · Sem dados
+    suficientes para comparar."
+  - *Causa (três, empilhadas):* (1) `products.preparationTimeMinutes` nunca era
+    semeado, e o use case filtra `IS NOT NULL` — retorno vazio antes de tocar no
+    resto; (2) `order_status_logs` estava vazia, e é dela que sai o tempo real;
+    (3) com dado presente, a query estourava
+    `invalid reference to FROM-clause entry for table "order_status_logs"` — a
+    subquery correlacionada entrava por `innerJoin` comum, e sem `LATERAL` o
+    Postgres recusa a referência à tabela externa. Os dois primeiros mascaravam
+    o terceiro: o endpoint nunca chegava a executar a query.
+  - *Bug latente no mesmo arquivo:* `realDurationMinutes` vem de `AVG`, logo é
+    string do driver; `real.toFixed(1)` quebraria na primeira amostra. Mesma
+    classe do TX (ver `shared/numeric.util.ts`), corrigido com `toNumber`.
+  - *Implementação:* query reescrita com `alias()` e auto-join entre o log
+    `in_production` e o `ready` do mesmo pedido, sem subquery correlacionada.
+    `catalog.seed.ts` ganhou `preparationTimeMinutes` por produto (1 a 18 min) e
+    `orders.seed.ts` passou a gravar os logs de status de todo o ciclo de vida.
+  - *Limite conceitual, exposto na tela:* o tempo real é por pedido, não por
+    item — refrigerante que dividiu comanda carrega o tempo do prato e aparece
+    com +2244%. Um aviso azul explica isso; sem ele o número parece falha de
+    cozinha em vez de granularidade da medição.
+  - *Verificação:* `GET /reports/preparation-time-comparison?days=30` devolveu
+    os 5 produtos com amostras (3 a 7); a tela passou de "0 produtos
+    comparados" para acurácia de 25.7% sobre 5. Baselines de tsc mantidas
+    (API 11, web 5).
+
 ## Riscos
 
 - **R1**: pacote compartilhado de conversas exige alinhamento de versões React
