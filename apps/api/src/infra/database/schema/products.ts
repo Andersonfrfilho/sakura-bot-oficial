@@ -20,6 +20,7 @@ export const products = pgTable('products', {
   preparationTimeMinutes: integer('preparation_time_minutes'),
   preparationInstructions: text('preparation_instructions'),
   active: boolean('active').default(true).notNull(),
+  allowNegativeStock: boolean('allow_negative_stock').default(false).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

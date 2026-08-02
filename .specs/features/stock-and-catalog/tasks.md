@@ -39,16 +39,21 @@ R$ 0,00 e a "receita" do produto é decorativa.
   *Verificação:* `POST` → `GET /ingredients` mostra o novo saldo e o novo custo;
   segundo lote mais caro move a média na direção certa.
 
-- **T1.2** 🧠 Baixa por receita no fechamento do pedido. Ao pedido entrar em
-  estado que consome (a definir com o fluxo de cozinha), para cada item explode
-  `product_ingredients × quantidade` e dá baixa **FIFO** nos lotes por
-  `expiresAt`, gravando um `stock_movements` (`out`) por lote tocado, com
-  `orderId` e `userId`.
-  Requisitos inegociáveis: transação única, **idempotência por `orderId`** (um
-  reprocessamento não pode baixar duas vezes) e decisão explícita para saldo
-  insuficiente — bloquear a venda ou permitir negativo e alertar. Produto sem
-  receita não movimenta nada, e isso é o caso normal, não um erro.
-  *Verificação:* pedido com 2 itens de receita conhecida baixa exatamente a
+- **T1.2** ✅ 🧠 Baixa por receita no fechamento do pedido. Concluído: gatilho é a
+  transição `received → in_production` (kitchen começa a produzir), via
+  `DeductStockForOrderUseCase` chamado de dentro de `UpdateOrderStatusUseCase`.
+  Para cada item explode `product_ingredients × quantidade` e dá baixa **FIFO**
+  nos lotes por `expiresAt`, gravando um `stock_movements` (`out`) por lote
+  tocado, com `orderId` e `userId`.
+  Decisão do saldo insuficiente: **configurável por produto**, campo
+  `products.allowNegativeStock` (default `false` = bloqueia a transição com
+  409; `true` = permite negativo e grava movimento extra sinalizando saldo
+  negativo permitido). Idempotência por `orderId`: checa `stock_movements`
+  existente antes de processar. Produto sem receita não movimenta nada.
+  Achado no caminho: `stock_batches`/`stock_movements`/`product_ingredients`
+  no banco real estavam desalinhados do schema Drizzle (colunas ausentes ou
+  com nome diferente) — corrigido via migrations `0025`, `0026`, `0027`.
+  *Verificação (feita ao vivo):* pedido com 2 itens de receita conhecida baixa exatamente a
   quantidade esperada, do lote que vence primeiro; repetir a chamada não muda
   saldo algum.
 

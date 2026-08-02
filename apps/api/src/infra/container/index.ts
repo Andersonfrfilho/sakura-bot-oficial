@@ -33,6 +33,7 @@ import { SectionController } from '@/modules/products/infra/http/SectionControll
 import { IngredientController } from '@/modules/products/infra/http/IngredientController'
 import { StockBatchController } from '@/modules/products/infra/http/StockBatchController'
 import { CreateStockBatchUseCase } from '@/modules/products/application/use-cases/CreateStockBatchUseCase'
+import { DeductStockForOrderUseCase } from '@/modules/products/application/use-cases/DeductStockForOrderUseCase'
 
 // Tables
 import { DrizzleTableRepository } from '@/modules/tables/infra/repositories/DrizzleTableRepository'
@@ -210,8 +211,9 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const ingredientController = new IngredientController(db)
   const createStockBatchUseCase = new CreateStockBatchUseCase(db, createAuditLogUseCase)
   const stockBatchController = new StockBatchController(db, createStockBatchUseCase)
+  const deductStockForOrderUseCase = new DeductStockForOrderUseCase(db)
   const triggerFiscalEmissionUseCase = new TriggerFiscalEmissionUseCase(db, wsHub)
-  const updateOrderStatusUseCase = new UpdateOrderStatusUseCase(db, wsHub, triggerFiscalEmissionUseCase)
+  const updateOrderStatusUseCase = new UpdateOrderStatusUseCase(db, wsHub, triggerFiscalEmissionUseCase, deductStockForOrderUseCase)
 
   // Orders
   const createOrderUseCase = new CreateOrderUseCase(db, wsHub)

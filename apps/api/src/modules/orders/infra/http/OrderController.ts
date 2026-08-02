@@ -126,6 +126,7 @@ export class OrderController {
       establishmentId: request.user.establishmentId,
       newStatus: parsed.data.status,
       cancellationReason: parsed.data.cancellationReason,
+      userId: request.user.id,
     })
     response.json(order)
   }
@@ -172,6 +173,7 @@ export class OrderController {
       orderId: order.id,
       establishmentId: request.user.establishmentId,
       newStatus: 'in_production',
+      userId: request.user.id,
     })
 
     response.json(updated)

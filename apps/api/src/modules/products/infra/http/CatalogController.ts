@@ -30,6 +30,7 @@ const productSchema = z.object({
   preparationTimeMinutes: z.number().int().positive().nullable().optional(),
   preparationInstructions: z.string().nullable().optional(),
   active: z.boolean().optional(),
+  allowNegativeStock: z.boolean().optional(),
   sortOrder: z.number().int().min(0).optional(),
 })
 
@@ -228,6 +229,7 @@ export class CatalogController {
         ...(parsed.data.preparationTimeMinutes !== undefined && { preparationTimeMinutes: parsed.data.preparationTimeMinutes }),
         ...(parsed.data.preparationInstructions !== undefined && { preparationInstructions: parsed.data.preparationInstructions }),
         ...(parsed.data.active !== undefined && { active: parsed.data.active }),
+        ...(parsed.data.allowNegativeStock !== undefined && { allowNegativeStock: parsed.data.allowNegativeStock }),
         ...(parsed.data.sortOrder !== undefined && { sortOrder: parsed.data.sortOrder }),
       })
       .returning()
@@ -281,6 +283,7 @@ export class CatalogController {
         ...(parsed.data.preparationTimeMinutes !== undefined && { preparationTimeMinutes: parsed.data.preparationTimeMinutes }),
         ...(parsed.data.preparationInstructions !== undefined && { preparationInstructions: parsed.data.preparationInstructions }),
         ...(parsed.data.active !== undefined && { active: parsed.data.active }),
+        ...(parsed.data.allowNegativeStock !== undefined && { allowNegativeStock: parsed.data.allowNegativeStock }),
         ...(parsed.data.sortOrder !== undefined && { sortOrder: parsed.data.sortOrder }),
       })
       .where(and(eq(schema.products.id, id), eq(schema.products.establishmentId, establishmentId)))

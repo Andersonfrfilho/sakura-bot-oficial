@@ -9,6 +9,7 @@ import { canTransitionTo } from '../../domain/entities/Order'
 import { MessagesConstants } from '@/shared/constants/MessagesConstants'
 import type { OrderStatus } from '@/shared/types'
 import type { TriggerFiscalEmissionUseCase } from '@/modules/fiscal/application/use-cases/TriggerFiscalEmissionUseCase'
+import type { DeductStockForOrderUseCase } from '@/modules/products/application/use-cases/DeductStockForOrderUseCase'
 
 type Database = NodePgDatabase<typeof schema>
 
@@ -17,6 +18,7 @@ interface UpdateStatusInput {
   establishmentId: string
   newStatus: OrderStatus
   cancellationReason?: string
+  userId?: string
 }
 
 
@@ -24,7 +26,8 @@ export class UpdateOrderStatusUseCase {
   constructor(
     private readonly db: Database,
     private readonly wsHub: WebSocketHub,
-    private readonly triggerFiscal?: TriggerFiscalEmissionUseCase
+    private readonly triggerFiscal?: TriggerFiscalEmissionUseCase,
+    private readonly deductStock?: DeductStockForOrderUseCase
   ) {}
 
   async execute(input: UpdateStatusInput) {
@@ -41,6 +44,16 @@ export class UpdateOrderStatusUseCase {
       throw new UnprocessableError(
         MessagesConstants.order.invalidStatusTransition(order.status, input.newStatus)
       )
+    }
+
+    // Baixa de estoque bloqueia a transição quando o produto não permite saldo negativo —
+    // é aqui que o pedido efetivamente começa a consumir receita.
+    if (input.newStatus === 'in_production' && this.deductStock) {
+      await this.deductStock.execute({
+        orderId: input.orderId,
+        establishmentId: input.establishmentId,
+        ...(input.userId ? { userId: input.userId } : {}),
+      })
     }
 
     const now = new Date()
