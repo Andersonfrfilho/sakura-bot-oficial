@@ -1,7 +1,7 @@
 import uWS from 'uWebSockets.js'
 import { readFileSync, existsSync } from 'fs'
 import { extname, join } from 'path'
-import { Router } from './router'
+import { Router, writeCorsAndSecurityHeaders } from './router'
 import { WebSocketHub } from '@/infra/websocket/WebSocketHub'
 import { buildContainer } from '@/infra/container'
 import { checkDatabaseConnection, runMigrations } from '@/infra/database/connection'
@@ -203,6 +203,21 @@ export async function createServer() {
         res.writeHeader('Cache-Control', 'public, max-age=31536000, immutable')
       }
       res.end(buffer)
+    })
+  })
+
+  // Rota coringa, registrada por último. Sem ela o uWS responde com o próprio
+  // 404 "File Not Found", sem Content-Type e sem CORS — no browser isso vira
+  // "Failed to fetch", e o cliente não consegue distinguir rota inexistente de
+  // API fora do ar.
+  app.any('/*', (res, req) => {
+    const origin = req.getHeader('origin')
+    const body = JSON.stringify({ error: 'not_found', message: 'Route not found' })
+    res.cork(() => {
+      res.writeStatus('404 Not Found')
+      res.writeHeader('Content-Type', 'application/json')
+      writeCorsAndSecurityHeaders(res, origin)
+      res.end(body)
     })
   })
 

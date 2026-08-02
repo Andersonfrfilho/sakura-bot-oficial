@@ -797,6 +797,29 @@ datalake por último (dependem do core estável).
     com os mesmos ids e `/reports/monthly` voltou a 200. Baseline de tsc do web
     mantida (5 erros pré-existentes).
 
+- ✅ **TX.9** 404 da API saía sem CORS e virava "Failed to fetch" no browser.
+  - *Sintoma:* chamada para rota inexistente falhava no cliente como erro de
+    rede, sem status. O front não conseguia distinguir "endpoint errado" de
+    "API fora do ar" — e nenhum tratamento por status, inclusive o do TX.8,
+    pegava o caso.
+  - *Causa:* não havia rota coringa registrada. Sem match, o uWS respondia com
+    seu próprio `404 File Not Found`, sem `Content-Type` e sem
+    `Access-Control-Allow-Origin`; o browser então bloqueia a leitura da
+    resposta e reporta falha de rede.
+  - *Implementação:* `app.any('/*')` registrado por último em `server.ts`,
+    devolvendo o mesmo envelope de erro das demais rotas
+    (`{ error: 'not_found', message }`) com CORS e headers de segurança. Os
+    headers foram extraídos para `writeCorsAndSecurityHeaders` em `router.ts`,
+    que passou a ser a única fonte deles (antes repetidos em `json`/`error` e
+    em `binary`).
+  - *Verificação:* rota inexistente responde 404 com
+    `Access-Control-Allow-Origin` e corpo JSON; no browser o `fetch` passou a
+    ler `404` onde antes lia `ERR Failed to fetch`. A rota coringa não
+    sequestrou nada: preflight `OPTIONS` segue 204 com os headers de CORS, e
+    `/health`, `/tables`, `/customers`, `/reports/monthly`, `/docs` e
+    `/api/openapi.json` seguem 200 — com o 403 do atendente em
+    `/reports/monthly` preservado. Baseline de tsc da API mantida (11 erros).
+
 ## Riscos
 
 - **R1**: pacote compartilhado de conversas exige alinhamento de versões React

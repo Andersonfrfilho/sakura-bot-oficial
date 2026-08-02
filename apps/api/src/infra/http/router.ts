@@ -108,6 +108,15 @@ const SECURITY_HEADERS: Array<[string, string]> = [
   ['X-XSS-Protection', '0'],
 ]
 
+export function writeCorsAndSecurityHeaders(uwsResponse: HttpResponse, origin: string): void {
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    uwsResponse.writeHeader('Access-Control-Allow-Origin', origin)
+  }
+  for (const [name, value] of SECURITY_HEADERS) {
+    uwsResponse.writeHeader(name, value)
+  }
+}
+
 function buildResponseHelper(
   uwsResponse: HttpResponse,
   isAborted: () => boolean,
@@ -120,12 +129,7 @@ function buildResponseHelper(
     uwsResponse.writeStatus(status)
     uwsResponse.writeHeader('Content-Type', 'application/json')
     uwsResponse.writeHeader('X-Request-Id', reqId)
-    if (ALLOWED_ORIGINS.includes(origin)) {
-      uwsResponse.writeHeader('Access-Control-Allow-Origin', origin)
-    }
-    for (const [name, value] of SECURITY_HEADERS) {
-      uwsResponse.writeHeader(name, value)
-    }
+    writeCorsAndSecurityHeaders(uwsResponse, origin)
   }
 
   return {
@@ -169,12 +173,7 @@ function buildResponseHelper(
           uwsResponse.writeHeader('Content-Disposition', `attachment; filename="${fileName}"`)
         }
         uwsResponse.writeHeader('X-Request-Id', reqId)
-        if (ALLOWED_ORIGINS.includes(origin)) {
-          uwsResponse.writeHeader('Access-Control-Allow-Origin', origin)
-        }
-        for (const [name, value] of SECURITY_HEADERS) {
-          uwsResponse.writeHeader(name, value)
-        }
+        writeCorsAndSecurityHeaders(uwsResponse, origin)
         uwsResponse.end(body)
       })
     },
