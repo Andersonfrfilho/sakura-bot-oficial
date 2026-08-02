@@ -341,7 +341,30 @@ barato em seguida).
     (`fn_audit_logs_immutable`), então os registros gerados no teste
     permanecem no banco — isso é o comportamento correto de trilha de
     auditoria, não sujeira. Posições e grupos de teste foram revertidos.
-- ⬜ **T3.4** (UX-TBL-05) Comandas da mesa no detalhe + abrir nova. 🔗 T2.2.
+- ✅ **T3.4** (UX-TBL-05) Comandas da mesa no detalhe + abrir nova. 🔗 T2.2.
+  - *Implementação:* `ComandaRepository.listByTable` + implementação Drizzle
+    (ordenada por `openedAt` desc, filtrada por estabelecimento);
+    `ListComandasByTableUseCase` — que já existia mas nunca havia sido ligado ao
+    container — instanciado e injetado no `TableController`; rota
+    `GET /tables/:id/comandas`. `OpenComandaUseCase` deixou de lançar
+    `ConflictError` quando a mesa já tinha comanda aberta: a spec pede N comandas
+    por mesa (uma por cliente). `TableController.list` passou a devolver o array
+    `comandas` por mesa, mantendo `comanda` (singular, a primeira aberta) para o
+    card da grade não quebrar. No front, `Comanda`, `ComandaStatus`,
+    `TableWithComanda` e os mapas de rótulo/cor foram centralizados em
+    `constants/tableLabels.ts` (estavam duplicados e já divergindo entre
+    `TablesPage` e `TableFloorMap`); card ganhou botão "Comandas (N)" e badge
+    `+N` no código; novo modal "Comandas — Mesa N" lista abertas e encerradas com
+    badge de status, cliente e horário, com "Nova comanda" no cabeçalho e
+    "Encerrar" por linha delegando ao modal de encerramento existente.
+  - *Verificação:* `npx tsc --noEmit` — API 12 → 11 erros, web de volta à baseline
+    de 5 (todos pré-existentes). Curl: 2ª comanda na mesma mesa retorna 201
+    (antes 409); fechar a 1ª mantém a mesa `occupied`, fechar a 2ª libera para
+    `available`; mesa inexistente devolve 404. Browser (mesa 3): modal listou
+    CMD-001, "Nova comanda" gerou `EGNDVG` e o card passou a "Comandas (2)" com
+    badge `+1`; "Encerrar" abriu o modal com o código correto e, após pagar, a
+    mesa voltou a 1 comanda aberta seguindo ocupada, com `EGNDVG` listada como
+    "Paga". Console sem erros após reload. Dado de teste encerrado ao fim.
 
 ## Fase 4 — Clientes
 > 🤖 Modelo: `sonnet`

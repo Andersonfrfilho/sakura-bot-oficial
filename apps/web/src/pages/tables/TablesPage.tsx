@@ -4,35 +4,18 @@ import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { Modal } from '@/components/ui/Modal'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { Plus, LayoutGrid, Map, Link2 } from 'lucide-react'
+import { Plus, LayoutGrid, Map, Link2, ReceiptText } from 'lucide-react'
 import { TableFloorMap } from './TableFloorMap'
 import {
   TABLE_STATUS_LABELS,
   TABLE_STATUS_COLORS,
   TABLE_STATUS_CARD,
+  COMANDA_STATUS_LABELS,
+  COMANDA_STATUS_COLORS,
   type TableStatus,
+  type Comanda,
+  type TableWithComanda,
 } from '@/constants/tableLabels'
-
-interface Comanda {
-  id: string
-  code: string
-  status: 'open'
-  customerName: string | null
-  customerPhone: string | null
-  openedAt: string
-}
-
-interface TableWithComanda {
-  id: string
-  number: number
-  capacity: number
-  status: TableStatus
-  positionX: number | null
-  positionY: number | null
-  createdAt: string
-  comanda: Comanda | null
-  groupId: string | null
-}
 
 const EMPTY_SELECTION = new Set<string>()
 
@@ -60,11 +43,22 @@ export function TablesPage() {
     queryFn: () => api.get<TableWithComanda[]>('/tables', accessToken ?? undefined),
     refetchInterval: 15_000,
   })
-  const tables = rawTables.map((table) => ({ ...table, groupId: table.groupId ?? null }))
+  const tables = rawTables.map((table) => ({
+    ...table,
+    groupId: table.groupId ?? null,
+    comandas: table.comandas ?? [],
+  }))
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid')
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(EMPTY_SELECTION)
   const [groupError, setGroupError] = useState<string | null>(null)
+  const [comandasTable, setComandasTable] = useState<{ id: string; number: number } | null>(null)
+
+  const { data: tableComandas = [], isLoading: comandasLoading } = useQuery({
+    queryKey: ['table-comandas', comandasTable?.id],
+    queryFn: () => api.get<Comanda[]>(`/tables/${comandasTable!.id}/comandas`, accessToken ?? undefined),
+    enabled: comandasTable !== null,
+  })
 
   async function handlePositionChange(tableId: string, positionX: number, positionY: number) {
     try {
@@ -168,6 +162,7 @@ export function TablesPage() {
     try {
       await api.post(`/tables/${comandaModal.tableId}/comanda`, {}, accessToken ?? undefined)
       void queryClient.invalidateQueries({ queryKey: ['tables'] })
+      void queryClient.invalidateQueries({ queryKey: ['table-comandas'] })
       setComandaModal(null)
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Erro ao abrir comanda')
@@ -182,6 +177,7 @@ export function TablesPage() {
     try {
       await api.patch(`/comandas/${closeModal.comanda.id}/close`, { status: closeStatus }, accessToken ?? undefined)
       void queryClient.invalidateQueries({ queryKey: ['tables'] })
+      void queryClient.invalidateQueries({ queryKey: ['table-comandas'] })
       setCloseModal(null)
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Erro ao encerrar comanda')
@@ -313,6 +309,11 @@ export function TablesPage() {
                     <span className="text-xs font-mono font-bold text-gray-800 bg-white/80 px-2 py-0.5 rounded border">
                       {table.comanda.code}
                     </span>
+                    {table.comandas.length > 1 && (
+                      <span className="text-xs font-medium text-gray-600 bg-white/80 px-1.5 py-0.5 rounded border">
+                        +{table.comandas.length - 1}
+                      </span>
+                    )}
                   </div>
                   {table.comanda.customerName ? (
                     <p className="text-xs text-gray-600 truncate">{table.comanda.customerName}</p>
@@ -328,21 +329,19 @@ export function TablesPage() {
               )}
 
               <div className="space-y-1.5">
-                {table.status === 'available' ? (
-                  <button
-                    onClick={() => setComandaModal({ tableId: table.id, tableNumber: table.number })}
-                    className="w-full px-2 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors active:scale-95"
-                  >
-                    Abrir comanda
-                  </button>
-                ) : table.comanda ? (
-                  <button
-                    onClick={() => setCloseModal({ comanda: table.comanda!, tableNumber: table.number })}
-                    className="w-full px-2 py-1.5 bg-gray-800 text-white text-xs font-medium rounded-lg hover:bg-gray-900 transition-colors active:scale-95"
-                  >
-                    Encerrar
-                  </button>
-                ) : null}
+                <button
+                  onClick={() => setComandaModal({ tableId: table.id, tableNumber: table.number })}
+                  className="w-full px-2 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors active:scale-95"
+                >
+                  {table.comandas.length > 0 ? 'Nova comanda' : 'Abrir comanda'}
+                </button>
+                <button
+                  onClick={() => setComandasTable({ id: table.id, number: table.number })}
+                  className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-white/60 transition-colors active:scale-95"
+                >
+                  <ReceiptText className="h-3.5 w-3.5" />
+                  Comandas{table.comandas.length > 0 ? ` (${table.comandas.length})` : ''}
+                </button>
                 <div className="flex gap-1">
                   <button
                     onClick={() => openEdit(table)}
@@ -403,6 +402,72 @@ export function TablesPage() {
           >
             {formLoading ? 'Salvando...' : 'Salvar'}
           </button>
+        </div>
+      </Modal>
+
+      {/* Modal comandas da mesa */}
+      <Modal open={comandasTable !== null} onClose={() => setComandasTable(null)} size="md">
+        <div className="p-6">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <h2 className="font-semibold text-gray-900">Comandas — Mesa {comandasTable?.number}</h2>
+            <button
+              onClick={() => {
+                if (!comandasTable) return
+                setComandaModal({ tableId: comandasTable.id, tableNumber: comandasTable.number })
+                setComandasTable(null)
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors active:scale-95 shrink-0"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Nova comanda
+            </button>
+          </div>
+
+          {comandasLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }, (_, index) => (
+                <Skeleton key={index} className="h-16 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : tableComandas.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">Nenhuma comanda nesta mesa ainda.</p>
+          ) : (
+            <ul className="space-y-2 max-h-[60vh] overflow-y-auto">
+              {tableComandas.map((comanda) => (
+                <li
+                  key={comanda.id}
+                  className="flex items-center justify-between gap-3 border border-gray-200 rounded-lg px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-sm font-mono font-bold text-gray-900">{comanda.code}</span>
+                      <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${COMANDA_STATUS_COLORS[comanda.status]}`}>
+                        {COMANDA_STATUS_LABELS[comanda.status]}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 truncate">
+                      {comanda.customerName ?? <span className="text-gray-400 italic">Aguardando confirmação</span>}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Aberta às{' '}
+                      {new Date(comanda.openedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  {comanda.status === 'open' && comandasTable && (
+                    <button
+                      onClick={() => {
+                        setCloseModal({ comanda, tableNumber: comandasTable.number })
+                        setComandasTable(null)
+                      }}
+                      className="px-3 py-1.5 bg-gray-800 text-white text-xs font-medium rounded-lg hover:bg-gray-900 transition-colors active:scale-95 shrink-0"
+                    >
+                      Encerrar
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </Modal>
 

@@ -44,6 +44,7 @@ import { ListTablesUseCase } from '@/modules/tables/application/use-cases/ListTa
 import { CreateTableUseCase } from '@/modules/tables/application/use-cases/CreateTableUseCase'
 import { UpdateTablePositionUseCase } from '@/modules/tables/application/use-cases/UpdateTablePositionUseCase'
 import { GroupTablesUseCase } from '@/modules/tables/application/use-cases/GroupTablesUseCase'
+import { ListComandasByTableUseCase } from '@/modules/tables/application/use-cases/ListComandasByTableUseCase'
 import { UngroupTablesUseCase } from '@/modules/tables/application/use-cases/UngroupTablesUseCase'
 import { UpdateTableUseCase } from '@/modules/tables/application/use-cases/UpdateTableUseCase'
 import { DeleteTableUseCase } from '@/modules/tables/application/use-cases/DeleteTableUseCase'
@@ -394,6 +395,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const openComandaUseCase = new OpenComandaUseCase(tableRepository, comandaRepository)
   const closeComandaUseCase = new CloseComandaUseCase(tableRepository, comandaRepository)
   const getComandaByCodeUseCase = new GetComandaByCodeUseCase(comandaRepository)
+  const listComandasByTableUseCase = new ListComandasByTableUseCase(tableRepository, comandaRepository)
   const confirmComandaUseCase = new ConfirmComandaUseCase(comandaRepository)
   const tableController = new TableController(
     listTablesUseCase,
@@ -406,6 +408,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     openComandaUseCase,
     closeComandaUseCase,
     getComandaByCodeUseCase,
+    listComandasByTableUseCase,
     confirmComandaUseCase,
     comandaRepository
   )

@@ -1,27 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { GripVertical } from 'lucide-react'
-import type { TableStatus } from '@/constants/tableLabels'
-
-interface Comanda {
-  id: string
-  code: string
-  status: 'open'
-  customerName: string | null
-  customerPhone: string | null
-  openedAt: string
-}
-
-interface TableWithComanda {
-  id: string
-  number: number
-  capacity: number
-  status: TableStatus
-  positionX: number | null
-  positionY: number | null
-  createdAt: string
-  comanda: Comanda | null
-  groupId: string | null
-}
+import type { TableStatus, TableWithComanda } from '@/constants/tableLabels'
 
 interface TableFloorMapProps {
   tables: TableWithComanda[]

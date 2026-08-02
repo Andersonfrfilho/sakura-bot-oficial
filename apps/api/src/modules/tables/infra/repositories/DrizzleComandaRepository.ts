@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm'
+import { eq, and, desc } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import type { ComandaRepository, ComandaWithTable } from '../../domain/repositories/ComandaRepository'
 import * as schema from '@/infra/database/schema'
@@ -69,6 +69,19 @@ export class DrizzleComandaRepository implements ComandaRepository {
       )
     if (!comanda) return null
     return this.joinTable(comanda)
+  }
+
+  async listByTable(tableId: string, establishmentId: string): Promise<Comanda[]> {
+    return this.db
+      .select()
+      .from(schema.comandas)
+      .where(
+        and(
+          eq(schema.comandas.tableId, tableId),
+          eq(schema.comandas.establishmentId, establishmentId)
+        )
+      )
+      .orderBy(desc(schema.comandas.openedAt))
   }
 
   async listOpenByEstablishment(establishmentId: string): Promise<ComandaWithTable[]> {

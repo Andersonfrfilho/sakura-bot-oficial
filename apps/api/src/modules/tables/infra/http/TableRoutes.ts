@@ -16,6 +16,7 @@ export function registerTableRoutes(router: Router, controller: TableController)
   router.delete('/tables/group/:groupId', authenticate, authorize('orders', 'write'), controller.ungroup)
 
   // Comanda management (authenticated — waiter/admin)
+  router.get('/tables/:id/comandas', authenticate, authorize('orders', 'read'), controller.listComandasByTable)
   router.post('/tables/:id/comanda', authenticate, authorize('orders', 'write'), controller.openComanda)
   router.patch('/comandas/:comandaId/close', authenticate, authorize('orders', 'write'), controller.closeComanda)
 

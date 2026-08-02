@@ -10,6 +10,7 @@ import type { UngroupTablesUseCase } from '../../application/use-cases/UngroupTa
 import type { OpenComandaUseCase } from '../../application/use-cases/OpenComandaUseCase'
 import type { CloseComandaUseCase } from '../../application/use-cases/CloseComandaUseCase'
 import type { GetComandaByCodeUseCase } from '../../application/use-cases/GetComandaByCodeUseCase'
+import type { ListComandasByTableUseCase } from '../../application/use-cases/ListComandasByTableUseCase'
 import type { ConfirmComandaUseCase } from '../../application/use-cases/ConfirmComandaUseCase'
 import type { ComandaRepository } from '../../domain/repositories/ComandaRepository'
 import { UnauthorizedError, ValidationError } from '@/shared/errors/AppError'
@@ -55,6 +56,7 @@ export class TableController {
     private readonly openComandaUseCase: OpenComandaUseCase,
     private readonly closeComandaUseCase: CloseComandaUseCase,
     private readonly getComandaByCodeUseCase: GetComandaByCodeUseCase,
+    private readonly listComandasByTableUseCase: ListComandasByTableUseCase,
     private readonly confirmComandaUseCase: ConfirmComandaUseCase,
     private readonly comandaRepository: ComandaRepository
   ) {}
@@ -63,8 +65,20 @@ export class TableController {
     if (!request.user) throw new UnauthorizedError()
     const tables = await this.listTablesUseCase.execute(request.user.establishmentId)
     const openComandas = await this.comandaRepository.listOpenByEstablishment(request.user.establishmentId)
-    const comandaByTable = Object.fromEntries(openComandas.map((c) => [c.tableId, c]))
-    response.json(tables.map((t) => ({ ...t, comanda: comandaByTable[t.id] ?? null })))
+    const comandasByTable = new Map<string, typeof openComandas>()
+    for (const comanda of openComandas) {
+      const bucket = comandasByTable.get(comanda.tableId) ?? []
+      bucket.push(comanda)
+      comandasByTable.set(comanda.tableId, bucket)
+    }
+    response.json(
+      tables.map((table) => {
+        const comandas = comandasByTable.get(table.id) ?? []
+        // `comanda` (singular) segue no payload como a primeira aberta — a UI
+        // de grade mostra um código só; `comandas` é a lista completa.
+        return { ...table, comandas, comanda: comandas[0] ?? null }
+      })
+    )
   }
 
   create: RouteHandler = async (request, response) => {
@@ -103,6 +117,15 @@ export class TableController {
       userId: request.user.id,
     })
     response.json(table)
+  }
+
+  listComandasByTable: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const comandas = await this.listComandasByTableUseCase.execute(
+      request.params['id']!,
+      request.user.establishmentId
+    )
+    response.json(comandas)
   }
 
   group: RouteHandler = async (request, response) => {
