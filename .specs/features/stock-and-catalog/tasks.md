@@ -187,8 +187,25 @@ R$ 0,00 e a "receita" do produto é decorativa.
     componente ainda não está montado em nenhuma tela do Order Hub — é
     biblioteca aguardando consumidor. Changeset registrado
     (`.changeset/product-list-bulk-actions.md`, minor).
-- **T3.3** Duplicar produto — variação de tamanho e sabor é o caso comum, e
+- ✅ **T3.3** Duplicar produto — variação de tamanho e sabor é o caso comum, e
   hoje se resolve redigitando.
+  - *Implementação:* botão "Duplicar" em `CatalogPage.tsx`, ao lado de
+    "Editar", em cada card de produto. Sem endpoint novo — abre o modal em
+    modo de criação com `duplicateSource` guardando o produto de origem;
+    `sdkInitialProduct` monta os `initialValues` do `ProductForm` a partir
+    dele (nome com sufixo " (cópia)", preço, catálogo, seção, unidade,
+    tempo/instruções de preparo). Código de barras não é copiado — copiar
+    geraria duplicidade no lookup de código de barras que o T3.1 usa para
+    achar produto existente. Submit reaproveita `createProd` (POST
+    `/catalog/products`), o mesmo caminho do "Novo produto".
+  - *Verificação:* `tsc --noEmit` sem novos erros (os 13 erros do
+    `apps/web` são pré-existentes, confirmado via `git stash` antes/depois
+    da mudança — nenhum introduzido por esta task). Testado ao vivo no
+    navegador: clicar "Duplicar" em "Refrigerante Lata" abriu o modal
+    "Duplicar · Refrigerante Lata" com nome "Refrigerante Lata (cópia)",
+    descrição, preço R$ 6,00 e catálogo/seção "Bebidas" pré-preenchidos e
+    código de barras vazio; salvar criou o produto (6 produtos na lista),
+    depois excluído para limpar o dado de teste (voltou a 5).
 - **T3.4** Histórico de preço (`product_price_history`: produto, preço anterior,
   novo, autor, data). Sem ele não há como responder "quando esse item subiu",
   e retroagir depois é impossível: o dado não existe em lugar nenhum.

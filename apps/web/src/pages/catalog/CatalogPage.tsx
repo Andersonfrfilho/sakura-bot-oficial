@@ -128,6 +128,9 @@ function CatalogPageContent() {
   // Product modal
   const [prodModal, setProdModal] = useState<'create' | 'edit' | 'delete' | null>(null)
   const [selectedProd, setSelectedProd] = useState<Product | null>(null)
+  // Preenche o `ProductForm` em modo de criação com os dados de outro produto — variação de
+  // tamanho/sabor é o caso comum, e redigitar tudo de novo é o que a duplicação evita.
+  const [duplicateSource, setDuplicateSource] = useState<Product | null>(null)
   const [prodError, setProdError] = useState<string | null>(null)
   const [showScanner, setShowScanner] = useState(false)
 
@@ -251,6 +254,7 @@ function CatalogPageContent() {
 
   function openCreateProd() {
     setSelectedProd(null)
+    setDuplicateSource(null)
     setProdError(null)
     setProdModal('create')
   }
@@ -259,6 +263,13 @@ function CatalogPageContent() {
     setSelectedProd(prod)
     setProdError(null)
     setProdModal('edit')
+  }
+
+  function openDuplicateProd(prod: Product) {
+    setSelectedProd(null)
+    setDuplicateSource(prod)
+    setProdError(null)
+    setProdModal('create')
   }
 
   function openDeleteProd(prod: Product) {
@@ -270,6 +281,7 @@ function CatalogPageContent() {
   function closeProdModal() {
     setProdModal(null)
     setSelectedProd(null)
+    setDuplicateSource(null)
     setProdError(null)
   }
 
@@ -371,6 +383,21 @@ function CatalogPageContent() {
         sortOrder: selectedProd.sortOrder,
         active: selectedProd.active,
       }
+    : duplicateSource
+    ? {
+        name: `${duplicateSource.name} (cópia)`,
+        description: duplicateSource.description,
+        priceInCents: toCents(duplicateSource.price),
+        costPriceInCents: duplicateSource.costPrice === null ? null : toCents(duplicateSource.costPrice),
+        // Código de barras identifica uma unidade física específica — copiar geraria duplicidade
+        // no mesmo lookup que o T3.1 usa para achar produto por código.
+        barcode: null,
+        unit: duplicateSource.unit,
+        catalogId: duplicateSource.catalogId,
+        sectionId: duplicateSource.sectionId,
+        preparationTimeMinutes: duplicateSource.preparationTimeMinutes,
+        preparationInstructions: duplicateSource.preparationInstructions,
+      }
     : { catalogId: selectedCatId === '__none__' ? null : selectedCatId }
 
   const withoutCatalogCount = allProducts.filter((p) => p.catalogId === null).length
@@ -378,7 +405,13 @@ function CatalogPageContent() {
   const catModalTitle =
     catModal === 'create' ? 'Novo catálogo' : catModal === 'edit' ? `Editar · ${selectedCat?.name}` : 'Excluir catálogo'
   const prodModalTitle =
-    prodModal === 'create' ? 'Novo produto' : prodModal === 'edit' ? `Editar · ${selectedProd?.name}` : 'Excluir produto'
+    prodModal === 'create'
+      ? duplicateSource
+        ? `Duplicar · ${duplicateSource.name}`
+        : 'Novo produto'
+      : prodModal === 'edit'
+      ? `Editar · ${selectedProd?.name}`
+      : 'Excluir produto'
 
   return (
     <div className="flex h-full min-h-screen">
@@ -544,6 +577,12 @@ function CatalogPageContent() {
                         Editar
                       </button>
                       <button
+                        onClick={() => openDuplicateProd(prod)}
+                        className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        Duplicar
+                      </button>
+                      <button
                         onClick={() => toggleProd.mutate(prod.id)}
                         disabled={toggleProd.isPending}
                         className={`px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${
@@ -662,7 +701,7 @@ function CatalogPageContent() {
               ) : (
                 <>
                   <ProductForm
-                    key={selectedProd?.id ?? 'new'}
+                    key={selectedProd?.id ?? duplicateSource?.id ?? 'new'}
                     catalogs={sdkCatalogs}
                     sections={sdkSections}
                     initialValues={sdkInitialProduct}
