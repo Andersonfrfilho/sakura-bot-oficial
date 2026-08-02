@@ -504,6 +504,22 @@ barato em seguida).
     timezone, expiry_alert_days, default_printer); organizados em seções
     (Estabelecimento, Operação, Estoque, Impressão) no SettingsPage.
 - 🔶 **T8.4** (UX-RPT-06) Correções visuais de relatórios (Pasted #8).
+  - *Parcial (2026-08-02):* auditoria da tela achou dois defeitos que independem
+    do Pasted #8 e foram corrigidos. `GET /reports/funnel` devolvia **500**
+    (`(row.avg… ?? 0).toFixed is not a function`) e `GET /reports/table-metrics`
+    devolvia `"NaN"` em tempo médio e taxa de ocupação. Causa comum: o driver do
+    Postgres entrega `AVG`/`numeric` como **string**, e a anotação `sql<number>`
+    do Drizzle não converte nada em runtime — `?? 0` não protege porque a string
+    não é nula, e somar string dentro do `reduce` concatena. Extraído
+    `reports/shared/numeric.util.ts` (`toNumber` / `toFixedNumber`) e aplicado
+    nos dois use cases.
+  - *Verificação:* curl — funil voltou a 200 e identifica o gargalo; métricas de
+    mesa agora com `averageTimeAtTableMinutes: "30.1"` e ocupação numérica.
+    Browser: a página, que renderizava só os títulos das seções, passou a exibir
+    as quatro seções completas. `npx tsc --noEmit` na API manteve a baseline de
+    11 erros pré-existentes.
+  - *Segue bloqueada* para o restante: sem o Pasted #8 não dá para saber quais
+    ajustes visuais o usuário pediu.
 - ✅ **T8.5** (UX-FIS-02) Geração/persistência de PDF (DANFE/cupom) das notas
   fiscais. 🔗 T7.3 (reusa storage).
   - Decisão: gerar DANFE sob demanda a partir do `xmlAutorizado` (sem persistir

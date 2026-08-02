@@ -1,6 +1,7 @@
 import { eq, and, count, sum, avg, gte, isNotNull, sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import * as schema from '@/infra/database/schema'
+import { toNumber } from '../../shared/numeric.util'
 
 type Database = NodePgDatabase<typeof schema>
 
@@ -27,10 +28,6 @@ export interface TableMetrics {
   totalTables: number
   totalComandasClosed: number
   tables: TableBreakdown[]
-}
-
-function isFiniteNumber(value: number): boolean {
-  return typeof value === 'number' && isFinite(value) && !isNaN(value)
 }
 
 export class GetTableMetricsUseCase {
@@ -68,7 +65,7 @@ export class GetTableMetricsUseCase {
     const totalComandasClosed = closedComandas.length
 
     const avgTimeMinutes = closedComandas.length > 0
-      ? closedComandas.reduce((acc, c) => acc + (c.durationMinutes ?? 0), 0) / closedComandas.length
+      ? closedComandas.reduce((acc, c) => acc + toNumber(c.durationMinutes), 0) / closedComandas.length
       : 0
 
     const tableComandaSummary = new Map<string, {
@@ -92,7 +89,7 @@ export class GetTableMetricsUseCase {
       const entry = tableComandaSummary.get(c.tableId)
       if (entry) {
         entry.comandaCount++
-        entry.totalDurationMinutes += c.durationMinutes ?? 0
+        entry.totalDurationMinutes += toNumber(c.durationMinutes)
       }
     }
 
@@ -147,7 +144,7 @@ export class GetTableMetricsUseCase {
       ? totalRevenue / totalTables
       : 0
 
-    const totalOccupiedMinutes = closedComandas.reduce((acc, c) => acc + (c.durationMinutes ?? 0), 0)
+    const totalOccupiedMinutes = closedComandas.reduce((acc, c) => acc + toNumber(c.durationMinutes), 0)
     const totalPeriodMinutes = totalTables * days * 24 * 60
     const occupancyRate = totalPeriodMinutes > 0
       ? (totalOccupiedMinutes / totalPeriodMinutes) * 100

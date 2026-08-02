@@ -1,6 +1,7 @@
 import { eq, and, count, gte, sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import * as schema from '@/infra/database/schema'
+import { toFixedNumber } from '../../shared/numeric.util'
 
 type Database = NodePgDatabase<typeof schema>
 
@@ -91,19 +92,19 @@ export class GetFunnelAnalysisUseCase {
         {
           stage: 'received_to_production',
           label: STAGE_LABELS['received_to_production'] ?? 'Recebido → Produção',
-          averageMinutes: (row.avgReceivedToProduction ?? 0).toFixed(1),
+          averageMinutes: toFixedNumber(row.avgReceivedToProduction),
           orderCount: row.orderCount,
         },
         {
           stage: 'production_to_ready',
           label: STAGE_LABELS['production_to_ready'] ?? 'Produção → Pronto',
-          averageMinutes: (row.avgProductionToReady ?? 0).toFixed(1),
+          averageMinutes: toFixedNumber(row.avgProductionToReady),
           orderCount: row.orderCount,
         },
         {
           stage: 'ready_to_completed',
           label: STAGE_LABELS['ready_to_completed'] ?? 'Pronto → Concluído',
-          averageMinutes: (row.avgReadyToCompleted ?? 0).toFixed(1),
+          averageMinutes: toFixedNumber(row.avgReadyToCompleted),
           orderCount: row.orderCount,
         },
       ]
