@@ -24,6 +24,7 @@ import { CustomerInvoicePage } from '@/pages/public/CustomerInvoicePage'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { MobileNav } from '@/components/layout/MobileNav'
 import { AuthGuard, RoleGuard } from '@/components/layout/RoleGuard'
+import { AccessDeniedBanner } from '@/components/layout/AccessDeniedBanner'
 import { PWAInstallBanner } from '@/components/pwa/PWAInstallBanner'
 import { ROLES } from '@/constants/navigation'
 
@@ -33,6 +34,7 @@ function AppLayout() {
       <MobileNav />
       <Sidebar />
       <main className="flex-1 overflow-auto pt-14 md:pt-0">
+        <AccessDeniedBanner />
         <Outlet />
       </main>
     </div>

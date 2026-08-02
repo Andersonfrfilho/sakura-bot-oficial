@@ -779,6 +779,24 @@ datalake por último (dependem do core estável).
     passou a mostrar "6 cadastrados"; o Financeiro renderizou as três abas; e
     "Cargos" saiu do menu do gerente. Baselines de tsc mantidas (API 11, web 5).
 
+- ✅ **TX.8** Qualquer 403 de query virava estado vazio silencioso na tela.
+  - *Sintoma:* faltando permissão, a página não mostrava erro nenhum — só
+    "0 cadastrados", igual a um cadastro realmente vazio. Foi exatamente o que
+    escondeu o bug do TX.7 por tanto tempo.
+  - *Causa:* nenhuma página olha o `error` da query; todas renderizam
+    `data ?? []`. Tratar caso a caso deixaria a classe inteira em aberto.
+  - *Implementação:* handler global no `QueryCache` (`main.tsx`) marca
+    `accessDeniedStore` quando o erro é `ApiError` com status 403, e o
+    `AccessDeniedBanner` renderizado no `AppLayout` avisa que a tela pode estar
+    incompleta. O banner se limpa sozinho na troca de rota. No mesmo ponto, o
+    `retry` padrão passou a ignorar 4xx — repetir 401/403/404 não muda o
+    resultado e só atrasa a tela.
+  - *Verificação:* removi temporariamente as permissões de `reports` do gerente
+    no banco de dev, abri `/reports` como gerente e o banner âmbar apareceu com
+    o texto esperado; ao navegar para `/orders` ele sumiu. Permissões restauradas
+    com os mesmos ids e `/reports/monthly` voltou a 200. Baseline de tsc do web
+    mantida (5 erros pré-existentes).
+
 ## Riscos
 
 - **R1**: pacote compartilhado de conversas exige alinhamento de versões React
