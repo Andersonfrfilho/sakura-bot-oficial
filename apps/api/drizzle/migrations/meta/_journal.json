@@ -232,6 +232,13 @@
       "when": 1785000400000,
       "tag": "0033_add_order_item_preparation_times",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1785000500000,
+      "tag": "0034_add_delivery_fee_establishment",
+      "breakpoints": true
     }
   ]
 }

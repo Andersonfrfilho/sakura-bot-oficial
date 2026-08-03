@@ -931,6 +931,27 @@ datalake por último (dependem do core estável).
     teste do TX.12 revertido antes (lotes e saldo recompostos). Baseline de tsc
     da API mantida (11 erros).
 
+- [x] **TX.14** — Taxa de entrega respondia 500: coluna de tenant só existia no schema
+  - *Sintoma:* `GET /delivery-fee/rules` devolvia
+    `500 column "establishment_id" does not exist`. A tela de configuração de
+    taxa de entrega não abria — nem regras, nem zonas.
+  - *Causa:* `delivery_fee_rules` e `delivery_fee_zones` vieram do `schema.sql`
+    legado do bot, anterior ao Drizzle e sem noção de tenant. O schema TypeScript
+    declara `establishmentId` nas duas e o controller já filtrava por ele, mas
+    nenhuma migration criou a coluna. O erro só aparecia em runtime porque o
+    `tsc` valida o schema declarado, não a tabela real.
+  - *Implementação:* migration `0034`, aditiva: coluna `establishment_id` com FK
+    para `establishments` nas duas tabelas, índice por tenant, e backfill que só
+    atribui dono quando existe **exatamente um** estabelecimento — com mais de
+    um, atribuir seria chute, e a decisão é humana.
+  - *Varredura:* comparei todas as tabelas do schema Drizzle com o
+    `information_schema` do banco de dev à procura de outras divergências como
+    esta. Só essas duas colunas faltavam; nenhuma tabela ausente.
+  - *Verificação:* migration aplicada no boot; regra e zona existentes ficaram
+    com o estabelecimento do seed, nenhuma zona órfã. `GET /delivery-fee/rules` e
+    `GET /delivery-fee/rules/1/zones` voltaram a 200 com o `establishmentId`
+    correto no corpo. Baseline de tsc da API mantida (11 erros).
+
 ## Riscos
 
 - **R1**: pacote compartilhado de conversas exige alinhamento de versões React
