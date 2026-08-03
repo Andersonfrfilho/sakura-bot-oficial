@@ -1,6 +1,11 @@
 import { db } from '../connection'
 import * as schema from '../schema'
 import { daysAgo, requireItemAt, ORDER_RECEIVED_HOURS_AGO } from './helpers/seed-helpers'
+import { buildServiceHistory } from './helpers/service-history'
+
+// Faixa de ids reservada ao movimento histórico, longe das comandas escritas à
+// mão para que acrescentar uma delas não empurre os ids gerados.
+const HISTORY_COMANDA_ID_OFFSET = 100
 
 // A comanda fechada precisa abrir antes do pedido pareado e fechar depois,
 // senão a receita da mesa cai fora da janela e o ticket por comanda volta a
@@ -80,6 +85,19 @@ export async function seedComandas({ establishmentId, tableIds, customerIds }: S
       customerName: comanda.customerName,
       openedAt: comandaOpenedAt(comanda.daysAgo),
       closedAt: new Date(comandaOpenedAt(comanda.daysAgo).getTime() + comanda.durationMinutes * 60 * 1000),
+    })),
+    // Movimento histórico do salão — ver `service-history.ts`. Cada sessão
+    // aqui tem o pedido pareado gerado pelo `orders.seed` a partir da mesma
+    // lista.
+    ...buildServiceHistory(tableIds.length).map((session, offset) => ({
+      id: comandaId(HISTORY_COMANDA_ID_OFFSET + offset),
+      establishmentId,
+      tableId: requireItemAt(tableIds, session.tableIndex),
+      code: `CMD-H${String(offset + 1).padStart(4, '0')}`,
+      status: 'paid' as const,
+      customerName: 'Cliente do salão',
+      openedAt: session.openedAt,
+      closedAt: session.closedAt,
     })),
   ]
   await db.insert(schema.comandas).values(comandas).onConflictDoNothing()

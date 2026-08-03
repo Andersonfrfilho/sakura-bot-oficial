@@ -1,6 +1,9 @@
 import { db } from '../connection'
 import * as schema from '../schema'
 import { daysAgo, money, randomInt, randomItem, ORDER_RECEIVED_HOURS_AGO } from './helpers/seed-helpers'
+import { buildServiceHistory } from './helpers/service-history'
+
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
 
 function orderId(index: number): string {
   return `00000000-0000-0000-0007-${String(index).padStart(12, '0')}`
@@ -70,15 +73,16 @@ type LifecycleParams = {
   type: OrderBlueprint['type']
   baseDaysAgo: number
   index: number
+  receivedAtOverride?: Date
 }
 
-function buildLifecycleTimestamps({ status, type, baseDaysAgo, index }: LifecycleParams) {
+function buildLifecycleTimestamps({ status, type, baseDaysAgo, index, receivedAtOverride }: LifecycleParams) {
   const inProgress: OrderStatusValue[] = ['in_production', 'ready', 'in_delivery', 'picked_up', 'completed']
   const ready: OrderStatusValue[] = ['ready', 'in_delivery', 'picked_up', 'completed']
   const finished: OrderStatusValue[] = ['picked_up', 'completed']
 
   const durations = STAGE_DURATION_MINUTES[type]
-  const receivedAt = daysAgo(baseDaysAgo, ORDER_RECEIVED_HOURS_AGO)
+  const receivedAt = receivedAtOverride ?? daysAgo(baseDaysAgo, ORDER_RECEIVED_HOURS_AGO)
 
   function stageAt(elapsedMinutes: number, stageOffset: number): Date {
     const jittered = Math.max(1, elapsedMinutes + jitterMinutes(index, stageOffset))
@@ -130,7 +134,7 @@ export async function seedOrders({ establishmentId, customerIds, tableIds }: See
   const statusLogs: (typeof schema.orderStatusLogs.$inferInsert)[] = []
   let orderItemIndex = 0
 
-  BLUEPRINTS.forEach((blueprint, index) => {
+  function buildOrder(blueprint: OrderBlueprint, index: number, receivedAtOverride?: Date): SeededOrder {
     const itemCount = randomInt(2, 3)
     let totalAmount = 0
 
@@ -152,20 +156,12 @@ export async function seedOrders({ establishmentId, customerIds, tableIds }: See
       orderItemIndex += 1
     }
 
-    orders.push({
-      id: orderId(index),
-      type: blueprint.type,
-      status: blueprint.status,
-      totalAmount: money(totalAmount),
-      fiscalEnabled: true,
-      daysAgo: blueprint.daysAgo,
-    })
-
     const lifecycle = buildLifecycleTimestamps({
       status: blueprint.status,
       type: blueprint.type,
       baseDaysAgo: blueprint.daysAgo,
       index,
+      ...(receivedAtOverride ? { receivedAtOverride } : {}),
     })
 
     orderRows.push({
@@ -211,6 +207,39 @@ export async function seedOrders({ establishmentId, customerIds, tableIds }: See
         createdAt: lifecycle.completedAt,
       })
     }
+
+    return {
+      id: orderId(index),
+      type: blueprint.type,
+      status: blueprint.status,
+      totalAmount: money(totalAmount),
+      fiscalEnabled: true,
+      daysAgo: blueprint.daysAgo,
+    }
+  }
+
+  BLUEPRINTS.forEach((blueprint, index) => {
+    orders.push(buildOrder(blueprint, index))
+  })
+
+  // Movimento histórico do salão, pareado com as comandas fechadas do
+  // `comandas.seed` pela mesma lista de sessões. Estes pedidos entram no banco
+  // mas ficam fora do retorno de propósito: caixa e fiscal montam seus registros
+  // a partir dele, e um turno de caixa não pode carregar trinta dias de venda.
+  const serviceHistory = buildServiceHistory(tableIds.length)
+  serviceHistory.forEach((session, offset) => {
+    const daysAgoValue = Math.floor((Date.now() - session.orderReceivedAt.getTime()) / MILLISECONDS_PER_DAY)
+    buildOrder(
+      {
+        type: 'table',
+        channel: 'manual',
+        status: 'completed',
+        tableIndex: session.tableIndex,
+        daysAgo: daysAgoValue,
+      },
+      BLUEPRINTS.length + offset,
+      session.orderReceivedAt
+    )
   })
 
   await db.insert(schema.orders).values(orderRows).onConflictDoNothing()

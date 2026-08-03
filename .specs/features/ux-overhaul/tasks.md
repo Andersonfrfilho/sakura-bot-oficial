@@ -849,6 +849,29 @@ datalake por último (dependem do core estável).
     concentra 6 comandas em 30 dias de janela. A conta está certa; o que falta
     é densidade de dados.
 
+- ✅ **TX.11** Taxa de ocupação indemonstrável por falta de movimento no seed.
+  - *Sintoma:* ocupação em 0,2% e tempo médio calculado sobre seis amostras.
+    A conta estava certa desde o TX.4; faltava movimento no banco de demonstração.
+  - *Implementação:* novo `helpers/service-history.ts` gera trinta dias de
+    salão — vinte sessões por dia, distribuídas na janela de operação, cada uma
+    com duração determinística entre 45 e 110 min. A comanda fechada e o pedido
+    de mesa nascem da **mesma** lista de sessões, então o pareamento que o TX.10
+    consertou passa a valer por construção, não por dois blueprints escritos à
+    mão em arquivos diferentes.
+  - *Decisão:* os pedidos históricos entram no banco mas ficam fora do retorno
+    de `seedOrders`. Caixa e fiscal montam seus registros a partir dele, e um
+    turno de caixa não pode carregar trinta dias de venda — anexar tudo ao
+    caixa fechado faria o valor declarado contradizer os movimentos, que é
+    exatamente a classe de erro que o TX.10 corrigiu.
+  - *Verificação:* seed rodado em banco descartável antes de tocar no de dev —
+    606 comandas fechadas, **nenhuma** sem receita dentro da janela, nenhuma
+    fechando no futuro, e os movimentos de caixa seguem em 15 (o histórico
+    ficou fora, como projetado). Aplicado ao banco de dev: ocupação passou de
+    0,2% para 21,7%, tempo médio 77,5 min sobre 606 comandas, ticket por
+    comanda R$ 73,69 e as dez mesas com linha própria. Os demais relatórios
+    seguem 200 sem `NaN`; o tempo de preparo passou a comparar cinco produtos
+    com ~260 amostras cada. Baseline de tsc da API mantida (11 erros).
+
 ## Riscos
 
 - **R1**: pacote compartilhado de conversas exige alinhamento de versões React
