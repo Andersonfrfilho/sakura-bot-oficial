@@ -903,6 +903,34 @@ datalake por último (dependem do core estável).
     devolveu `true` e o pedido foi para `ready` com ambos os carimbos. Estado de
     teste revertido ao do seed. Baselines de tsc mantidas (API 11, web 5).
 
+- [x] **TX.13** — Ranking de ingredientes filtrava um tipo de movimento que não existe
+  - *Sintoma:* "Ingredientes mais usados" vinha sempre vazio, mesmo com estoque
+    baixando a cada pedido. A tela dizia que não houve consumo enquanto o saldo
+    dos lotes caía.
+  - *Causa:* `GetIngredientsRankingUseCase` filtrava
+    `movement_type = 'consumption'`. Nenhum ponto do sistema escreve esse valor —
+    os tipos gravados são `in` (entrada de lote), `out` (baixa por pedido),
+    `adjustment` e `loss`. Como `movement_type` é VARCHAR e não ENUM, o valor
+    inexistente não falha: apenas devolve zero linha, para sempre.
+  - *Implementação:* filtro passa a usar `out`, extraído para a constante
+    `CONSUMPTION_MOVEMENT_TYPE` com a razão registrada ao lado. Junto, novo
+    `stock-consumption.seed.ts`: executa o próprio `DeductStockForOrderUseCase`
+    (idempotente por pedido) sobre os pedidos concluídos dos últimos três dias,
+    depois de repor os lotes com folga sobre o consumo da janela, e alinha a data
+    do movimento ao início do preparo do pedido.
+  - *Decisão:* a janela do consumo é de três dias, não dos trinta do histórico do
+    salão. Consumo é lastreado em lote — cobrir trinta dias exigiria simular
+    trinta dias de reposição, e o seed passaria a comprar um caminhão de arroz
+    para popular uma tela. O ranking de 30 dias mostra o que existe, sem inventar
+    baixa sem lastro.
+  - *Verificação:* seed rodado em `botdb_seedcheck` antes do dev — 139 baixas,
+    saldo de cada ingrediente batendo exatamente com a soma dos lotes, nenhum
+    negativo, movimentos datados dentro da janela. Aplicado ao dev: ranking
+    devolve os quatro ingredientes (laranja 19,50 · frango 14,20 · arroz 10,65 ·
+    feijão 7,10) com contagens coerentes com as receitas. Resíduo de estoque do
+    teste do TX.12 revertido antes (lotes e saldo recompostos). Baseline de tsc
+    da API mantida (11 erros).
+
 ## Riscos
 
 - **R1**: pacote compartilhado de conversas exige alinhamento de versões React

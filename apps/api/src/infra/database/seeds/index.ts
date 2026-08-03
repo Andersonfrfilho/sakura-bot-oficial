@@ -7,6 +7,7 @@ import { seedCustomers } from './customers.seed'
 import { seedTables } from './tables.seed'
 import { seedComandas } from './comandas.seed'
 import { seedOrders } from './orders.seed'
+import { seedStockConsumption } from './stock-consumption.seed'
 import { seedDeliveries } from './deliveries.seed'
 import { seedCashier } from './cashier.seed'
 import { seedSettings } from './settings.seed'
@@ -27,6 +28,7 @@ async function seed(): Promise<void> {
   await seedComandas({ establishmentId, tableIds, customerIds })
 
   const orders = await seedOrders({ establishmentId, customerIds, tableIds })
+  await seedStockConsumption({ establishmentId })
   await seedDeliveries({ establishmentId, delivererUserId: userIds.entregador, orders })
   await seedCashier({ establishmentId, caixaUserId: userIds.caixa, orders })
   await seedFiscal({ establishmentId, orders })

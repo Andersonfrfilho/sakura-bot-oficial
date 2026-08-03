@@ -4,6 +4,11 @@ import * as schema from '@/infra/database/schema'
 
 type Database = NodePgDatabase<typeof schema>
 
+// Baixa de estoque por pedido, gravada pelo `DeductStockForOrderUseCase`. O
+// ranking media `consumption`, que nenhum ponto do sistema escreve — a lista
+// vinha sempre vazia, e a tela dizia "sem consumo" com o estoque baixando.
+const CONSUMPTION_MOVEMENT_TYPE = 'out'
+
 interface IngredientsRankingInput {
   establishmentId: string
   days: number
@@ -59,7 +64,7 @@ export class GetIngredientsRankingUseCase {
       .innerJoin(schema.ingredients, eq(schema.stockMovements.ingredientId, schema.ingredients.id))
       .where(and(
         eq(schema.stockMovements.establishmentId, establishmentId),
-        eq(schema.stockMovements.movementType, 'consumption'),
+        eq(schema.stockMovements.movementType, CONSUMPTION_MOVEMENT_TYPE),
         gte(schema.stockMovements.createdAt, from),
       ))
       .groupBy(schema.stockMovements.ingredientId, schema.ingredients.name)
