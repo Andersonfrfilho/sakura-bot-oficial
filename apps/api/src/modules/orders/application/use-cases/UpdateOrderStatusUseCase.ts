@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm'
+import { eq, and, isNull, sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import * as schema from '@/infra/database/schema'
 import type { NewOrder } from '@/infra/database/schema'
@@ -78,6 +78,8 @@ export class UpdateOrderStatusUseCase {
       )
       .returning()
 
+    await this.stampItemPreparation(input.orderId, input.newStatus, now)
+
     await this.wsHub.publishBroadcast(input.establishmentId, WS_EVENTS.ORDER_STATUS_CHANGED, {
       orderId: input.orderId,
       previousStatus: order.status,
@@ -92,5 +94,28 @@ export class UpdateOrderStatusUseCase {
     }
 
     return updated!
+  }
+
+  /**
+   * O tempo de preparo real é medido por item, não pelo pedido — um pedido com
+   * refrigerante e marmita atribuía a mesma duração aos dois. Avançar o pedido
+   * inteiro continua carimbando todos os itens que ainda não foram marcados na
+   * cozinha, para que nenhum item fique sem medição.
+   */
+  private async stampItemPreparation(orderId: string, newStatus: OrderStatus, now: Date): Promise<void> {
+    if (newStatus === 'in_production') {
+      await this.db
+        .update(schema.orderItems)
+        .set({ productionStartedAt: now })
+        .where(and(eq(schema.orderItems.orderId, orderId), isNull(schema.orderItems.productionStartedAt)))
+      return
+    }
+
+    if (newStatus === 'ready') {
+      await this.db
+        .update(schema.orderItems)
+        .set({ readyAt: now, productionStartedAt: sql`coalesce(${schema.orderItems.productionStartedAt}, ${now})` })
+        .where(and(eq(schema.orderItems.orderId, orderId), isNull(schema.orderItems.readyAt)))
+    }
   }
 }

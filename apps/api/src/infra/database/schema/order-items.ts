@@ -13,6 +13,11 @@ export const orderItems = pgTable('order_items', {
   quantity: integer('quantity').notNull(),
   totalPrice: numeric('total_price', { precision: 10, scale: 2 }).notNull(),
   notes: text('notes'),
+  // Tempo de preparo é uma propriedade do item, não do pedido: medir pelo
+  // status do pedido faz um refrigerante "levar" o tempo da marmita que saiu
+  // junto. Nulo enquanto a etapa não aconteceu.
+  productionStartedAt: timestamp('production_started_at', { withTimezone: true }),
+  readyAt: timestamp('ready_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
 

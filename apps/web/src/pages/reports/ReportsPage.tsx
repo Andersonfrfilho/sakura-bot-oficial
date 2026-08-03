@@ -865,9 +865,10 @@ export function ReportsPage() {
               <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-2">
                 <Info className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" aria-hidden="true" />
                 <p className="text-xs text-blue-800">
-                  O tempo real é medido por pedido, não por item. Produto que dividiu comanda
-                  com um prato mais demorado carrega o tempo do pedido inteiro — por isso
-                  bebidas e sobremesas costumam aparecer muito acima do cadastrado.
+                  O tempo real é medido por item, do início do preparo até a cozinha marcar o
+                  item como pronto. Itens liberados só quando o pedido inteiro sai carregam o
+                  tempo do prato mais demorado — marcar item a item na cozinha é o que deixa a
+                  comparação fiel.
                 </p>
               </div>
             )}

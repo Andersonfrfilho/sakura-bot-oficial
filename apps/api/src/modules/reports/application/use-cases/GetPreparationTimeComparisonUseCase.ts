@@ -1,6 +1,5 @@
-import { eq, and, gte, sql } from 'drizzle-orm'
+import { eq, and, gte, isNotNull, sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
-import { alias } from 'drizzle-orm/pg-core'
 import * as schema from '@/infra/database/schema'
 import { toNumber } from '../../shared/numeric.util'
 
@@ -68,50 +67,41 @@ export class GetPreparationTimeComparisonUseCase {
       }
     }
 
-    // Auto-join entre o log de entrada em produção e o de "pronto" do mesmo
-    // pedido. A versão anterior usava subquery correlacionada num `innerJoin`
-    // comum — sem `LATERAL` o Postgres recusa a referência à tabela externa, e
-    // o erro só aparecia quando havia log para comparar.
-    const productionLogs = alias(schema.orderStatusLogs, 'production_logs')
-    const readyLogs = alias(schema.orderStatusLogs, 'ready_logs')
-
+    // O tempo real vem dos carimbos do próprio item. A versão anterior media
+    // `ready - in_production` no log de status do pedido, e portanto atribuía a
+    // duração do pedido inteiro a cada item dele: um refrigerante de 1 minuto
+    // cadastrado aparecia com 30 minutos "reais" só por ter saído junto com uma
+    // marmita.
     const durationMinutes = sql<number>`
-      AVG(EXTRACT(EPOCH FROM (${readyLogs.createdAt} - ${productionLogs.createdAt})) / 60)
+      AVG(EXTRACT(EPOCH FROM (${schema.orderItems.readyAt} - ${schema.orderItems.productionStartedAt})) / 60)
     `
 
-    const logsByProduct = await this.db
+    const timesByProduct = await this.db
       .select({
         productId: schema.orderItems.productId,
         realDurationMinutes: durationMinutes,
-        sampleSize: sql<number>`COUNT(DISTINCT ${schema.orders.id})`,
+        sampleSize: sql<number>`COUNT(*)`,
       })
-      .from(schema.orders)
-      .innerJoin(schema.orderItems, eq(schema.orders.id, schema.orderItems.orderId))
-      .innerJoin(productionLogs, and(
-        eq(productionLogs.orderId, schema.orders.id),
-        eq(productionLogs.status, 'in_production'),
-      ))
-      .innerJoin(readyLogs, and(
-        eq(readyLogs.orderId, schema.orders.id),
-        eq(readyLogs.status, 'ready'),
-        sql`${readyLogs.createdAt} > ${productionLogs.createdAt}`,
-      ))
+      .from(schema.orderItems)
+      .innerJoin(schema.orders, eq(schema.orderItems.orderId, schema.orders.id))
       .where(and(
         eq(schema.orders.establishmentId, establishmentId),
         gte(schema.orders.receivedAt, from),
         eq(schema.orders.status, 'completed'),
+        isNotNull(schema.orderItems.productionStartedAt),
+        isNotNull(schema.orderItems.readyAt),
+        sql`${schema.orderItems.readyAt} > ${schema.orderItems.productionStartedAt}`,
       ))
       .groupBy(schema.orderItems.productId)
-      .having(sql`${durationMinutes} IS NOT NULL`)
 
     const comparisonMap = new Map<string, { realMin: number; sampleSize: number }>()
-    for (const log of logsByProduct) {
-      if (log.productId) {
+    for (const measured of timesByProduct) {
+      if (measured.productId) {
         // AVG volta como string do driver — sem converter, o `.toFixed` abaixo
         // quebra assim que existir amostra.
-        comparisonMap.set(log.productId, {
-          realMin: toNumber(log.realDurationMinutes),
-          sampleSize: toNumber(log.sampleSize),
+        comparisonMap.set(measured.productId, {
+          realMin: toNumber(measured.realDurationMinutes),
+          sampleSize: toNumber(measured.sampleSize),
         })
       }
     }

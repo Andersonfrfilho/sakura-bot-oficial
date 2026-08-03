@@ -1,6 +1,7 @@
 import type { RouteHandler } from '@/infra/http/router'
 import type { GetKitchenQueueUseCase } from '../../application/use-cases/GetKitchenQueueUseCase'
 import type { UpdateOrderStatusUseCase } from '@/modules/orders/application/use-cases/UpdateOrderStatusUseCase'
+import type { MarkOrderItemReadyUseCase } from '../../application/use-cases/MarkOrderItemReadyUseCase'
 import { UnauthorizedError, ValidationError } from '@/shared/errors/AppError'
 import { z } from 'zod'
 
@@ -11,7 +12,8 @@ const advanceSchema = z.object({
 export class KitchenController {
   constructor(
     private readonly getKitchenQueueUseCase: GetKitchenQueueUseCase,
-    private readonly updateStatusUseCase: UpdateOrderStatusUseCase
+    private readonly updateStatusUseCase: UpdateOrderStatusUseCase,
+    private readonly markItemReadyUseCase: MarkOrderItemReadyUseCase
   ) {}
 
   queue: RouteHandler = async (request, response) => {
@@ -32,5 +34,15 @@ export class KitchenController {
       newStatus: parsed.data.status,
     })
     response.json(order)
+  }
+
+  markItemReady: RouteHandler = async (request, response) => {
+    if (!request.user) throw new UnauthorizedError()
+    const result = await this.markItemReadyUseCase.execute({
+      orderId: request.params['id']!,
+      itemId: request.params['itemId']!,
+      establishmentId: request.user.establishmentId,
+    })
+    response.json(result)
   }
 }

@@ -94,6 +94,7 @@ import {
 
 // Kitchen
 import { GetKitchenQueueUseCase } from '@/modules/kitchen/application/use-cases/GetKitchenQueueUseCase'
+import { MarkOrderItemReadyUseCase } from '@/modules/kitchen/application/use-cases/MarkOrderItemReadyUseCase'
 import { KitchenController } from '@/modules/kitchen/infra/http/KitchenController'
 
 // Delivery
@@ -300,7 +301,12 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
 
   // Kitchen
   const getKitchenQueueUseCase = new GetKitchenQueueUseCase(db)
-  const kitchenController = new KitchenController(getKitchenQueueUseCase, updateOrderStatusUseCase)
+  const markOrderItemReadyUseCase = new MarkOrderItemReadyUseCase(db, updateOrderStatusUseCase)
+  const kitchenController = new KitchenController(
+    getKitchenQueueUseCase,
+    updateOrderStatusUseCase,
+    markOrderItemReadyUseCase
+  )
 
   // Delivery
   const getDeliveryQueueUseCase = new GetDeliveryQueueUseCase(db)

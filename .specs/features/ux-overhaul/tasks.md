@@ -872,6 +872,37 @@ datalake por último (dependem do core estável).
     seguem 200 sem `NaN`; o tempo de preparo passou a comparar cinco produtos
     com ~260 amostras cada. Baseline de tsc da API mantida (11 erros).
 
+- [x] **TX.12** — Tempo de preparo medido por item, não pelo pedido
+  - *Sintoma:* no relatório de tempo de preparo, um refrigerante com 1 minuto
+    cadastrado aparecia com 31,8 minutos "reais". Todo item de um mesmo pedido
+    recebia a mesma duração, então a coluna de diferença apontava a bebida como
+    o pior gargalo da casa.
+  - *Causa:* a medição vinha do auto-join de `order_status_logs` — `ready` menos
+    `in_production` do **pedido**. A duração do prato mais demorado era atribuída
+    a cada item que saiu junto. O TX.6 documentou a distorção como ressalva na
+    tela porque o schema não tinha onde guardar a medição por item.
+  - *Implementação:* `order_items` ganhou `production_started_at` e `ready_at`
+    (migration `0033`, aditiva, colunas nulas). `UpdateOrderStatusUseCase` passa
+    a carimbar os itens ainda não marcados ao avançar o pedido, para que nenhum
+    item fique sem medição. Novo `MarkOrderItemReadyUseCase` e rota
+    `PATCH /kitchen/orders/:id/items/:itemId/ready` (`kitchen:write`) marcam item
+    a item; quando o último item fica pronto o pedido avança sozinho para
+    `ready`, passando por `in_production` se ainda estava em `received`. O
+    `GetPreparationTimeComparisonUseCase` foi reescrito sobre os carimbos do
+    item, dispensando o auto-join. Na cozinha cada item ganhou botão "Pronto"
+    (riscado quando concluído) e o botão do cartão virou "Tudo pronto". O seed
+    carimba cada item com o tempo cadastrado do produto mais um desvio
+    determinístico, e os itens já existentes foram preenchidos por UPDATE a
+    partir do `production_started_at` do pedido.
+  - *Verificação:* migration aplicada no boot (colunas presentes em
+    `\d order_items`), 1540 itens preenchidos. Relatório de 30 dias: refrigerante
+    1 min cadastrado × **2,5 min** reais (era 31,8), pudim 3 × 4,1, suco 4 × 5,1,
+    prato feito 18 × 18,9, marmita 14 × 14,9 — acurácia geral 64,4% sobre ~300
+    amostras por produto. Rota por item testada ao vivo: primeiro item marcado
+    devolveu `orderReady: false` com o pedido ainda em `received`; o segundo
+    devolveu `true` e o pedido foi para `ready` com ambos os carimbos. Estado de
+    teste revertido ao do seed. Baselines de tsc mantidas (API 11, web 5).
+
 ## Riscos
 
 - **R1**: pacote compartilhado de conversas exige alinhamento de versões React

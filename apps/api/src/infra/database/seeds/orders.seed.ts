@@ -68,6 +68,15 @@ function jitterMinutes(index: number, stageOffset: number): number {
   return ((index * 7 + stageOffset * 3) % 9) - 4
 }
 
+// Produto sem tempo cadastrado ainda precisa de um realizado plausível — o item
+// fica fora da comparação, mas não pode nascer com duração zero.
+const DEFAULT_PREPARATION_MINUTES = 10
+
+// Desvio determinístico do realizado em relação ao cadastrado, em minutos.
+function itemDeviationMinutes(orderIndex: number, itemOffset: number): number {
+  return ((orderIndex * 5 + itemOffset * 11) % 7) - 2
+}
+
 type LifecycleParams = {
   status: OrderStatusValue
   type: OrderBlueprint['type']
@@ -137,6 +146,7 @@ export async function seedOrders({ establishmentId, customerIds, tableIds }: See
   function buildOrder(blueprint: OrderBlueprint, index: number, receivedAtOverride?: Date): SeededOrder {
     const itemCount = randomInt(2, 3)
     let totalAmount = 0
+    const itemsOfThisOrder: { rowIndex: number; preparationTimeMinutes: number | null }[] = []
 
     for (let i = 0; i < itemCount; i += 1) {
       const product = randomItem(products)
@@ -152,6 +162,10 @@ export async function seedOrders({ establishmentId, customerIds, tableIds }: See
         unitPrice: product.price,
         quantity,
         totalPrice: money(totalPrice),
+      })
+      itemsOfThisOrder.push({
+        rowIndex: orderItems.length - 1,
+        preparationTimeMinutes: product.preparationTimeMinutes,
       })
       orderItemIndex += 1
     }
@@ -176,6 +190,20 @@ export async function seedOrders({ establishmentId, customerIds, tableIds }: See
       fiscalEnabled: true,
       ...lifecycle,
     })
+
+    // Carimbo por item: o relatório de tempo de preparo compara o cadastrado do
+    // produto com o realizado do item. Cada item leva o próprio tempo de
+    // cadastro mais um desvio determinístico, senão a comparação sai exata e a
+    // tela deixa de demonstrar o que existe para demonstrar.
+    if (lifecycle.productionStartedAt) {
+      itemsOfThisOrder.forEach((item, itemOffset) => {
+        const cadastrado = item.preparationTimeMinutes ?? DEFAULT_PREPARATION_MINUTES
+        const realMinutes = Math.max(1, cadastrado + itemDeviationMinutes(index, itemOffset))
+        const row = orderItems[item.rowIndex]!
+        row.productionStartedAt = lifecycle.productionStartedAt
+        row.readyAt = new Date(lifecycle.productionStartedAt!.getTime() + realMinutes * 60 * 1000)
+      })
+    }
 
     // O relatório de tempo de preparo mede `ready - in_production` a partir
     // destes logs; sem eles a tela fica em "0 produtos comparados".

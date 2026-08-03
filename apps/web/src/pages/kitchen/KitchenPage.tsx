@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Check } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { useWebSocket } from '@/hooks/useWebSocket'
@@ -9,6 +10,7 @@ interface OrderItem {
   productName: string
   quantity: number
   notes: string | null
+  readyAt: string | null
 }
 
 interface KitchenOrder {
@@ -36,9 +38,15 @@ const SLA_AGE_COLORS = {
   critical: 'text-red-600',
 }
 
-function OrderCard({ order, onAdvance }: { order: KitchenOrder; onAdvance: (id: string, status: string) => void }) {
+type OrderCardProps = {
+  order: KitchenOrder
+  onAdvance: (orderId: string, status: string) => void
+  onItemReady: (orderId: string, itemId: string) => void
+}
+
+function OrderCard({ order, onAdvance, onItemReady }: OrderCardProps) {
   const nextStatus = order.status === 'received' ? 'in_production' : 'ready'
-  const nextLabel = order.status === 'received' ? 'Iniciar' : 'Pronto'
+  const nextLabel = order.status === 'received' ? 'Iniciar' : 'Tudo pronto'
 
   return (
     <div className={`bg-white rounded-xl shadow-sm border-l-4 ${SLA_COLORS[order.slaStatus]} p-4 flex flex-col gap-3`}>
@@ -54,10 +62,27 @@ function OrderCard({ order, onAdvance }: { order: KitchenOrder; onAdvance: (id: 
 
       <ul className="space-y-1">
         {order.items.map((item) => (
-          <li key={item.id} className="text-sm text-gray-800">
-            <span className="font-bold text-lg mr-2">{item.quantity}×</span>
-            {item.productName}
-            {item.notes && <span className="text-gray-500 ml-1">({item.notes})</span>}
+          <li key={item.id} className="flex items-center justify-between gap-2 text-sm text-gray-800">
+            <span className={item.readyAt ? 'line-through text-gray-400' : undefined}>
+              <span className="font-bold text-lg mr-2">{item.quantity}×</span>
+              {item.productName}
+              {item.notes && <span className="text-gray-500 ml-1">({item.notes})</span>}
+            </span>
+            {item.readyAt ? (
+              <span className="shrink-0 inline-flex items-center gap-1 text-xs text-green-600">
+                <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                Pronto
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onItemReady(order.id, item.id)}
+                className="shrink-0 inline-flex items-center gap-1 rounded-md border border-green-600 px-2 py-1 text-xs font-medium text-green-700 transition-colors hover:bg-green-50 active:scale-95"
+              >
+                <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                Pronto
+              </button>
+            )}
           </li>
         ))}
       </ul>
@@ -101,6 +126,13 @@ export function KitchenPage() {
     void queryClient.invalidateQueries({ queryKey: ['kitchen', 'queue'] })
   }
 
+  // Marcar item a item é o que dá ao relatório de tempo de preparo uma medição
+  // por produto: sem isso a bebida herda a duração do prato que saiu junto.
+  async function handleItemReady(orderId: string, itemId: string) {
+    await api.patch(`/kitchen/orders/${orderId}/items/${itemId}/ready`, {}, accessToken ?? undefined)
+    void queryClient.invalidateQueries({ queryKey: ['kitchen', 'queue'] })
+  }
+
   if (isLoading) return <div className="p-4 md:p-8 text-gray-500">Carregando fila...</div>
 
   const received = orders.filter((o) => o.status === 'received')
@@ -122,7 +154,7 @@ export function KitchenPage() {
           </h2>
           <div className="space-y-3">
             {received.map((order) => (
-              <OrderCard key={order.id} order={order} onAdvance={handleAdvance} />
+              <OrderCard key={order.id} order={order} onAdvance={handleAdvance} onItemReady={handleItemReady} />
             ))}
             {received.length === 0 && (
               <p className="text-gray-400 text-center py-8">Nenhum pedido aguardando</p>
@@ -136,7 +168,7 @@ export function KitchenPage() {
           </h2>
           <div className="space-y-3">
             {inProduction.map((order) => (
-              <OrderCard key={order.id} order={order} onAdvance={handleAdvance} />
+              <OrderCard key={order.id} order={order} onAdvance={handleAdvance} onItemReady={handleItemReady} />
             ))}
             {inProduction.length === 0 && (
               <p className="text-gray-400 text-center py-8">Nenhum pedido em preparo</p>
