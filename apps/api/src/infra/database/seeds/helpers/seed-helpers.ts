@@ -12,6 +12,11 @@ export function brazilianWhatsappNumber(): string {
   return `55${ddd}9${faker.string.numeric(8)}`
 }
 
+// Hora do dia em que todo pedido do seed é recebido. Fica aqui porque o seed
+// de comandas precisa abrir a comanda antes desse instante para que a receita
+// da mesa caia dentro da janela da comanda.
+export const ORDER_RECEIVED_HOURS_AGO = 3
+
 export function daysAgo(days: number, hours = 0): Date {
   const date = new Date()
   date.setDate(date.getDate() - days)

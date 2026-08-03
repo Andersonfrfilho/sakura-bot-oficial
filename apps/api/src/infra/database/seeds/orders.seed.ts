@@ -1,6 +1,6 @@
 import { db } from '../connection'
 import * as schema from '../schema'
-import { daysAgo, money, randomInt, randomItem } from './helpers/seed-helpers'
+import { daysAgo, money, randomInt, randomItem, ORDER_RECEIVED_HOURS_AGO } from './helpers/seed-helpers'
 
 function orderId(index: number): string {
   return `00000000-0000-0000-0007-${String(index).padStart(12, '0')}`
@@ -78,7 +78,7 @@ function buildLifecycleTimestamps({ status, type, baseDaysAgo, index }: Lifecycl
   const finished: OrderStatusValue[] = ['picked_up', 'completed']
 
   const durations = STAGE_DURATION_MINUTES[type]
-  const receivedAt = daysAgo(baseDaysAgo, 3)
+  const receivedAt = daysAgo(baseDaysAgo, ORDER_RECEIVED_HOURS_AGO)
 
   function stageAt(elapsedMinutes: number, stageOffset: number): Date {
     const jittered = Math.max(1, elapsedMinutes + jitterMinutes(index, stageOffset))

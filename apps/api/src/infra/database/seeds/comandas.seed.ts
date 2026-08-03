@@ -1,6 +1,16 @@
 import { db } from '../connection'
 import * as schema from '../schema'
-import { daysAgo, requireItemAt } from './helpers/seed-helpers'
+import { daysAgo, requireItemAt, ORDER_RECEIVED_HOURS_AGO } from './helpers/seed-helpers'
+
+// A comanda fechada precisa abrir antes do pedido pareado e fechar depois,
+// senão a receita da mesa cai fora da janela e o ticket por comanda volta a
+// zero. Todas as durações do blueprint são maiores que esta folga.
+const MINUTES_BEFORE_PAIRED_ORDER = 25
+
+function comandaOpenedAt(daysAgoValue: number): Date {
+  const orderReceivedAt = daysAgo(daysAgoValue, ORDER_RECEIVED_HOURS_AGO)
+  return new Date(orderReceivedAt.getTime() - MINUTES_BEFORE_PAIRED_ORDER * 60 * 1000)
+}
 
 function comandaId(index: number): string {
   return `00000000-0000-0000-0006-${String(index).padStart(12, '0')}`
@@ -68,8 +78,8 @@ export async function seedComandas({ establishmentId, tableIds, customerIds }: S
       code: `CMD-${String(4 + offset).padStart(3, '0')}`,
       status: 'paid' as const,
       customerName: comanda.customerName,
-      openedAt: daysAgo(comanda.daysAgo, 4),
-      closedAt: new Date(daysAgo(comanda.daysAgo, 4).getTime() + comanda.durationMinutes * 60 * 1000),
+      openedAt: comandaOpenedAt(comanda.daysAgo),
+      closedAt: new Date(comandaOpenedAt(comanda.daysAgo).getTime() + comanda.durationMinutes * 60 * 1000),
     })),
   ]
   await db.insert(schema.comandas).values(comandas).onConflictDoNothing()

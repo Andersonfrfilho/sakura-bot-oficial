@@ -820,6 +820,35 @@ datalake por último (dependem do core estável).
     `/api/openapi.json` seguem 200 — com o 403 do atendente em
     `/reports/monthly` preservado. Baseline de tsc da API mantida (11 erros).
 
+- ✅ **TX.10** Métricas de mesa contavam receita e comandas de populações diferentes.
+  - *Sintoma:* mesa aparecia com "0 comandas fechadas" e receita de R$ 31,00 ao
+    mesmo tempo — dois números que se contradizem na mesma linha. E o ticket
+    médio da casa saía inflado (R$ 114,85), porque dividia a receita do salão
+    inteiro só pelas comandas fechadas.
+  - *Causa:* a receita vinha de todos os pedidos de mesa do período, sem
+    nenhum vínculo com as comandas contadas. Não existe relação pedido↔comanda
+    no schema, então a atribuição precisa ser por mesa dentro da janela da
+    comanda.
+  - *Implementação:* em `GetTableMetricsUseCase`, a receita passou a sair de um
+    join `comandas × orders` pela mesa e pela janela `openedAt..closedAt`,
+    restrito às comandas fechadas já contadas. Numerador e denominador agora
+    falam da mesma população.
+  - *Correção de seed associada:* as comandas fechadas abriam 4h antes do dia
+    de referência e os pedidos pareados chegavam 3h antes — folga de 1h contra
+    durações de 41 a 96 min, então duas das cinco comandas ficavam sem receita
+    dentro da janela. O instante de recebimento virou a constante compartilhada
+    `ORDER_RECEIVED_HOURS_AGO`, e `comandas.seed` passa a abrir a comanda 25 min
+    antes do pedido pareado.
+  - *Verificação:* seed rodado num banco descartável (`botdb_seedcheck`,
+    derrubado em seguida) — as seis comandas fechadas têm receita dentro da
+    janela. No banco de dev, as comandas existentes foram realinhadas em lugar
+    de um reset: nenhuma mesa com receita e zero comandas, ticket por comanda
+    caiu de R$ 114,85 para R$ 67,17 (a média real das seis) e cada linha fecha
+    com o próprio ticket. Baseline de tsc da API mantida (11 erros).
+  - *Pendente, não é bug:* a taxa de ocupação segue em 0,2% porque o seed
+    concentra 6 comandas em 30 dias de janela. A conta está certa; o que falta
+    é densidade de dados.
+
 ## Riscos
 
 - **R1**: pacote compartilhado de conversas exige alinhamento de versões React

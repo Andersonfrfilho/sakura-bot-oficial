@@ -111,19 +111,31 @@ export class GetTableMetricsUseCase {
       }
     }
 
+    // A receita precisa vir das mesmas comandas que entram na contagem, senão
+    // numerador e denominador falam de populações diferentes: a mesa aparecia
+    // com receita e "0 comandas fechadas" ao mesmo tempo, e o ticket médio da
+    // casa dividia a receita do salão inteiro só pelas comandas fechadas.
+    // Não existe vínculo pedido↔comanda no schema, então a atribuição é por
+    // mesa dentro da janela de abertura e fechamento da comanda.
     const ordersRevenue = await this.db
       .select({
-        tableId: schema.orders.tableId,
+        tableId: schema.comandas.tableId,
         revenue: sum(schema.orders.totalAmount),
       })
-      .from(schema.orders)
-      .where(and(
-        eq(schema.orders.establishmentId, establishmentId),
+      .from(schema.comandas)
+      .innerJoin(schema.orders, and(
+        eq(schema.orders.tableId, schema.comandas.tableId),
         eq(schema.orders.type, 'table'),
-        gte(schema.orders.receivedAt, from),
+        gte(schema.orders.receivedAt, schema.comandas.openedAt),
+        sql`${schema.orders.receivedAt} <= ${schema.comandas.closedAt}`,
         sql`${schema.orders.status} NOT IN ('cancelled')`,
       ))
-      .groupBy(schema.orders.tableId)
+      .where(and(
+        eq(schema.comandas.establishmentId, establishmentId),
+        gte(schema.comandas.openedAt, from),
+        isNotNull(schema.comandas.closedAt),
+      ))
+      .groupBy(schema.comandas.tableId)
 
     for (const row of ordersRevenue) {
       if (!row.tableId) continue
