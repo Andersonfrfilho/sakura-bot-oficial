@@ -238,6 +238,8 @@ services:
       - WHATSAPP_BUSINESS_ACCOUNT_ID=${WHATSAPP_BUSINESS_ACCOUNT_ID}
       - WHATSAPP_WEBHOOK_VERIFY_TOKEN=${WHATSAPP_WEBHOOK_VERIFY_TOKEN}
       - WHATSAPP_APP_SECRET=${WHATSAPP_APP_SECRET}
+      # Simulador de cliente na tela de conversas — só dev. Forja inbound assinado no servidor.
+      - CONVERSATION_PREVIEW_ENABLED=${CONVERSATION_PREVIEW_ENABLED:-false}
       - ALLOWED_ORIGINS=http://localhost:4000
       - LOG_LEVEL=info
       - PRODUCT_AFFINITY_WORKER_ENABLED=${PRODUCT_AFFINITY_WORKER_ENABLED:-false}
@@ -282,6 +284,9 @@ services:
       # URLs como vistas pelo BROWSER (host), não pelo Docker network
       - VITE_API_URL=http://localhost:3333
       - VITE_API_WS_URL=ws://localhost:3333/ws
+      # Só desenha o botão do simulador. Quem decide de verdade é CONVERSATION_PREVIEW_ENABLED
+      # na API — VITE_* vai literal para o bundle e não serve de controle de acesso.
+      - VITE_CONVERSATION_PREVIEW_ENABLED=${VITE_CONVERSATION_PREVIEW_ENABLED:-false}
     ports:
       - "4000:4000"
     networks:

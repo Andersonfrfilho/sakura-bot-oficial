@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@adatechnology/conversations-ui": "0.1.0-rc.21",
+    "@adatechnology/conversations-ui": "0.1.0-rc.22",
     "@adatechnology/products-ui": "0.1.0-rc.1",
     "lucide-react": "^0.468.0",
     "@tanstack/react-query": "^5.62.7",
