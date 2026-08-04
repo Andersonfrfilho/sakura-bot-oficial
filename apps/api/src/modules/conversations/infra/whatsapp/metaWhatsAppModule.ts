@@ -38,6 +38,12 @@ interface MetaWhatsAppModuleRegistryParams {
    * o anexo continua acessível só pelo proxy de mídia da Meta, enquanto a URL dela viver.
    */
   readonly objectStorage?: ObjectStorageInterface | undefined
+  /**
+   * Faz o canal aceitar mídia gravada no simulador (`preview-upload:<chave>`) — é o que devolve o
+   * microfone ao painel. Ligado, um webhook forjado consegue ler objeto do bucket por id: só vale
+   * onde o simulador já está habilitado.
+   */
+  readonly previewMediaEnabled?: boolean | undefined
 }
 
 export interface MetaWhatsAppModuleRegistry {
@@ -87,7 +93,11 @@ export function createMetaWhatsAppModuleRegistry(
         db: params.db,
         config,
         nonceStore,
-        features: { flowEngine: false },
+        features: {
+          flowEngine: false,
+          // Sem storage o flag é ignorado pelo pacote — não há bytes para devolver.
+          previewMedia: Boolean(params.previewMediaEnabled && params.objectStorage),
+        },
         providers: {
           realtime: createConversationRealtimeNotifier(params.webSocketHub, establishmentId),
           ...(params.objectStorage ? { objectStorage: params.objectStorage } : {}),

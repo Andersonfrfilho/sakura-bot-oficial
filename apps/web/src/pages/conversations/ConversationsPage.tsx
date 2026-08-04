@@ -38,6 +38,7 @@ import { api } from '@/lib/api'
 import { conversationsSdkApi } from '@/lib/conversationsSdkApi'
 import { conversationsSdkRealtime } from '@/lib/conversationsSdkRealtime'
 import { fileToAttachment } from '@/lib/fileToAttachment'
+import { uploadPreviewMedia } from '@/lib/uploadPreviewMedia'
 import { IS_CONVERSATION_PREVIEW_ENABLED } from './previewEnvironment'
 import { stateLabel, toContextEntries } from './conversationContext'
 import { downloadConversation } from './conversationsExport'
@@ -223,6 +224,9 @@ function SimulatorPanel({ conversationId, onClose }: { conversationId: string; o
       conversationId={conversationId}
       onClose={onClose}
       client={client}
+      // Sem isto o painel esconde o microfone: nota de voz precisa de um id que o canal resolva,
+      // e é o servidor que hospeda os bytes e devolve esse id.
+      uploadMedia={uploadPreviewMedia}
       sse={conversationsSdkRealtime}
       loadMessages={(id) => conversationsSdkApi.fetchMessages(id)}
     />

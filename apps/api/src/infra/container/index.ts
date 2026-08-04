@@ -134,6 +134,7 @@ import { CreateAuditLogUseCase } from '@/modules/audit/application/use-cases/Cre
 // Webhook
 import { WebhookController } from '@/modules/webhook/infra/http/WebhookController'
 import { PreviewInboundController } from '@/modules/webhook/infra/http/PreviewInboundController'
+import { PreviewMediaController } from '@/modules/webhook/infra/http/PreviewMediaController'
 import { SendPreviewInboundUseCase } from '@/modules/webhook/application/SendPreviewInbound.use-case'
 
 // Conversations — servidas pelo @adatechnology/meta-whatsapp-module
@@ -201,6 +202,7 @@ export interface AppContainer {
   deliveryFeeController: DeliveryFeeController
   webhookController: WebhookController
   previewInboundController: PreviewInboundController
+  previewMediaController: PreviewMediaController
   customerController: CustomerController
   addressController: AddressController
   tableController: TableController
@@ -227,12 +229,15 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   // acessível pelo proxy de mídia da Meta enquanto a URL dela viver.
   const objectStorage = isStorageEnabled() ? createConversationObjectStorage() : undefined
 
+  const isConversationPreviewEnabled = process.env.CONVERSATION_PREVIEW_ENABLED === 'true'
+
   // Uma instância do módulo por estabelecimento: os eventos que ele emite não carregam tenant.
   const metaWhatsAppModules = createMetaWhatsAppModuleRegistry({
     db,
     cache,
     webSocketHub: wsHub,
     objectStorage: objectStorage?.forModule,
+    previewMediaEnabled: isConversationPreviewEnabled,
   })
 
   // Shared repos
@@ -379,9 +384,10 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     new SendPreviewInboundUseCase(
       metaWhatsAppModules,
       process.env.WHATSAPP_APP_SECRET,
-      process.env.CONVERSATION_PREVIEW_ENABLED === 'true'
+      isConversationPreviewEnabled
     )
   )
+  const previewMediaController = new PreviewMediaController(metaWhatsAppModules)
 
   // Customers
   const customerRepository = new DrizzleCustomerRepository(db)
@@ -599,6 +605,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     deliveryFeeController,
     webhookController,
     previewInboundController,
+    previewMediaController,
     customerController,
     addressController,
     tableController,

@@ -141,7 +141,7 @@ export async function createServer() {
   registerDeliveryFeeRoutes(router, container.deliveryFeeController)
   registerWebhookRoutes(router, container.webhookController)
   // Antes de `registerConversationRoutes`: "preview" casaria com `/conversations/:whatsapp`.
-  registerPreviewInboundRoutes(router, container.previewInboundController)
+  registerPreviewInboundRoutes(router, container.previewInboundController, container.previewMediaController)
   registerCustomerRoutes(router, container.customerController)
   registerAddressRoutes(router, container.addressController)
   registerTableRoutes(router, container.tableController)
