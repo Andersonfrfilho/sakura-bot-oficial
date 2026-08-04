@@ -52,6 +52,8 @@ interface ConversationPaneProps {
   onReturnToBot: () => void
   onFinish: () => void
   onBack: () => void
+  simulatorOpen: boolean
+  onToggleSimulator: () => void
 }
 
 function ConversationPane({
@@ -62,6 +64,8 @@ function ConversationPane({
   onReturnToBot,
   onFinish,
   onBack,
+  simulatorOpen,
+  onToggleSimulator,
 }: ConversationPaneProps) {
   const { messages, refetch, sendMessage, sendMedia, sendTemplate } = useConversationMessages(conversation.id)
   const { context } = useConversationContext(conversation.id)
@@ -113,6 +117,21 @@ function ConversationPane({
           })
         }
         onBack={onBack}
+        // No cabeçalho da conversa, ao lado de "Assumir atendimento": o simulador age sobre ESTA
+        // conversa, e no cabeçalho da página ele parecia um filtro da inbox.
+        extraUtilities={
+          IS_CONVERSATION_PREVIEW_ENABLED
+            ? [
+                {
+                  key: 'simulator',
+                  icon: '🧪',
+                  label: 'Simular cliente',
+                  active: simulatorOpen,
+                  run: onToggleSimulator,
+                },
+              ]
+            : []
+        }
       />
 
       <ConversationContextPanel
@@ -245,17 +264,6 @@ function Inbox() {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          {IS_CONVERSATION_PREVIEW_ENABLED && selectedConversation ? (
-            <button
-              type="button"
-              onClick={() => setSimulatorOpen((open) => !open)}
-              aria-pressed={simulatorOpen}
-              title="Simular cliente (dev)"
-              className={`rounded-md border px-3 py-2 text-sm ${simulatorOpen ? 'bg-brand-600 text-white' : ''}`}
-            >
-              🧪<span className="cv-only-wide"> Simular cliente</span>
-            </button>
-          ) : null}
           <button
             type="button"
             onClick={() => inbox.setWaitingOnly(!inbox.waitingOnly)}
@@ -294,7 +302,9 @@ function Inbox() {
       {/* Master/detail: abaixo de `lg` a lista e a conversa dividiriam a mesma altura fixa e cada
           uma viraria uma fatia inútil — ali mostra uma ou outra. */}
       <div
-        className="grid min-h-0 flex-1 grid-cols-1 gap-3 bg-gray-100 p-3 dark:bg-gray-900 lg:grid-cols-[360px_minmax(0,1fr)]"
+        className={`grid min-h-0 flex-1 grid-cols-1 gap-3 bg-gray-100 p-3 dark:bg-gray-900 ${
+          showSimulator ? 'lg:grid-cols-[360px_minmax(0,1fr)_24rem]' : 'lg:grid-cols-[360px_minmax(0,1fr)]'
+        }`}
       >
         <aside
           className={`flex min-h-0 flex-col overflow-hidden rounded-xl border bg-white dark:bg-gray-800 ${
@@ -430,45 +440,40 @@ function Inbox() {
 
         {/* `min-w-0` junto do `min-h-0`: em grid o padrão é não encolher abaixo do conteúdo, e é
             por aí que uma bolha larga vaza para fora da coluna. */}
-        {/* Simulador DENTRO do mesmo cartão da conversa, como uma segunda coluna deste flex: é o
-            lado do cliente da mesma conversa, e separado numa coluna do grid ele ficava solto, com
-            moldura própria. `min-h-0` em cada filho porque o painel do pacote não tem teto de
-            altura — sem isso ele cresce com o transcript e estica a página inteira. */}
         <section
           className={`min-h-0 min-w-0 overflow-hidden rounded-xl border bg-white dark:bg-gray-800 ${
-            selectedConversation ? 'flex' : 'hidden lg:block'
+            selectedConversation ? 'flex flex-col' : 'hidden lg:block'
           }`}
         >
           {selectedConversation ? (
-            <>
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                <ConversationPane
-                  conversation={selectedConversation}
-                  now={inbox.now}
-                  busy={inbox.busy}
-                  onTakeover={() => void inbox.takeover(selectedConversation.id)}
-                  onReturnToBot={() => void inbox.releaseToBot(selectedConversation.id)}
-                  onFinish={() => void inbox.finalize(selectedConversation.id)}
-                  onBack={inbox.clearSelection}
-                />
-              </div>
-
-              {/* `flex` em linha, e não `flex-col`: em coluna o painel do pacote fica com altura
-                  automática, cresce com o transcript e transborda o cartão. Em linha ele herda a
-                  altura da faixa pelo `stretch` padrão e rola por dentro. */}
-              {showSimulator ? (
-                <div className="flex min-h-0 overflow-hidden border-l-8 border-gray-100 dark:border-gray-900">
-                  <SimulatorPanel
-                    conversationId={selectedConversation.id}
-                    onClose={() => setSimulatorOpen(false)}
-                  />
-                </div>
-              ) : null}
-            </>
+            <ConversationPane
+              conversation={selectedConversation}
+              now={inbox.now}
+              busy={inbox.busy}
+              onTakeover={() => void inbox.takeover(selectedConversation.id)}
+              onReturnToBot={() => void inbox.releaseToBot(selectedConversation.id)}
+              onFinish={() => void inbox.finalize(selectedConversation.id)}
+              onBack={inbox.clearSelection}
+              simulatorOpen={simulatorOpen}
+              onToggleSimulator={() => setSimulatorOpen((open) => !open)}
+            />
           ) : (
             <p className="p-6 text-sm text-gray-500">Selecione uma conversa.</p>
           )}
         </section>
+
+        {/* Cartão próprio, como no financiamento e no quickcart: mesma moldura da conversa, separado
+            pelo `gap` do grid. Dentro do cartão da conversa ele lia como parte do atendimento.
+            `flex` em linha porque o painel do pacote não tem teto de altura — em coluna ele cresce
+            com o transcript e transborda; em linha herda a altura da faixa e rola por dentro. */}
+        {showSimulator && selectedConversation ? (
+          <div className="flex min-h-0 overflow-hidden rounded-xl border bg-white dark:bg-gray-800">
+            <SimulatorPanel
+              conversationId={selectedConversation.id}
+              onClose={() => setSimulatorOpen(false)}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   )
