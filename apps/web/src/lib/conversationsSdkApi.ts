@@ -7,18 +7,19 @@
  */
 
 import type {
+  CompanyDocumentPage,
+  ConversationDocumentPage,
   ConversationsApi,
   ConversationPage,
   ConversationSummary,
   MessagePayload,
 } from '@adatechnology/conversations-ui'
 import { useAuthStore } from '@/stores/authStore'
-import { api, ApiError } from '@/lib/api'
+import { api } from '@/lib/api'
 
 /** Template aprovado usado para reabrir a janela de 24h quando ela expira. */
 export const REOPEN_TEMPLATE_NAME = 'atendimento_reabertura'
 const DEFAULT_LANGUAGE_CODE = 'pt_BR'
-const DOCUMENTS_UNSUPPORTED_MESSAGE = 'Biblioteca de documentos não disponível neste painel.'
 
 function accessToken(): string | undefined {
   return useAuthStore.getState().accessToken ?? undefined
@@ -239,12 +240,42 @@ export const conversationsSdkApi: ConversationsApi = {
     return { mimeType: result.mimeType, data: result.base64 }
   },
 
-  // O Order Hub não indexa anexos por conversa — sem rota, a lista é vazia em vez de erro, e o
-  // painel de documentos simplesmente não é usado nesta tela.
-  getDocuments: async () => [],
+  // Repassa filtro, ordenação e página: o backend honra os quatro, e mandar só `search` faria a
+  // UI exibir controles que não mudam nada.
+  getDocuments: async (conversationId, params) =>
+    api.get<ConversationDocumentPage>(
+      `/conversations/${encodeURIComponent(conversationId)}/documents${buildQuery({
+        search: params?.search,
+        source: params?.source,
+        sortDirection: params?.sortDirection,
+        page: params?.page,
+        limit: params?.limit,
+      })}`,
+      accessToken()
+    ),
 
-  getDocumentUrl: async () => {
-    throw new ApiError(DOCUMENTS_UNSUPPORTED_MESSAGE, 501)
+  // Biblioteca da empresa: mesma forma de filtro, sem conversa no caminho — cada item volta
+  // dizendo de qual conversa veio.
+  getAllDocuments: async (params) =>
+    api.get<CompanyDocumentPage>(
+      `/conversations/documents${buildQuery({
+        search: params?.search,
+        source: params?.source,
+        sortDirection: params?.sortDirection,
+        page: params?.page,
+        limit: params?.limit,
+      })}`,
+      accessToken()
+    ),
+
+  // A rota devolve URL assinada e curta; o binário nunca passa pela API — o atendente vai direto
+  // ao storage. Por isso o `uploadId` (que é a key do objeto, com barras) precisa ser escapado.
+  getDocumentUrl: async (uploadId, disposition) => {
+    const result = await api.get<{ url: string }>(
+      `/conversations/documents/${encodeURIComponent(uploadId)}/url${buildQuery({ disposition })}`,
+      accessToken()
+    )
+    return result.url
   },
 
   takeover: takeoverConversation,

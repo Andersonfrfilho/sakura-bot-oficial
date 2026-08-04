@@ -136,6 +136,9 @@ import { WebhookController } from '@/modules/webhook/infra/http/WebhookControlle
 
 // Conversations — servidas pelo @adatechnology/meta-whatsapp-module
 import { createMetaWhatsAppModuleRegistry } from '@/modules/conversations/infra/whatsapp/metaWhatsAppModule'
+import { createConversationObjectStorage } from '@/modules/conversations/infra/storage/conversationObjectStorage'
+import { startDocumentIngestionWorker } from '@/modules/conversations/application/workers/DocumentIngestionWorker'
+import { isStorageEnabled } from '@/infra/config/storageEnvironment'
 import { ConversationController } from '@/modules/conversations/infra/http/ConversationController'
 import { WhatsAppTemplateProvider } from '@adatechnology/meta-whatsapp-provider'
 import { WhatsAppSettingsController } from '@/modules/conversations/infra/http/WhatsAppSettingsController'
@@ -211,13 +214,23 @@ export interface AppContainer {
   ifoodWorker?: Worker | undefined
   productAffinityWorker?: Worker | undefined
   stockWorker?: Worker | undefined
+  documentIngestionWorker?: Worker | undefined
 }
 
 export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const cache = new RedisProvider()
 
+  // Sem STORAGE_ENABLED a instalação roda igual, só sem biblioteca de documentos: o anexo segue
+  // acessível pelo proxy de mídia da Meta enquanto a URL dela viver.
+  const objectStorage = isStorageEnabled() ? createConversationObjectStorage() : undefined
+
   // Uma instância do módulo por estabelecimento: os eventos que ele emite não carregam tenant.
-  const metaWhatsAppModules = createMetaWhatsAppModuleRegistry({ db, cache, webSocketHub: wsHub })
+  const metaWhatsAppModules = createMetaWhatsAppModuleRegistry({
+    db,
+    cache,
+    webSocketHub: wsHub,
+    objectStorage: objectStorage?.forModule,
+  })
 
   // Shared repos
   const userRepository = new DrizzleUserRepository(db)
@@ -420,7 +433,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   )
 
   // Conversations
-  const conversationController = new ConversationController(metaWhatsAppModules)
+  const conversationController = new ConversationController(metaWhatsAppModules, objectStorage?.forModule)
   const whatsAppSettingsController = new WhatsAppSettingsController(
     metaWhatsAppModules,
     new WhatsAppTemplateProvider({
@@ -539,7 +552,17 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     startBullBoard()
   }
 
+  // Ingestão de anexos: só faz sentido com storage, e é o consumidor do hook `onMediaReceived`.
+  const documentIngestionWorker = objectStorage
+    ? startDocumentIngestionWorker({ modules: metaWhatsAppModules })
+    : undefined
+  if (documentIngestionWorker) {
+    console.log('[API] Document ingestion worker started')
+    startBullBoard()
+  }
+
   return {
+    documentIngestionWorker,
     fiscalWorker,
     financeWorker,
     ifoodWorker,

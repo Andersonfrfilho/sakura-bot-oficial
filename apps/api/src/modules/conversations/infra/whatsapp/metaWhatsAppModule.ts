@@ -17,8 +17,14 @@ import {
   type NonceStoreInterface,
   verifyWebhookChallenge,
 } from '@adatechnology/meta-whatsapp-module'
+import type { ObjectStorageInterface } from '@adatechnology/meta-whatsapp-contracts'
 import type { CacheProvider } from '@/shared/providers/CacheProvider'
 import type { WebSocketHub } from '@/infra/websocket/WebSocketHub'
+import {
+  conversationDocumentsQueue,
+  inboundMediaJobId,
+} from '@/infra/queue/conversationDocumentsQueue'
+import { CONVERSATION_DOCUMENTS_JOB } from '@/infra/queue/QueueNames.constant'
 import { createConversationRealtimeNotifier } from '../realtime/ConversationRealtimeNotifier'
 
 const NONCE_VALUE = '1'
@@ -27,6 +33,11 @@ interface MetaWhatsAppModuleRegistryParams {
   readonly db: MetaWhatsAppDatabase
   readonly cache: CacheProvider
   readonly webSocketHub: WebSocketHub
+  /**
+   * Ausente, a biblioteca de documentos fica desligada: o módulo não expõe `ingestInboundMedia` e
+   * o anexo continua acessível só pelo proxy de mídia da Meta, enquanto a URL dela viver.
+   */
+  readonly objectStorage?: ObjectStorageInterface | undefined
 }
 
 export interface MetaWhatsAppModuleRegistry {
@@ -79,7 +90,29 @@ export function createMetaWhatsAppModuleRegistry(
         features: { flowEngine: false },
         providers: {
           realtime: createConversationRealtimeNotifier(params.webSocketHub, establishmentId),
+          ...(params.objectStorage ? { objectStorage: params.objectStorage } : {}),
         },
+        // Hook próprio, e não `onMessageReceived`: aquele não roda em atendimento humano, que é
+        // justamente quando o cliente manda comprovante para o atendente.
+        ...(params.objectStorage
+          ? {
+              hooks: {
+                onMediaReceived: async (media): Promise<void> => {
+                  await conversationDocumentsQueue.add(
+                    CONVERSATION_DOCUMENTS_JOB.INGEST_INBOUND_MEDIA,
+                    {
+                      companyId: media.companyId,
+                      messageId: media.messageId,
+                      sourceMediaId: media.sourceMediaId,
+                      mimeType: media.mimeType,
+                      ...(media.filename ? { filename: media.filename } : {}),
+                    },
+                    { jobId: inboundMediaJobId(media.companyId, media.sourceMediaId) }
+                  )
+                },
+              },
+            }
+          : {}),
       })
 
       instances.set(establishmentId, instance)
