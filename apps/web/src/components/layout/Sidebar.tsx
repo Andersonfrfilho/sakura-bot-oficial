@@ -1,37 +1,46 @@
 import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
-import { NAV_ITEMS } from '@/constants/navigation'
+import { visibleSectionsFor } from '@/constants/navigation'
 
 export function Sidebar() {
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
 
-  const visibleItems = NAV_ITEMS.filter(
-    (item) => !item.roles || (user && item.roles.includes(user.role))
-  )
+  const sections = visibleSectionsFor(user?.role)
 
   return (
-    <aside className="w-56 bg-gray-900 min-h-screen flex flex-col hidden md:flex">
+    // `flex-shrink-0` para a coluna manter os 14rem quando o conteúdo ao lado é largo; sem ele o
+    // menu era espremido e os rótulos quebravam em duas linhas.
+    <aside className="w-56 flex-shrink-0 bg-gray-900 h-full flex-col hidden md:flex">
       <div className="p-4 border-b border-gray-700">
         <h1 className="text-white font-bold text-lg">Order Hub</h1>
         {user && <p className="text-gray-400 text-xs mt-1">{user.name} · {user.role}</p>}
       </div>
 
-      <nav className="flex-1 p-3 space-y-1">
-        {visibleItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === '/'}
-            className={({ isActive }) =>
-              `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive ? 'bg-brand-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              }`
-            }
-          >
-            {item.icon && <item.icon className="h-4 w-4 flex-shrink-0" />}
-            <span>{item.label}</span>
-          </NavLink>
+      {/* `min-h-0`: filho de flex column tem `min-height: auto` por padrão e se recusa a encolher
+          abaixo do conteúdo, o que anula o `overflow-y-auto` e empurra a barra para fora da tela. */}
+      <nav className="flex-1 min-h-0 overflow-y-auto p-3 space-y-5">
+        {sections.map((section) => (
+          <div key={section.label} className="space-y-1">
+            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              {section.label}
+            </p>
+            {section.items.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/'}
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive ? 'bg-brand-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  }`
+                }
+              >
+                <item.icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
 

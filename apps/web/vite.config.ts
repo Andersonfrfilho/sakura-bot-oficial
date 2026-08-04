@@ -64,11 +64,6 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  // Linkado por `file:` do repo irmão: no pre-bundle o optimizer congela uma cópia e passa a
-  // servir dist obsoleto a cada rebuild do pacote.
-  optimizeDeps: {
-    exclude: ['@adatechnology/conversations-ui'],
-  },
   server: {
     port: 4000,
     host: true,

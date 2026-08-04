@@ -8,6 +8,7 @@ import { OrderDetailPage } from '@/pages/orders/OrderDetailPage'
 import { OrdersPage } from '@/pages/orders/OrdersPage'
 import { CreateOrderPage } from '@/pages/orders/CreateOrderPage'
 import { ConversationsPage } from '@/pages/conversations/ConversationsPage'
+import { DocumentsPage } from '@/pages/conversations/DocumentsPage'
 import { MessagesPage } from '@/pages/messages/MessagesPage'
 import { CustomersPage } from '@/pages/customers/CustomersPage'
 import { TablesPage } from '@/pages/tables/TablesPage'
@@ -28,12 +29,16 @@ import { AccessDeniedBanner } from '@/components/layout/AccessDeniedBanner'
 import { PWAInstallBanner } from '@/components/pwa/PWAInstallBanner'
 import { ROLES } from '@/constants/navigation'
 
+// `h-screen` e não `min-h-screen`: com altura só mínima, nenhum filho tem teto contra o qual rolar,
+// o `overflow-y-auto` do main nunca entra em ação e quem estica é a página inteira. `min-w-0` pelo
+// mesmo motivo no eixo horizontal — sem ele, uma tabela larga alarga o layout todo em vez de rolar
+// dentro do próprio contêiner.
 function AppLayout() {
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <MobileNav />
       <Sidebar />
-      <main className="flex-1 overflow-auto pt-14 md:pt-0">
+      <main className="flex-1 min-w-0 overflow-y-auto pt-14 md:pt-0">
         <AccessDeniedBanner />
         <Outlet />
       </main>
@@ -109,6 +114,14 @@ export default function App() {
             element={
               <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.ATTENDANT]}>
                 <ConversationsPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/documents"
+            element={
+              <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.ATTENDANT]}>
+                <DocumentsPage />
               </RoleGuard>
             }
           />

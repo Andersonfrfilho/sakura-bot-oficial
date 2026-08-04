@@ -4,7 +4,7 @@
  * listagem no `useConversationsInbox`; aqui só se monta a tela.
  */
 
-import { useState, type RefObject } from 'react'
+import { useMemo, useState, type RefObject } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import '@adatechnology/conversations-ui/styles.css'
 import {
@@ -28,11 +28,17 @@ import {
   windowOf,
   type ConversationSummary,
 } from '@adatechnology/conversations-ui'
+import {
+  ConversationSimulatorPanel,
+  createPreviewBridgeClient,
+} from '@adatechnology/conversations-ui/preview'
 
 import { CONVERSATION_QUERY_PARAM } from '@/constants/conversationLinks'
+import { api } from '@/lib/api'
 import { conversationsSdkApi } from '@/lib/conversationsSdkApi'
 import { conversationsSdkRealtime } from '@/lib/conversationsSdkRealtime'
 import { fileToAttachment } from '@/lib/fileToAttachment'
+import { IS_CONVERSATION_PREVIEW_ENABLED } from './previewEnvironment'
 import { stateLabel, toContextEntries } from './conversationContext'
 import { downloadConversation } from './conversationsExport'
 import { CONVERSATION_QUICK_REPLIES, quickReplyVariablesFor } from './quickReplies'
@@ -171,14 +177,49 @@ function ConversationPane({
   )
 }
 
+/**
+ * Lado do cliente, para exercitar o fluxo sem um telefone real. Manda a INTENÇÃO ("mandou este
+ * texto", "tocou neste botão") para a API, que monta o payload da Meta e o assina com o app secret —
+ * que fica só no servidor. Assinar aqui obrigaria a publicar o segredo no bundle.
+ *
+ * Neste projeto o bot é o workflow do n8n, e a API não responde sozinha: o que se vê na thread ao
+ * lado é a mensagem do cliente entrando. A resposta aparece quando o n8n estiver apontado para esta
+ * instância.
+ */
+function SimulatorPanel({ conversationId, onClose }: { conversationId: string; onClose: () => void }) {
+  const client = useMemo(
+    () =>
+      createPreviewBridgeClient({
+        from: conversationId,
+        // `api` e não `fetch` na mão: é o cliente que carrega o access token e renova no 401.
+        sendCommand: async (command) => {
+          await api.post('/conversations/preview/inbound', command)
+        },
+      }),
+    [conversationId]
+  )
+
+  return (
+    <ConversationSimulatorPanel
+      conversationId={conversationId}
+      onClose={onClose}
+      client={client}
+      sse={conversationsSdkRealtime}
+      loadMessages={(id) => conversationsSdkApi.fetchMessages(id)}
+    />
+  )
+}
+
 function Inbox() {
   const [searchParams] = useSearchParams()
+  const [simulatorOpen, setSimulatorOpen] = useState(false)
   // Lido uma vez: o hook usa como estado inicial, e reagir a mudanças depois roubaria a conversa
   // que o atendente tivesse aberto na mão.
   const inbox = useConversationsInbox({
     initialWhatsappNumber: searchParams.get(CONVERSATION_QUERY_PARAM) ?? undefined,
   })
   const selectedConversation = inbox.selectedConversation
+  const showSimulator = simulatorOpen && selectedConversation !== undefined
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] min-h-0 flex-col md:h-screen">
@@ -204,6 +245,17 @@ function Inbox() {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {IS_CONVERSATION_PREVIEW_ENABLED && selectedConversation ? (
+            <button
+              type="button"
+              onClick={() => setSimulatorOpen((open) => !open)}
+              aria-pressed={simulatorOpen}
+              title="Simular cliente (dev)"
+              className={`rounded-md border px-3 py-2 text-sm ${simulatorOpen ? 'bg-brand-600 text-white' : ''}`}
+            >
+              🧪<span className="cv-only-wide"> Simular cliente</span>
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => inbox.setWaitingOnly(!inbox.waitingOnly)}
@@ -241,7 +293,11 @@ function Inbox() {
 
       {/* Master/detail: abaixo de `lg` a lista e a conversa dividiriam a mesma altura fixa e cada
           uma viraria uma fatia inútil — ali mostra uma ou outra. */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 bg-gray-100 p-3 lg:grid-cols-[360px_minmax(0,1fr)] dark:bg-gray-900">
+      <div
+        className={`grid min-h-0 flex-1 grid-cols-1 gap-3 bg-gray-100 p-3 dark:bg-gray-900 ${
+          showSimulator ? 'lg:grid-cols-[360px_minmax(0,1fr)_24rem]' : 'lg:grid-cols-[360px_minmax(0,1fr)]'
+        }`}
+      >
         <aside
           className={`flex min-h-0 flex-col overflow-hidden rounded-xl border bg-white dark:bg-gray-800 ${
             selectedConversation ? 'hidden lg:flex' : 'flex'
@@ -395,6 +451,15 @@ function Inbox() {
             <p className="p-6 text-sm text-gray-500">Selecione uma conversa.</p>
           )}
         </section>
+
+        {/* Fora da `section` da conversa: dentro dela o painel dividiria a altura com o transcript
+            em vez de ficar ao lado. O próprio pacote vira tela cheia abaixo de `lg`. */}
+        {showSimulator && selectedConversation ? (
+          <SimulatorPanel
+            conversationId={selectedConversation.id}
+            onClose={() => setSimulatorOpen(false)}
+          />
+        ) : null}
       </div>
     </div>
   )

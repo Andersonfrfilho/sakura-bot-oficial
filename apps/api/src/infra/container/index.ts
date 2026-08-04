@@ -133,9 +133,14 @@ import { CreateAuditLogUseCase } from '@/modules/audit/application/use-cases/Cre
 
 // Webhook
 import { WebhookController } from '@/modules/webhook/infra/http/WebhookController'
+import { PreviewInboundController } from '@/modules/webhook/infra/http/PreviewInboundController'
+import { SendPreviewInboundUseCase } from '@/modules/webhook/application/SendPreviewInbound.use-case'
 
 // Conversations — servidas pelo @adatechnology/meta-whatsapp-module
 import { createMetaWhatsAppModuleRegistry } from '@/modules/conversations/infra/whatsapp/metaWhatsAppModule'
+import { createConversationObjectStorage } from '@/modules/conversations/infra/storage/conversationObjectStorage'
+import { startDocumentIngestionWorker } from '@/modules/conversations/application/workers/DocumentIngestionWorker'
+import { isStorageEnabled } from '@/infra/config/storageEnvironment'
 import { ConversationController } from '@/modules/conversations/infra/http/ConversationController'
 import { WhatsAppTemplateProvider } from '@adatechnology/meta-whatsapp-provider'
 import { WhatsAppSettingsController } from '@/modules/conversations/infra/http/WhatsAppSettingsController'
@@ -195,6 +200,7 @@ export interface AppContainer {
   settingsController: SettingsController
   deliveryFeeController: DeliveryFeeController
   webhookController: WebhookController
+  previewInboundController: PreviewInboundController
   customerController: CustomerController
   addressController: AddressController
   tableController: TableController
@@ -211,13 +217,23 @@ export interface AppContainer {
   ifoodWorker?: Worker | undefined
   productAffinityWorker?: Worker | undefined
   stockWorker?: Worker | undefined
+  documentIngestionWorker?: Worker | undefined
 }
 
 export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const cache = new RedisProvider()
 
+  // Sem STORAGE_ENABLED a instalação roda igual, só sem biblioteca de documentos: o anexo segue
+  // acessível pelo proxy de mídia da Meta enquanto a URL dela viver.
+  const objectStorage = isStorageEnabled() ? createConversationObjectStorage() : undefined
+
   // Uma instância do módulo por estabelecimento: os eventos que ele emite não carregam tenant.
-  const metaWhatsAppModules = createMetaWhatsAppModuleRegistry({ db, cache, webSocketHub: wsHub })
+  const metaWhatsAppModules = createMetaWhatsAppModuleRegistry({
+    db,
+    cache,
+    webSocketHub: wsHub,
+    objectStorage: objectStorage?.forModule,
+  })
 
   // Shared repos
   const userRepository = new DrizzleUserRepository(db)
@@ -358,6 +374,15 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   // Webhook — assinatura, replay e persistência ficam no módulo
   const webhookController = new WebhookController(metaWhatsAppModules)
 
+  // Simulador de cliente — desligado por padrão; o app secret nunca sai daqui para o navegador
+  const previewInboundController = new PreviewInboundController(
+    new SendPreviewInboundUseCase(
+      metaWhatsAppModules,
+      process.env.WHATSAPP_APP_SECRET,
+      process.env.CONVERSATION_PREVIEW_ENABLED === 'true'
+    )
+  )
+
   // Customers
   const customerRepository = new DrizzleCustomerRepository(db)
   const listCustomersUseCase = new ListCustomersUseCase(customerRepository)
@@ -420,7 +445,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   )
 
   // Conversations
-  const conversationController = new ConversationController(metaWhatsAppModules)
+  const conversationController = new ConversationController(metaWhatsAppModules, objectStorage?.forModule)
   const whatsAppSettingsController = new WhatsAppSettingsController(
     metaWhatsAppModules,
     new WhatsAppTemplateProvider({
@@ -539,7 +564,17 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     startBullBoard()
   }
 
+  // Ingestão de anexos: só faz sentido com storage, e é o consumidor do hook `onMediaReceived`.
+  const documentIngestionWorker = objectStorage
+    ? startDocumentIngestionWorker({ modules: metaWhatsAppModules })
+    : undefined
+  if (documentIngestionWorker) {
+    console.log('[API] Document ingestion worker started')
+    startBullBoard()
+  }
+
   return {
+    documentIngestionWorker,
     fiscalWorker,
     financeWorker,
     ifoodWorker,
@@ -563,6 +598,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     settingsController,
     deliveryFeeController,
     webhookController,
+    previewInboundController,
     customerController,
     addressController,
     tableController,

@@ -13,9 +13,10 @@
   },
   "dependencies": {
     "@adatechnology/fiscal-provider": "file:../../../adatechnology-packages/packages/backend/fiscal-provider",
-    "@adatechnology/meta-whatsapp-contracts": "0.2.0-rc.8",
-    "@adatechnology/meta-whatsapp-module": "0.2.0-rc.16",
+    "@adatechnology/meta-whatsapp-contracts": "0.2.0-rc.9",
+    "@adatechnology/meta-whatsapp-module": "0.2.0-rc.18",
     "@adatechnology/meta-whatsapp-provider": "0.2.0-rc.3",
+    "@adatechnology/object-storage-provider": "0.1.1",
     "@bull-board/api": "^8.1.2",
     "@bull-board/express": "^8.1.2",
     "argon2": "^0.44.0",

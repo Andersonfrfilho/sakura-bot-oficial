@@ -13,6 +13,8 @@ import { seedCashier } from './cashier.seed'
 import { seedSettings } from './settings.seed'
 import { seedAuditLogs } from './audit-logs.seed'
 import { seedFiscal } from './fiscal.seed'
+import { seedConversations } from './conversations.seed'
+import { seedConversationDocuments } from './conversation-documents.seed'
 
 async function seed(): Promise<void> {
   console.log('[Seed] Starting...')
@@ -32,6 +34,9 @@ async function seed(): Promise<void> {
   await seedDeliveries({ establishmentId, delivererUserId: userIds.entregador, orders })
   await seedCashier({ establishmentId, caixaUserId: userIds.caixa, orders })
   await seedFiscal({ establishmentId, orders })
+
+  await seedConversations(establishmentId, userIds.atendente)
+  await seedConversationDocuments(establishmentId)
 
   await seedSettings(establishmentId)
   await seedAuditLogs({ establishmentId, adminUserId: userIds.admin, caixaUserId: userIds.caixa, orders })

@@ -7,6 +7,11 @@ export function registerConversationRoutes(router: Router, controller: Conversat
   router.post('/conversations/read-all', authenticate, authorize('conversations', 'write'), controller.markAllRead)
   router.get('/conversations/media/:mediaId', authenticate, authorize('conversations', 'read'), controller.fetchMedia)
 
+  // Antes de `/conversations/:whatsapp/...`: "documents" casaria com o parâmetro de número.
+  router.get('/conversations/documents', authenticate, authorize('conversations', 'read'), controller.companyDocuments)
+  router.get('/conversations/documents/:uploadId/url', authenticate, authorize('conversations', 'read'), controller.documentUrl)
+  router.get('/conversations/:whatsapp/documents', authenticate, authorize('conversations', 'read'), controller.documents)
+
   router.get('/conversations/:whatsapp/messages', authenticate, authorize('conversations', 'read'), controller.history)
   router.get('/conversations/:whatsapp/context', authenticate, authorize('conversations', 'read'), controller.context)
   router.get('/conversations/:whatsapp/export', authenticate, authorize('conversations', 'read'), controller.export)

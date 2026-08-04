@@ -40,6 +40,46 @@ services:
       timeout: 5s
       retries: 5
 
+  # Storage S3-compatível — anexos das conversas (biblioteca de documentos)
+  minio:
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    container_name: minio
+    restart: always
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY_ID:-orderhub}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_ACCESS_KEY:-orderhub123}
+    ports:
+      # 9566/9567 já são do MinIO do quickcart em dev — portas altas evitam a colisão.
+      - "9570:9000"
+      - "9571:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - sakura_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # O MinIO não cria bucket sozinho, e o provider assume que ele existe (healthCheckBucket).
+  # Serviço de um tiro: cria e sai.
+  minio-init:
+    image: minio/mc:latest
+    container_name: minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - sakura_net
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${STORAGE_ACCESS_KEY_ID:-orderhub} ${STORAGE_SECRET_ACCESS_KEY:-orderhub123} &&
+      mc mb --ignore-existing local/${STORAGE_BUCKET:-orderhub-documents} &&
+      echo 'bucket pronto'
+      "
+
   # Orquestração de fluxos — recebe webhooks da Meta Cloud API
   n8n:
     image: n8nio/n8n:latest
@@ -198,10 +238,27 @@ services:
       - WHATSAPP_BUSINESS_ACCOUNT_ID=${WHATSAPP_BUSINESS_ACCOUNT_ID}
       - WHATSAPP_WEBHOOK_VERIFY_TOKEN=${WHATSAPP_WEBHOOK_VERIFY_TOKEN}
       - WHATSAPP_APP_SECRET=${WHATSAPP_APP_SECRET}
+      # Simulador de cliente na tela de conversas — só dev. Forja inbound assinado no servidor.
+      - CONVERSATION_PREVIEW_ENABLED=${CONVERSATION_PREVIEW_ENABLED:-false}
       - ALLOWED_ORIGINS=http://localhost:4000
       - LOG_LEVEL=info
       - PRODUCT_AFFINITY_WORKER_ENABLED=${PRODUCT_AFFINITY_WORKER_ENABLED:-false}
       - STOCK_WORKER_ENABLED=${STOCK_WORKER_ENABLED:-false}
+      # Storage dos anexos de conversa. Endpoint pelo nome do serviço: quem baixa é a API, dentro
+      # da rede do compose — a URL assinada que chega ao browser sai daqui e por isso o host
+      # precisa ser alcançável de fora também em produção.
+      - STORAGE_ENABLED=${STORAGE_ENABLED:-true}
+      # Interno: a API fala com o MinIO pela rede do compose. O endereço público é o que
+      # assina a URL entregue ao browser — ver STORAGE_PUBLIC_ENDPOINT no .env.example.
+      - STORAGE_ENDPOINT=${STORAGE_ENDPOINT:-http://minio:9000}
+      - STORAGE_PUBLIC_ENDPOINT=${STORAGE_PUBLIC_ENDPOINT:-http://localhost:9570}
+      - STORAGE_REGION=${STORAGE_REGION:-us-east-1}
+      - STORAGE_BUCKET=${STORAGE_BUCKET:-orderhub-documents}
+      - STORAGE_ACCESS_KEY_ID=${STORAGE_ACCESS_KEY_ID:-orderhub}
+      - STORAGE_SECRET_ACCESS_KEY=${STORAGE_SECRET_ACCESS_KEY:-orderhub123}
+      - STORAGE_FORCE_PATH_STYLE=${STORAGE_FORCE_PATH_STYLE:-true}
+      - STORAGE_MAX_OBJECT_SIZE_BYTES=${STORAGE_MAX_OBJECT_SIZE_BYTES:-26214400}
+      - STORAGE_DOWNLOAD_URL_TTL_SECONDS=${STORAGE_DOWNLOAD_URL_TTL_SECONDS:-300}
     ports:
       - "3333:3333"
     networks:
@@ -210,6 +267,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
 
   # Order Hub — Painel operacional (React + Vite em modo dev)
@@ -221,14 +280,13 @@ services:
     volumes:
       - ../apps/web:/app
       - web_node_modules:/app/node_modules
-      # @adatechnology/conversations-ui e products-ui entram por "file:" do monorepo irmão: o
-      # symlink em node_modules aponta para fora de /app e sem este bind o Vite não resolve o
-      # import. Mesmo caminho que o symlink espera resolver a partir de /app/node_modules.
-      - ../../adatechnology-packages:/adatechnology-packages
     environment:
       # URLs como vistas pelo BROWSER (host), não pelo Docker network
       - VITE_API_URL=http://localhost:3333
       - VITE_API_WS_URL=ws://localhost:3333/ws
+      # Só desenha o botão do simulador. Quem decide de verdade é CONVERSATION_PREVIEW_ENABLED
+      # na API — VITE_* vai literal para o bundle e não serve de controle de acesso.
+      - VITE_CONVERSATION_PREVIEW_ENABLED=${VITE_CONVERSATION_PREVIEW_ENABLED:-false}
     ports:
       - "4000:4000"
     networks:
@@ -282,6 +340,7 @@ volumes:
   api_node_modules:
   web_node_modules:
   fiscal_node_modules:
+  minio_data:
 
 networks:
   sakura_net:

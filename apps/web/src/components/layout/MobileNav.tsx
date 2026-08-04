@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
-import { NAV_ITEMS } from '@/constants/navigation'
+import { visibleSectionsFor } from '@/constants/navigation'
 
 const TRANSITION_MS = 200
 
@@ -12,9 +12,7 @@ export function MobileNav() {
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
 
-  const visibleItems = NAV_ITEMS.filter(
-    (item) => !item.roles || (user && item.roles.includes(user.role))
-  )
+  const sections = visibleSectionsFor(user?.role)
 
   useEffect(() => {
     if (open) {
@@ -70,23 +68,31 @@ export function MobileNav() {
               </button>
             </div>
             {user && <p className="px-4 py-2 text-gray-400 text-xs">{user.name} · {user.role}</p>}
-            <nav className="flex-1 p-3 space-y-1">
-              {visibleItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === '/'}
-                  onClick={() => setOpen(false)}
-                  className={({ isActive }) =>
-                    `block px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-brand-600 text-white'
-                        : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                    }`
-                  }
-                >
-                  {item.label}
-                </NavLink>
+            <nav className="flex-1 overflow-y-auto p-3 space-y-5">
+              {sections.map((section) => (
+                <div key={section.label} className="space-y-1">
+                  <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    {section.label}
+                  </p>
+                  {section.items.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.to === '/'}
+                      onClick={() => setOpen(false)}
+                      className={({ isActive }) =>
+                        `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          isActive
+                            ? 'bg-brand-600 text-white'
+                            : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                        }`
+                      }
+                    >
+                      <item.icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
               ))}
             </nav>
             <div className="p-3 border-t border-gray-700">

@@ -66,6 +66,27 @@ export type MediaProcessingJobData = {
   key: string
 }
 
+export const CONVERSATION_DOCUMENTS_QUEUE = 'conversation-documents' as const
+
+export const CONVERSATION_DOCUMENTS_JOB = {
+  INGEST_INBOUND_MEDIA: 'ingest-inbound-media',
+} as const
+
+export type ConversationDocumentsJobName =
+  (typeof CONVERSATION_DOCUMENTS_JOB)[keyof typeof CONVERSATION_DOCUMENTS_JOB]
+
+/**
+ * O que o módulo entrega no `onMediaReceived` e o que a ingestão precisa de volta. Nenhum campo
+ * é dado pessoal: são identificadores opacos da Meta e metadados do arquivo.
+ */
+export type ConversationDocumentsJobData = {
+  companyId: string
+  messageId: string
+  sourceMediaId: string
+  mimeType: string
+  filename?: string
+}
+
 export const FINANCE_DUE_ALERTS_QUEUE = 'finance-due-alerts' as const
 
 export const FINANCE_DUE_JOB = {
