@@ -246,7 +246,10 @@ services:
       # da rede do compose — a URL assinada que chega ao browser sai daqui e por isso o host
       # precisa ser alcançável de fora também em produção.
       - STORAGE_ENABLED=${STORAGE_ENABLED:-true}
-      - STORAGE_ENDPOINT=${STORAGE_ENDPOINT:-http://localhost:9570}
+      # Interno: a API fala com o MinIO pela rede do compose. O endereço público é o que
+      # assina a URL entregue ao browser — ver STORAGE_PUBLIC_ENDPOINT no .env.example.
+      - STORAGE_ENDPOINT=${STORAGE_ENDPOINT:-http://minio:9000}
+      - STORAGE_PUBLIC_ENDPOINT=${STORAGE_PUBLIC_ENDPOINT:-http://localhost:9570}
       - STORAGE_REGION=${STORAGE_REGION:-us-east-1}
       - STORAGE_BUCKET=${STORAGE_BUCKET:-orderhub-documents}
       - STORAGE_ACCESS_KEY_ID=${STORAGE_ACCESS_KEY_ID:-orderhub}

@@ -46,15 +46,22 @@ async function collectStream(stream: ReadableStream<Uint8Array>): Promise<Buffer
 export function createConversationObjectStorage(): ConversationObjectStorage {
   const environment = loadStorageEnvironment()
 
-  const provider = createObjectStorageProvider({
-    endpoint: new URL(environment.STORAGE_ENDPOINT),
-    region: environment.STORAGE_REGION,
-    accessKeyId: environment.STORAGE_ACCESS_KEY_ID,
-    secretAccessKey: environment.STORAGE_SECRET_ACCESS_KEY,
-    forcePathStyle: environment.STORAGE_FORCE_PATH_STYLE,
-    healthCheckBucket: environment.STORAGE_BUCKET,
-    maxObjectSizeBytes: environment.STORAGE_MAX_OBJECT_SIZE_BYTES,
-  })
+  function buildProvider(endpoint: string): ObjectStorageProvider {
+    return createObjectStorageProvider({
+      endpoint: new URL(endpoint),
+      region: environment.STORAGE_REGION,
+      accessKeyId: environment.STORAGE_ACCESS_KEY_ID,
+      secretAccessKey: environment.STORAGE_SECRET_ACCESS_KEY,
+      forcePathStyle: environment.STORAGE_FORCE_PATH_STYLE,
+      healthCheckBucket: environment.STORAGE_BUCKET,
+      maxObjectSizeBytes: environment.STORAGE_MAX_OBJECT_SIZE_BYTES,
+    })
+  }
+
+  const provider = buildProvider(environment.STORAGE_ENDPOINT)
+  const signingProvider = environment.STORAGE_PUBLIC_ENDPOINT
+    ? buildProvider(environment.STORAGE_PUBLIC_ENDPOINT)
+    : provider
 
   const forModule: ReadableObjectStorage = {
     async upload({ buffer, mimeType, key }) {
@@ -81,7 +88,7 @@ export function createConversationObjectStorage(): ConversationObjectStorage {
     },
 
     async getDownloadUrl(uploadId, options) {
-      const url = await provider.createSignedDownload({
+      const url = await signingProvider.createSignedDownload({
         bucket: environment.STORAGE_BUCKET,
         key: uploadId,
         expiresInSeconds: options?.expiresInSeconds ?? environment.STORAGE_DOWNLOAD_URL_TTL_SECONDS,

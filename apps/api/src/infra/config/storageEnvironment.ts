@@ -11,6 +11,15 @@ import { z } from 'zod'
 
 const storageEnvironmentSchema = z.object({
   STORAGE_ENDPOINT: z.string().url(),
+  /**
+   * Endereço pelo qual o BROWSER alcança o storage, quando difere do interno — em dev a API fala
+   * com `http://minio:9000` pela rede do compose e o navegador só enxerga a porta publicada.
+   *
+   * A assinatura SigV4 cobre o header `Host`, então uma URL assinada contra o endereço interno é
+   * rejeitada ao ser aberta pelo endereço público. Por isso a assinatura sai de um provider à
+   * parte, apontado para cá.
+   */
+  STORAGE_PUBLIC_ENDPOINT: z.string().url().optional(),
   STORAGE_REGION: z.string().min(1).default('us-east-1'),
   STORAGE_BUCKET: z.string().min(1),
   STORAGE_ACCESS_KEY_ID: z.string().min(1),
