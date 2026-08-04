@@ -457,7 +457,7 @@ function Inbox() {
                   automática, cresce com o transcript e transborda o cartão. Em linha ele herda a
                   altura da faixa pelo `stretch` padrão e rola por dentro. */}
               {showSimulator ? (
-                <div className="flex min-h-0 overflow-hidden">
+                <div className="flex min-h-0 overflow-hidden border-l-8 border-gray-100 dark:border-gray-900">
                   <SimulatorPanel
                     conversationId={selectedConversation.id}
                     onClose={() => setSimulatorOpen(false)}
