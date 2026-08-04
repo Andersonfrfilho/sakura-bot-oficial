@@ -294,9 +294,7 @@ function Inbox() {
       {/* Master/detail: abaixo de `lg` a lista e a conversa dividiriam a mesma altura fixa e cada
           uma viraria uma fatia inútil — ali mostra uma ou outra. */}
       <div
-        className={`grid min-h-0 flex-1 grid-cols-1 gap-3 bg-gray-100 p-3 dark:bg-gray-900 ${
-          showSimulator ? 'lg:grid-cols-[360px_minmax(0,1fr)_24rem]' : 'lg:grid-cols-[360px_minmax(0,1fr)]'
-        }`}
+        className="grid min-h-0 flex-1 grid-cols-1 gap-3 bg-gray-100 p-3 dark:bg-gray-900 lg:grid-cols-[360px_minmax(0,1fr)]"
       >
         <aside
           className={`flex min-h-0 flex-col overflow-hidden rounded-xl border bg-white dark:bg-gray-800 ${
@@ -432,34 +430,45 @@ function Inbox() {
 
         {/* `min-w-0` junto do `min-h-0`: em grid o padrão é não encolher abaixo do conteúdo, e é
             por aí que uma bolha larga vaza para fora da coluna. */}
+        {/* Simulador DENTRO do mesmo cartão da conversa, como uma segunda coluna deste flex: é o
+            lado do cliente da mesma conversa, e separado numa coluna do grid ele ficava solto, com
+            moldura própria. `min-h-0` em cada filho porque o painel do pacote não tem teto de
+            altura — sem isso ele cresce com o transcript e estica a página inteira. */}
         <section
           className={`min-h-0 min-w-0 overflow-hidden rounded-xl border bg-white dark:bg-gray-800 ${
-            selectedConversation ? 'flex flex-col' : 'hidden lg:block'
+            selectedConversation ? 'flex' : 'hidden lg:block'
           }`}
         >
           {selectedConversation ? (
-            <ConversationPane
-              conversation={selectedConversation}
-              now={inbox.now}
-              busy={inbox.busy}
-              onTakeover={() => void inbox.takeover(selectedConversation.id)}
-              onReturnToBot={() => void inbox.releaseToBot(selectedConversation.id)}
-              onFinish={() => void inbox.finalize(selectedConversation.id)}
-              onBack={inbox.clearSelection}
-            />
+            <>
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <ConversationPane
+                  conversation={selectedConversation}
+                  now={inbox.now}
+                  busy={inbox.busy}
+                  onTakeover={() => void inbox.takeover(selectedConversation.id)}
+                  onReturnToBot={() => void inbox.releaseToBot(selectedConversation.id)}
+                  onFinish={() => void inbox.finalize(selectedConversation.id)}
+                  onBack={inbox.clearSelection}
+                />
+              </div>
+
+              {/* `flex` em linha, e não `flex-col`: em coluna o painel do pacote fica com altura
+                  automática, cresce com o transcript e transborda o cartão. Em linha ele herda a
+                  altura da faixa pelo `stretch` padrão e rola por dentro. */}
+              {showSimulator ? (
+                <div className="flex min-h-0 overflow-hidden">
+                  <SimulatorPanel
+                    conversationId={selectedConversation.id}
+                    onClose={() => setSimulatorOpen(false)}
+                  />
+                </div>
+              ) : null}
+            </>
           ) : (
             <p className="p-6 text-sm text-gray-500">Selecione uma conversa.</p>
           )}
         </section>
-
-        {/* Fora da `section` da conversa: dentro dela o painel dividiria a altura com o transcript
-            em vez de ficar ao lado. O próprio pacote vira tela cheia abaixo de `lg`. */}
-        {showSimulator && selectedConversation ? (
-          <SimulatorPanel
-            conversationId={selectedConversation.id}
-            onClose={() => setSimulatorOpen(false)}
-          />
-        ) : null}
       </div>
     </div>
   )
