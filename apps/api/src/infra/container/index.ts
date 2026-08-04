@@ -133,6 +133,8 @@ import { CreateAuditLogUseCase } from '@/modules/audit/application/use-cases/Cre
 
 // Webhook
 import { WebhookController } from '@/modules/webhook/infra/http/WebhookController'
+import { PreviewInboundController } from '@/modules/webhook/infra/http/PreviewInboundController'
+import { SendPreviewInboundUseCase } from '@/modules/webhook/application/SendPreviewInbound.use-case'
 
 // Conversations — servidas pelo @adatechnology/meta-whatsapp-module
 import { createMetaWhatsAppModuleRegistry } from '@/modules/conversations/infra/whatsapp/metaWhatsAppModule'
@@ -198,6 +200,7 @@ export interface AppContainer {
   settingsController: SettingsController
   deliveryFeeController: DeliveryFeeController
   webhookController: WebhookController
+  previewInboundController: PreviewInboundController
   customerController: CustomerController
   addressController: AddressController
   tableController: TableController
@@ -370,6 +373,15 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
 
   // Webhook — assinatura, replay e persistência ficam no módulo
   const webhookController = new WebhookController(metaWhatsAppModules)
+
+  // Simulador de cliente — desligado por padrão; o app secret nunca sai daqui para o navegador
+  const previewInboundController = new PreviewInboundController(
+    new SendPreviewInboundUseCase(
+      metaWhatsAppModules,
+      process.env.WHATSAPP_APP_SECRET,
+      process.env.CONVERSATION_PREVIEW_ENABLED === 'true'
+    )
+  )
 
   // Customers
   const customerRepository = new DrizzleCustomerRepository(db)
@@ -586,6 +598,7 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
     settingsController,
     deliveryFeeController,
     webhookController,
+    previewInboundController,
     customerController,
     addressController,
     tableController,
