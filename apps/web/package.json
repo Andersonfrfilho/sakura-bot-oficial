@@ -9,8 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@adatechnology/conversations-ui": "file:../../../adatechnology-packages/packages/frontend/conversations-ui",
-    "@adatechnology/products-ui": "file:../../../adatechnology-packages/packages/frontend/products-ui",
+    "@adatechnology/conversations-ui": "0.1.0-rc.21",
+    "@adatechnology/products-ui": "0.1.0-rc.1",
     "lucide-react": "^0.468.0",
     "@tanstack/react-query": "^5.62.7",
     "qrcode.react": "^4.2.0",
