@@ -8,7 +8,7 @@
 
 import { useNavigate } from 'react-router-dom'
 import '@adatechnology/conversations-ui/styles.css'
-import { ConversationsProvider, DocumentsLibrary } from '@adatechnology/conversations-ui'
+import { ConversationsProvider, DocumentsWorkspace } from '@adatechnology/conversations-ui'
 
 import { CONVERSATION_QUERY_PARAM } from '@/constants/conversationLinks'
 import { conversationsSdkApi } from '@/lib/conversationsSdkApi'
@@ -23,9 +23,9 @@ export function DocumentsPage() {
 
   return (
     <ConversationsProvider api={conversationsSdkApi} sse={conversationsSdkRealtime}>
-      {/* Sem título próprio: o DocumentsLibrary já desenha o seu, e dois viravam cabeçalho repetido. */}
+      {/* Sem título próprio: o DocumentsWorkspace já desenha o seu, e dois viravam cabeçalho repetido. */}
       <div className="p-4 lg:p-6">
-        <DocumentsLibrary onOpenConversation={handleOpenConversation} />
+        <DocumentsWorkspace onOpenConversation={handleOpenConversation} />
       </div>
     </ConversationsProvider>
   )
