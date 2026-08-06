@@ -47,7 +47,7 @@
       "name": "@order-hub/web",
       "version": "0.0.1",
       "dependencies": {
-        "@adatechnology/conversations-ui": "0.1.0-rc.26",
+        "@adatechnology/conversations-ui": "0.1.0-rc.27",
         "@adatechnology/products-ui": "0.1.0-rc.1",
         "@tanstack/react-query": "^5.62.7",
         "lucide-react": "^0.468.0",
@@ -72,7 +72,7 @@
     },
   },
   "packages": {
-    "@adatechnology/conversations-ui": ["@adatechnology/conversations-ui@0.1.0-rc.26", "", { "dependencies": { "@adatechnology/meta-whatsapp-contracts": "0.2.0-rc.10", "clsx": "^2.1.1", "lucide-react": "^1.21.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "@xyflow/react": "^12", "react": "^18 || ^19", "react-dom": "^18 || ^19" }, "optionalPeers": ["@xyflow/react"] }, "sha512-7Qcuxv7/6x3LHTdIcl4Yu+2NZ33wyKa5B6rEUzufrTyYmrphMp7pasZcSmbx4os9c8dqBBNJzSuGoW//Z4gXGg=="],
+    "@adatechnology/conversations-ui": ["@adatechnology/conversations-ui@0.1.0-rc.27", "", { "dependencies": { "@adatechnology/meta-whatsapp-contracts": "0.2.0-rc.10", "clsx": "^2.1.1", "lucide-react": "^1.21.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "@xyflow/react": "^12", "react": "^18 || ^19", "react-dom": "^18 || ^19" }, "optionalPeers": ["@xyflow/react"] }, "sha512-epbVOguCT/ue7g1OOM2tdIO3Z77zBG7TZOq77eWDXIxroYsAUbOvJkWGpzb0CoMusZUxVk8B5k9NWhF4BqX18A=="],
 
     "@adatechnology/meta-graph-core": ["@adatechnology/meta-graph-core@0.2.0-rc.2", "", { "dependencies": { "zod": "^3.24.1" } }, "sha512-IW2EeIBAFTflhOCiePp2LlrhLsA/2bW76ZUD8G0HSHbh0VFVLQnCXLrEiSiV3KFmNgyyQSn3PkGbCFnUnYoYpA=="],
 
