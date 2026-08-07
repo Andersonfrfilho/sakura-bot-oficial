@@ -231,15 +231,6 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
 
   const isConversationPreviewEnabled = process.env.CONVERSATION_PREVIEW_ENABLED === 'true'
 
-  // Uma instância do módulo por estabelecimento: os eventos que ele emite não carregam tenant.
-  const metaWhatsAppModules = createMetaWhatsAppModuleRegistry({
-    db,
-    cache,
-    webSocketHub: wsHub,
-    objectStorage: objectStorage?.forModule,
-    previewMediaEnabled: isConversationPreviewEnabled,
-  })
-
   // Shared repos
   const userRepository = new DrizzleUserRepository(db)
 
@@ -253,6 +244,22 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   // Shared use cases
   const findOrCreateCustomerUseCase = new FindOrCreateCustomerUseCase(db)
   const createAuditLogUseCase = new CreateAuditLogUseCase(db)
+
+  // Config/pedido usados tanto pelas rotas de Order Hub quanto pela ação de handover do bot
+  // (flow engine) — montados aqui, antes do registry do WhatsApp, para serem injetados nele.
+  const botConfigRepository = new BotConfigRepository(db)
+  const calculateDeliveryFeeUseCase = new CalculateDeliveryFeeUseCase(botConfigRepository, new NominatimProvider())
+  const createOrderUseCase = new CreateOrderUseCase(db, wsHub, calculateDeliveryFeeUseCase)
+
+  // Uma instância do módulo por estabelecimento: os eventos que ele emite não carregam tenant.
+  const metaWhatsAppModules = createMetaWhatsAppModuleRegistry({
+    db,
+    cache,
+    webSocketHub: wsHub,
+    objectStorage: objectStorage?.forModule,
+    previewMediaEnabled: isConversationPreviewEnabled,
+    botEngineFlowActions: { botConfigRepository, createOrderUseCase, findOrCreateCustomerUseCase },
+  })
 
   // Products / Catalog
   // A ordem do array é a ordem de tentativa do fallback. Provider fiscal (T4.2) entra
@@ -278,9 +285,6 @@ export function buildContainer(wsHub: WebSocketHub): AppContainer {
   const updateOrderStatusUseCase = new UpdateOrderStatusUseCase(db, wsHub, triggerFiscalEmissionUseCase, deductStockForOrderUseCase)
 
   // Orders
-  const botConfigRepository = new BotConfigRepository(db)
-  const calculateDeliveryFeeUseCase = new CalculateDeliveryFeeUseCase(botConfigRepository, new NominatimProvider())
-  const createOrderUseCase = new CreateOrderUseCase(db, wsHub, calculateDeliveryFeeUseCase)
   const updateOrderNotesUseCase = new UpdateOrderNotesUseCase(db)
   const getOrderUseCase = new GetOrderUseCase(db)
   const listOrdersUseCase = new ListOrdersUseCase(db)

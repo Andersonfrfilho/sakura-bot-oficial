@@ -19,6 +19,7 @@ import {
   verifyWebhookChallenge,
 } from '@adatechnology/meta-whatsapp-module'
 import type { ObjectStorageInterface } from '@adatechnology/meta-whatsapp-contracts'
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import type { CacheProvider } from '@/shared/providers/CacheProvider'
 import type { WebSocketHub } from '@/infra/websocket/WebSocketHub'
 import {
@@ -27,6 +28,14 @@ import {
 } from '@/infra/queue/conversationDocumentsQueue'
 import { CONVERSATION_DOCUMENTS_JOB } from '@/infra/queue/QueueNames.constant'
 import { createConversationRealtimeNotifier } from '../realtime/ConversationRealtimeNotifier'
+import type * as schema from '@/infra/database/schema'
+import type { BotConfigRepository } from '@/infra/database/BotConfigRepository'
+import type { CreateOrderUseCase } from '@/modules/orders/application/use-cases/CreateOrderUseCase'
+import type { FindOrCreateCustomerUseCase } from '@/modules/customers/application/use-cases/FindOrCreateCustomerUseCase'
+import { DrizzleBotEngineSessionRepository } from '../../bot-engine/flow-actions/BotEngineSessionRepository'
+import { DrizzleBotEngineDataLoader } from '../../bot-engine/flow-actions/BotEngineDataLoader'
+import { BotEngineResultPersister } from '../../bot-engine/flow-actions/persistBotEngineResult'
+import { registerSakuraBotFlowActions } from '../../bot-engine/flow-actions/registerSakuraBotFlowActions'
 
 const NONCE_VALUE = '1'
 
@@ -45,6 +54,16 @@ interface MetaWhatsAppModuleRegistryParams {
    * onde o simulador já está habilitado.
    */
   readonly previewMediaEnabled?: boolean | undefined
+  /**
+   * Dependências da ação de handover do bot (Fase 1, Passo 2 da migração n8n → SDK). O grafo
+   * ainda não existe (Fase 2) e o webhook da Meta continua no n8n (Fase 3) — registrar a ação
+   * aqui só a deixa pronta para quando o grafo passar a chamá-la.
+   */
+  readonly botEngineFlowActions: {
+    readonly botConfigRepository: BotConfigRepository
+    readonly createOrderUseCase: CreateOrderUseCase
+    readonly findOrCreateCustomerUseCase: FindOrCreateCustomerUseCase
+  }
 }
 
 export interface MetaWhatsAppModuleRegistry {
@@ -125,6 +144,31 @@ export function createMetaWhatsAppModuleRegistry(
             }
           : {}),
       })
+
+      if (instance.flows) {
+        // `params.db` chega tipado como `MetaWhatsAppDatabase` (o SDK não conhece nosso schema) —
+        // é o MESMO objeto `NodePgDatabase<typeof schema>` que o container monta em
+        // `@/infra/database/connection`, então o cast é seguro.
+        const sakuraDb = params.db as unknown as NodePgDatabase<typeof schema>
+        const sessionRepository = new DrizzleBotEngineSessionRepository(sakuraDb)
+        const dataLoader = new DrizzleBotEngineDataLoader(
+          sakuraDb,
+          params.botEngineFlowActions.botConfigRepository,
+          sessionRepository,
+          params.botEngineFlowActions.findOrCreateCustomerUseCase
+        )
+        const resultPersister = new BotEngineResultPersister(
+          sakuraDb,
+          sessionRepository,
+          params.botEngineFlowActions.createOrderUseCase
+        )
+
+        registerSakuraBotFlowActions({
+          registerFlowAction: instance.flows.registerFlowAction,
+          dataLoader,
+          resultPersister,
+        })
+      }
 
       instances.set(establishmentId, instance)
       return instance
