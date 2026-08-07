@@ -1,8 +1,8 @@
-import uWS from 'uWebSockets.js'
 import { readFileSync, existsSync } from 'fs'
 import { extname, join } from 'path'
-import { Router, writeCorsAndSecurityHeaders } from './router'
-import { WebSocketHub } from '@/infra/websocket/WebSocketHub'
+import type { ServerWebSocket, Server } from 'bun'
+import { Router, corsAndSecurityHeaders, type ParsedRequest, type ResponseHelper } from './router'
+import { WebSocketHub, type WsClientData } from '@/infra/websocket/WebSocketHub'
 import { buildContainer } from '@/infra/container'
 import { checkDatabaseConnection, runMigrations } from '@/infra/database/connection'
 import { checkRedisConnection } from '@/infra/redis/connection'
@@ -50,14 +50,20 @@ function renderDocs(): string {
   return SCALAR_TEMPLATE.replace('__OPENAPI_SPEC__', JSON.stringify(spec))
 }
 
+function notFoundResponse(origin: string): Response {
+  const body = JSON.stringify({ error: 'not_found', message: 'Route not found' })
+  const headers = corsAndSecurityHeaders(origin)
+  headers.set('Content-Type', 'application/json')
+  return new Response(body, { status: 404, headers })
+}
+
 export async function createServer() {
   await checkDatabaseConnection()
   await runMigrations()
   await checkRedisConnection()
 
-  const app = uWS.App()
-  const router = new Router(app)
-  const wsHub = new WebSocketHub(app, new RedisProvider())
+  const router = new Router()
+  const wsHub = new WebSocketHub(new RedisProvider())
   const container = buildContainer(wsHub)
 
   // Graceful shutdown: drain workers before exiting
@@ -83,50 +89,8 @@ export async function createServer() {
     process.on('SIGINT', shutdownWorkers)
   }
 
-  // CORS pre-flight
-  app.options('/*', (res, req) => {
-    const origin = req.getHeader('origin')
-    res.cork(() => {
-      if (ALLOWED_ORIGINS.includes(origin)) {
-        res
-          .writeStatus('204 No Content')
-          .writeHeader('Access-Control-Allow-Origin', origin)
-          .writeHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
-          .writeHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-          .writeHeader('Access-Control-Max-Age', '86400')
-          .end()
-      } else {
-        res.writeStatus('403 Forbidden').end()
-      }
-    })
-  })
-
-  // Health check
-  router.get('/health', async (_request, response) => {
+  router.get('/health', async (_request: ParsedRequest, response: ResponseHelper) => {
     response.json({ status: 'ok', timestamp: new Date().toISOString(), env: NODE_ENV })
-  })
-
-  // OpenAPI spec (JSON) + CORS
-  app.get('/api/openapi.json', (res, req) => {
-    const origin = req.getHeader('origin')
-    const spec = generateOpenAPISpec()
-    const body = JSON.stringify(spec)
-    res.cork(() => {
-      res.writeStatus('200 OK')
-        .writeHeader('Content-Type', 'application/json; charset=utf-8')
-        .writeHeader('Access-Control-Allow-Origin', '*')
-        .end(body)
-    })
-  })
-
-  // Scalar API docs (HTML) — spec injetado inline (zero fetch)
-  app.get('/docs', (res) => {
-    const html = renderDocs()
-    res.cork(() => {
-      res.writeStatus('200 OK')
-        .writeHeader('Content-Type', 'text/html; charset=utf-8')
-        .end(html)
-    })
   })
 
   // Register all module routes
@@ -160,7 +124,6 @@ export async function createServer() {
   registerExpenseRoutes(router, container.expenseController)
   registerUploadRoutes(router, container.uploadController)
 
-  // Serve uploaded files (public)
   const storageProvider = new LocalStorageProvider()
   const CACHEABLE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.ico', '.css', '.js', '.woff2'])
 
@@ -179,63 +142,95 @@ export async function createServer() {
     '.js': 'application/javascript',
   }
 
-  app.get('/uploads/:key', (res, req) => {
-    const key = req.getParameter(0)
-    if (!key) {
-      res.cork(() => {
-        res.writeStatus('404 Not Found').end('File not found')
-      })
-      return
-    }
-
+  function serveUpload(key: string): Response {
     const filePath = storageProvider.getFilePath(key)
-
     if (!existsSync(filePath)) {
-      res.cork(() => {
-        res.writeStatus('404 Not Found').end('File not found')
-      })
-      return
+      return new Response('File not found', { status: 404 })
     }
 
     const extension = extname(key).toLowerCase()
     const contentType = MIME_TYPES[extension] ?? 'application/octet-stream'
-
     const buffer = readFileSync(filePath)
-    res.cork(() => {
-      res.writeStatus('200 OK')
-      res.writeHeader('Content-Type', contentType)
-      if (CACHEABLE_EXTENSIONS.has(extension)) {
-        res.writeHeader('Cache-Control', 'public, max-age=31536000, immutable')
-      }
-      res.end(buffer)
-    })
-  })
+    const headers = new Headers({ 'Content-Type': contentType })
+    if (CACHEABLE_EXTENSIONS.has(extension)) {
+      headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+    }
+    return new Response(buffer, { status: 200, headers })
+  }
 
-  // Rota coringa, registrada por último. Sem ela o uWS responde com o próprio
-  // 404 "File Not Found", sem Content-Type e sem CORS — no browser isso vira
-  // "Failed to fetch", e o cliente não consegue distinguir rota inexistente de
-  // API fora do ar.
-  app.any('/*', (res, req) => {
-    const origin = req.getHeader('origin')
-    const body = JSON.stringify({ error: 'not_found', message: 'Route not found' })
-    res.cork(() => {
-      res.writeStatus('404 Not Found')
-      res.writeHeader('Content-Type', 'application/json')
-      writeCorsAndSecurityHeaders(res, origin)
-      res.end(body)
+  function handleCorsPreflight(origin: string): Response {
+    if (!ALLOWED_ORIGINS.includes(origin)) {
+      return new Response(null, { status: 403 })
+    }
+    const headers = new Headers({
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
     })
-  })
+    return new Response(null, { status: 204, headers })
+  }
+
+  async function fetch(request: Request, server: Server<WsClientData>): Promise<Response | undefined> {
+    const url = new URL(request.url)
+    const origin = request.headers.get('origin') ?? ''
+
+    if (request.method === 'OPTIONS') {
+      return handleCorsPreflight(origin)
+    }
+
+    if (url.pathname === '/ws') {
+      const upgraded = server.upgrade(request, { data: wsHub.createClientData() })
+      if (upgraded) return undefined
+      return new Response('WebSocket upgrade failed', { status: 400 })
+    }
+
+    if (url.pathname === '/api/openapi.json') {
+      const spec = generateOpenAPISpec()
+      const headers = new Headers({
+        'Content-Type': 'application/json; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+      })
+      return new Response(JSON.stringify(spec), { status: 200, headers })
+    }
+
+    if (url.pathname === '/docs') {
+      const headers = new Headers({ 'Content-Type': 'text/html; charset=utf-8' })
+      return new Response(renderDocs(), { status: 200, headers })
+    }
+
+    if (url.pathname.startsWith('/uploads/')) {
+      const key = url.pathname.slice('/uploads/'.length)
+      if (!key) return new Response('File not found', { status: 404 })
+      return serveUpload(key)
+    }
+
+    const routed = await router.handle(request)
+    if (routed) return routed
+
+    // Sem esta rota, respostas 404 chegariam sem Content-Type e sem CORS — no browser
+    // isso vira "Failed to fetch", e o cliente não distingue rota inexistente de API fora do ar.
+    return notFoundResponse(origin)
+  }
 
   return {
     listen() {
-      app.listen(PORT, (token) => {
-        if (token) {
-          console.log(`[API] Listening on port ${PORT} [${NODE_ENV}]`)
-        } else {
-          console.error(`[API] Failed to listen on port ${PORT}`)
-          process.exit(1)
-        }
+      const server = Bun.serve<WsClientData>({
+        port: PORT,
+        fetch,
+        websocket: {
+          open(ws: ServerWebSocket<WsClientData>) {
+            wsHub.open(ws)
+          },
+          message(ws: ServerWebSocket<WsClientData>, message: string | Buffer) {
+            void wsHub.message(ws, message)
+          },
+          close(ws: ServerWebSocket<WsClientData>) {
+            wsHub.close(ws)
+          },
+        },
       })
+      console.log(`[API] Listening on port ${server.port} [${NODE_ENV}]`)
     },
   }
 }

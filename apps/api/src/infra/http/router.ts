@@ -1,5 +1,4 @@
 import { randomUUID } from 'crypto'
-import type { TemplatedApp, HttpResponse, HttpRequest } from 'uWebSockets.js'
 import type { AuthenticatedUser } from '@/shared/types'
 import { MetaWhatsAppError } from '@adatechnology/meta-whatsapp-contracts'
 import { AppError } from '@/shared/errors/AppError'
@@ -32,73 +31,7 @@ export type Middleware = (
 
 export type RouteHandler = (request: ParsedRequest, response: ResponseHelper) => Promise<void>
 
-const HTTP_STATUS: Record<number, string> = {
-  200: '200 OK',
-  201: '201 Created',
-  204: '204 No Content',
-  400: '400 Bad Request',
-  401: '401 Unauthorized',
-  403: '403 Forbidden',
-  404: '404 Not Found',
-  409: '409 Conflict',
-  422: '422 Unprocessable Entity',
-  423: '423 Locked',
-  429: '429 Too Many Requests',
-  500: '500 Internal Server Error',
-  503: '503 Service Unavailable',
-}
-
 const METHODS_WITH_BODY = new Set(['POST', 'PUT', 'PATCH'])
-
-function extractParamNames(pattern: string): string[] {
-  const matches = pattern.match(/:([^/]+)/g) ?? []
-  return matches.map((match) => match.slice(1))
-}
-
-function parseQueryString(raw: string): Record<string, string> {
-  const result: Record<string, string> = {}
-  if (!raw) return result
-  try {
-    new URLSearchParams(raw).forEach((value, key) => {
-      result[key] = value
-    })
-  } catch {
-    // malformed query string
-  }
-  return result
-}
-
-function setupBodyReader(
-  uwsResponse: HttpResponse,
-  hasBody: boolean
-): { bodyPromise: Promise<Buffer>; isAborted: () => boolean } {
-  let aborted = false
-  let resolveBody!: (value: Buffer) => void
-  let rejectBody!: (reason: unknown) => void
-
-  const bodyPromise = new Promise<Buffer>((resolve, reject) => {
-    resolveBody = resolve
-    rejectBody = reject
-  })
-
-  // onAborted must be set synchronously
-  uwsResponse.onAborted(() => {
-    aborted = true
-    rejectBody(new Error('Request aborted'))
-  })
-
-  if (hasBody) {
-    const chunks: Buffer[] = []
-    uwsResponse.onData((chunk: ArrayBuffer, isLast: boolean) => {
-      chunks.push(Buffer.from(chunk))
-      if (isLast) resolveBody(Buffer.concat(chunks))
-    })
-  } else {
-    resolveBody(Buffer.alloc(0))
-  }
-
-  return { bodyPromise, isAborted: () => aborted }
-}
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? 'http://localhost:5173').split(',')
 
@@ -108,28 +41,50 @@ const SECURITY_HEADERS: Array<[string, string]> = [
   ['X-XSS-Protection', '0'],
 ]
 
-export function writeCorsAndSecurityHeaders(uwsResponse: HttpResponse, origin: string): void {
+export function corsAndSecurityHeaders(origin: string): Headers {
+  const headers = new Headers()
   if (ALLOWED_ORIGINS.includes(origin)) {
-    uwsResponse.writeHeader('Access-Control-Allow-Origin', origin)
+    headers.set('Access-Control-Allow-Origin', origin)
   }
   for (const [name, value] of SECURITY_HEADERS) {
-    uwsResponse.writeHeader(name, value)
+    headers.set(name, value)
   }
+  return headers
+}
+
+function extractParamNames(pattern: string): string[] {
+  const matches = pattern.match(/:([^/]+)/g) ?? []
+  return matches.map((match) => match.slice(1))
+}
+
+function compilePattern(pattern: string): RegExp {
+  const escaped = pattern
+    .split('/')
+    .map((segment) =>
+      segment.startsWith(':') ? '([^/]+)' : segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    )
+    .join('/')
+  return new RegExp(`^${escaped}$`)
 }
 
 function buildResponseHelper(
-  uwsResponse: HttpResponse,
-  isAborted: () => boolean,
-  origin: string
+  origin: string,
+  requestId: string,
+  resolve: (response: Response) => void
 ): ResponseHelper {
   let sent = false
-  const reqId = randomUUID()
 
-  function writeCommonHeaders(status: string): void {
-    uwsResponse.writeStatus(status)
-    uwsResponse.writeHeader('Content-Type', 'application/json')
-    uwsResponse.writeHeader('X-Request-Id', reqId)
-    writeCorsAndSecurityHeaders(uwsResponse, origin)
+  function buildHeaders(
+    contentType: string,
+    extraHeaders?: Record<string, string>
+  ): Headers {
+    const headers = corsAndSecurityHeaders(origin)
+    headers.set('Content-Type', contentType)
+    headers.set('X-Request-Id', requestId)
+    if (extraHeaders) {
+      for (const [name, value] of Object.entries(extraHeaders)) headers.set(name, value)
+    }
+    return headers
   }
 
   return {
@@ -138,44 +93,33 @@ function buildResponseHelper(
     },
 
     get requestId() {
-      return reqId
+      return requestId
     },
 
     json(data: unknown, statusCode = 200): void {
-      if (sent || isAborted()) return
+      if (sent) return
       sent = true
-      const body = JSON.stringify(data)
-      uwsResponse.cork(() => {
-        writeCommonHeaders(HTTP_STATUS[statusCode] ?? String(statusCode))
-        uwsResponse.end(body)
-      })
+      const headers = buildHeaders('application/json')
+      resolve(new Response(JSON.stringify(data), { status: statusCode, headers }))
     },
 
     error(code: string, message: string, statusCode = 500, details?: unknown): void {
-      if (sent || isAborted()) return
+      if (sent) return
       sent = true
       const payload: Record<string, unknown> = { error: code, message }
       if (details !== undefined) payload.details = details
-      const body = JSON.stringify(payload)
-      uwsResponse.cork(() => {
-        writeCommonHeaders(HTTP_STATUS[statusCode] ?? String(statusCode))
-        uwsResponse.end(body)
-      })
+      const headers = buildHeaders('application/json')
+      resolve(new Response(JSON.stringify(payload), { status: statusCode, headers }))
     },
 
     binary(body: Buffer, contentType: string, fileName?: string, statusCode = 200): void {
-      if (sent || isAborted()) return
+      if (sent) return
       sent = true
-      uwsResponse.cork(() => {
-        uwsResponse.writeStatus(HTTP_STATUS[statusCode] ?? String(statusCode))
-        uwsResponse.writeHeader('Content-Type', contentType)
-        if (fileName) {
-          uwsResponse.writeHeader('Content-Disposition', `attachment; filename="${fileName}"`)
-        }
-        uwsResponse.writeHeader('X-Request-Id', reqId)
-        writeCorsAndSecurityHeaders(uwsResponse, origin)
-        uwsResponse.end(body)
-      })
+      const extraHeaders = fileName
+        ? { 'Content-Disposition': `attachment; filename="${fileName}"` }
+        : undefined
+      const headers = buildHeaders(contentType, extraHeaders)
+      resolve(new Response(body, { status: statusCode, headers }))
     },
   }
 }
@@ -190,7 +134,9 @@ async function runMiddlewareChain(
 
   async function next(): Promise<void> {
     if (index < middlewares.length) {
-      const middleware = middlewares[index++]
+      const middleware = middlewares[index]
+      index += 1
+      if (!middleware) return
       await middleware(request, response, next)
     } else {
       await handler(request, response)
@@ -200,48 +146,77 @@ async function runMiddlewareChain(
   await next()
 }
 
-type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'del' | 'options' | 'head'
+interface RouteEntry {
+  method: string
+  regex: RegExp
+  paramNames: string[]
+  middlewares: Middleware[]
+  handler: RouteHandler
+}
 
 export class Router {
-  private readonly app: TemplatedApp
-
-  constructor(app: TemplatedApp) {
-    this.app = app
-  }
+  private readonly routes: RouteEntry[] = []
 
   private register(
-    method: HttpMethod,
+    method: string,
     pattern: string,
     middlewares: Middleware[],
     handler: RouteHandler
   ): void {
-    const paramNames = extractParamNames(pattern)
+    this.routes.push({
+      method,
+      regex: compilePattern(pattern),
+      paramNames: extractParamNames(pattern),
+      middlewares,
+      handler,
+    })
+  }
 
-    this.app[method](pattern, (uwsResponse: HttpResponse, uwsRequest: HttpRequest) => {
-      // Extract ALL sync data from uwsRequest before any async operation —
-      // uWS invalidates HttpRequest after the synchronous handler returns
-      const url = uwsRequest.getUrl()
-      const query = uwsRequest.getQuery()
-      const httpMethod = uwsRequest.getMethod().toUpperCase()
-      const headers: Record<string, string> = {}
-      uwsRequest.forEach((key: string, value: string) => {
-        headers[key] = value
-      })
+  private matchRoute(
+    method: string,
+    pathname: string
+  ): { route: RouteEntry; params: Record<string, string> } | undefined {
+    for (const route of this.routes) {
+      if (route.method !== method) continue
+      const match = route.regex.exec(pathname)
+      if (!match) continue
       const params: Record<string, string> = {}
-      paramNames.forEach((name, index) => {
-        params[name] = uwsRequest.getParameter(index)
+      route.paramNames.forEach((name, index) => {
+        params[name] = decodeURIComponent(match[index + 1] ?? '')
       })
+      return { route, params }
+    }
+    return undefined
+  }
 
-      const hasBody = METHODS_WITH_BODY.has(httpMethod)
-      const origin = headers['origin'] ?? ''
-      const { bodyPromise, isAborted } = setupBodyReader(uwsResponse, hasBody)
-      const response = buildResponseHelper(uwsResponse, isAborted, origin)
+  // Returns undefined when no registered route matches — caller falls through to its own 404.
+  async handle(request: Request): Promise<Response | undefined> {
+    const url = new URL(request.url)
+    const httpMethod = request.method.toUpperCase()
+    const origin = request.headers.get('origin') ?? ''
 
-      bodyPromise
-        .then((rawBody) => {
-          if (isAborted()) return
+    const matched = this.matchRoute(httpMethod, url.pathname)
+    if (!matched) return undefined
 
-          let body: unknown = undefined
+    const { route, params } = matched
+    const headers: Record<string, string> = {}
+    request.headers.forEach((value, key) => {
+      headers[key] = value
+    })
+
+    return new Promise<Response>((resolve) => {
+      const response = buildResponseHelper(origin, randomUUID(), resolve)
+
+      void (async () => {
+        let rawBody = Buffer.alloc(0)
+        let body: unknown = undefined
+
+        if (METHODS_WITH_BODY.has(httpMethod)) {
+          try {
+            rawBody = Buffer.from(await request.arrayBuffer())
+          } catch {
+            return // request aborted before body finished
+          }
           if (rawBody.length > 0) {
             const contentType = headers['content-type'] ?? ''
             if (contentType.includes('application/json')) {
@@ -253,35 +228,35 @@ export class Router {
               }
             }
           }
+        }
 
-          const request: ParsedRequest = {
-            method: httpMethod,
-            url,
-            params,
-            query: parseQueryString(query),
-            headers,
-            body,
-            rawBody,
+        const parsedRequest: ParsedRequest = {
+          method: httpMethod,
+          url: url.pathname,
+          params,
+          query: Object.fromEntries(url.searchParams),
+          headers,
+          body,
+          rawBody,
+        }
+
+        try {
+          await runMiddlewareChain(route.middlewares, route.handler, parsedRequest, response)
+        } catch (error) {
+          if (response.sent) return
+          if (error instanceof AppError) {
+            response.error(error.code, error.message, error.statusCode, error.details)
+          } else if (error instanceof MetaWhatsAppError) {
+            // O módulo tem a própria hierarquia e já carrega status e código estáveis; sem esta
+            // ponte, assinatura inválida e janela de 24h expirada viravam 500 `internal_error`.
+            response.error(error.code, error.message, error.statusCode, error.details)
+          } else {
+            const message =
+              error instanceof Error ? error.message : 'An unexpected error occurred'
+            response.error('internal_error', message, 500)
           }
-
-          runMiddlewareChain(middlewares, handler, request, response).catch((error: unknown) => {
-            if (response.sent || isAborted()) return
-            if (error instanceof AppError) {
-              response.error(error.code, error.message, error.statusCode, error.details)
-            } else if (error instanceof MetaWhatsAppError) {
-              // O módulo tem a própria hierarquia e já carrega status e código estáveis; sem esta
-              // ponte, assinatura inválida e janela de 24h expirada viravam 500 `internal_error`.
-              response.error(error.code, error.message, error.statusCode, error.details)
-            } else {
-              const message =
-                error instanceof Error ? error.message : 'An unexpected error occurred'
-              response.error('internal_error', message, 500)
-            }
-          })
-        })
-        .catch(() => {
-          // Body read failed (request aborted before body was complete)
-        })
+        }
+      })()
     })
   }
 
@@ -296,36 +271,36 @@ export class Router {
 
   get(pattern: string, ...args: Array<Middleware | RouteHandler>): void {
     const { middlewares, handler } = this.resolveArgs(args)
-    this.register('get', pattern, middlewares, handler)
+    this.register('GET', pattern, middlewares, handler)
   }
 
   post(pattern: string, ...args: Array<Middleware | RouteHandler>): void {
     const { middlewares, handler } = this.resolveArgs(args)
-    this.register('post', pattern, middlewares, handler)
+    this.register('POST', pattern, middlewares, handler)
   }
 
   put(pattern: string, ...args: Array<Middleware | RouteHandler>): void {
     const { middlewares, handler } = this.resolveArgs(args)
-    this.register('put', pattern, middlewares, handler)
+    this.register('PUT', pattern, middlewares, handler)
   }
 
   patch(pattern: string, ...args: Array<Middleware | RouteHandler>): void {
     const { middlewares, handler } = this.resolveArgs(args)
-    this.register('patch', pattern, middlewares, handler)
+    this.register('PATCH', pattern, middlewares, handler)
   }
 
   delete(pattern: string, ...args: Array<Middleware | RouteHandler>): void {
     const { middlewares, handler } = this.resolveArgs(args)
-    this.register('del', pattern, middlewares, handler)
+    this.register('DELETE', pattern, middlewares, handler)
   }
 
   options(pattern: string, ...args: Array<Middleware | RouteHandler>): void {
     const { middlewares, handler } = this.resolveArgs(args)
-    this.register('options', pattern, middlewares, handler)
+    this.register('OPTIONS', pattern, middlewares, handler)
   }
 
   head(pattern: string, ...args: Array<Middleware | RouteHandler>): void {
     const { middlewares, handler } = this.resolveArgs(args)
-    this.register('head', pattern, middlewares, handler)
+    this.register('HEAD', pattern, middlewares, handler)
   }
 }
