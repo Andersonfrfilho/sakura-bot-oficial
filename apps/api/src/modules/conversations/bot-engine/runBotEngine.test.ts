@@ -182,6 +182,81 @@ describe('PaymentHandler', () => {
     expect(result.state).toBe(BotState.AWAITING_MIXED_AMOUNT);
     expect(result.cart.mixed_amount).toBe(0);
   });
+
+  test('escolher a forma no menu misto avança para o valor', async () => {
+    const result = await runBotEngine(buildParams('1', BotState.AWAITING_MIXED_METHOD, {
+      session: { cart: buildCart() },
+    }));
+    expect(result.state).toBe(BotState.AWAITING_MIXED_AMOUNT);
+    expect(result.cart.mixed_method).toBe('pix');
+  });
+
+  test('conta dividida entre 3 pessoas fecha só na terceira, com um pagamento em dinheiro e troco', async () => {
+    const first = await runBotEngine(buildParams('3', BotState.AWAITING_SPLIT_COUNT, {
+      session: { cart: buildCart() },
+    }));
+    expect(first.state).toBe(BotState.AWAITING_SPLIT_PAYMENT);
+    expect(first.cart.split_count).toBe(3);
+    expect(first.cart.split_current).toBe(1);
+
+    const second = await runBotEngine(buildParams('2', BotState.AWAITING_SPLIT_PAYMENT, {
+      session: { cart: { ...buildCart(), split_count: 3, split_current: 1, split_payments: [] } },
+    }));
+    expect(second.save_order).toBe(false);
+    expect(second.cart.split_current).toBe(2);
+
+    const third = await runBotEngine(buildParams('1', BotState.AWAITING_SPLIT_PAYMENT, {
+      session: {
+        cart: {
+          ...buildCart(),
+          split_count: 3,
+          split_current: 2,
+          split_payments: [{ person: 1, label: '📱 Pix', change_for: null }],
+        },
+      },
+    }));
+    expect(third.save_order).toBe(false);
+    expect(third.state).toBe(BotState.AWAITING_SPLIT_CHANGE);
+    expect(third.cart.payment_method).toBe('dinheiro');
+
+    const closing = await runBotEngine(buildParams('40', BotState.AWAITING_SPLIT_CHANGE, {
+      session: {
+        cart: {
+          ...buildCart(),
+          split_count: 3,
+          split_current: 3,
+          payment_method: 'dinheiro',
+          split_payments: [
+            { person: 1, label: '📱 Pix', change_for: null },
+            { person: 2, label: '📱 Pix', change_for: null },
+          ],
+        },
+      },
+    }));
+    expect(closing.save_order).toBe(true);
+    expect(closing.order?.split_count).toBe(3);
+    expect(closing.order?.split_payments).toHaveLength(3);
+    expect(closing.order?.split_payments?.[2]?.change_for).toBe(40);
+  });
+
+  test('troco da divisão menor ou igual à parte por pessoa é rejeitado', async () => {
+    const result = await runBotEngine(buildParams('20', BotState.AWAITING_SPLIT_CHANGE, {
+      session: {
+        cart: {
+          ...buildCart(),
+          split_count: 3,
+          split_current: 3,
+          payment_method: 'dinheiro',
+          split_payments: [
+            { person: 1, label: '📱 Pix', change_for: null },
+            { person: 2, label: '📱 Pix', change_for: null },
+          ],
+        },
+      },
+    }));
+    expect(result.save_order).toBe(false);
+    expect(result.state).toBe(BotState.AWAITING_SPLIT_CHANGE);
+  });
 });
 
 describe('DeliveryHandler', () => {
@@ -328,6 +403,27 @@ describe('ReservationHandler', () => {
     expect(result.reservation_temp).toEqual({});
     expect(result.state).toBe(BotState.START);
   });
+
+  test('mesa já reservada no mesmo horário é pulada em favor da próxima disponível', async () => {
+    const result = await runBotEngine(buildParams('25/12 20:00 4 pessoas', BotState.RESERVING, {
+      restaurant_tables: [...TABLES, { id: 't3', number: 3, capacity: 4 }],
+      upcoming_reservations: [{ date: '2026-12-25', time: '20:00:00', table_id: 't2' }],
+    }));
+
+    expect(result.state).toBe(BotState.CONFIRMING_RESERVATION);
+    expect(result.reservation_temp.table_id).toBe('t3');
+  });
+
+  test('todas as mesas com capacidade já reservadas no horário não avança', async () => {
+    const result = await runBotEngine(buildParams('25/12 20:00 4 pessoas', BotState.RESERVING, {
+      restaurant_tables: TABLES,
+      upcoming_reservations: [{ date: '2026-12-25', time: '20:00:00', table_id: 't2' }],
+    }));
+
+    expect(result.state).toBe(BotState.RESERVING);
+    expect(result.reservation_temp.table_id).toBeUndefined();
+    expect(result.save_reservation).toBe(false);
+  });
 });
 
 describe('OrderingHandler', () => {
@@ -375,6 +471,43 @@ describe('OrderingHandler', () => {
       session: { cart: buildCart() },
     }));
     expect(result.state).toBe(BotState.CONFIRMING);
+  });
+
+  const manyProducts = Array.from({ length: 11 }, (_, index) => ({
+    id: 'm' + (index + 1),
+    name: 'Item ' + (index + 1),
+    price: 10,
+    category: 'Temakis',
+  }));
+
+  test('próxima página avança quando há mais itens além da página atual', async () => {
+    const result = await runBotEngine(buildParams('próxima', BotState.ORDERING_ITEMS, {
+      products: manyProducts,
+      session: { cart: { items: [], browse_category: 'Temakis', browse_page: 0 } },
+    }));
+
+    expect(result.state).toBe(BotState.ORDERING_ITEMS);
+    expect(result.cart.browse_page).toBe(1);
+  });
+
+  test('próxima página na última página volta para a primeira', async () => {
+    const result = await runBotEngine(buildParams('próxima', BotState.ORDERING_ITEMS, {
+      products: manyProducts,
+      session: { cart: { items: [], browse_category: 'Temakis', browse_page: 1 } },
+    }));
+
+    expect(result.state).toBe(BotState.ORDERING_ITEMS);
+    expect(result.cart.browse_page).toBe(1);
+  });
+
+  test('escolher item pelo número exibido na segunda página adiciona o produto correto', async () => {
+    const result = await runBotEngine(buildParams('10', BotState.ORDERING_ITEMS, {
+      products: manyProducts,
+      session: { cart: { items: [], browse_category: 'Temakis', browse_page: 1 } },
+    }));
+
+    expect(result.state).toBe(BotState.AWAITING_QTY);
+    expect(result.cart.pending_item_id).toBe('m10');
   });
 });
 
