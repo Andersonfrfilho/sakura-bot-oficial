@@ -36,6 +36,8 @@ import { DrizzleBotEngineSessionRepository } from '../../bot-engine/flow-actions
 import { DrizzleBotEngineDataLoader } from '../../bot-engine/flow-actions/BotEngineDataLoader'
 import { BotEngineResultPersister } from '../../bot-engine/flow-actions/persistBotEngineResult'
 import { registerSakuraBotFlowActions } from '../../bot-engine/flow-actions/registerSakuraBotFlowActions'
+import { SakuraBotFlowDriver } from '../../bot-engine/flow-actions/SakuraBotFlowDriver'
+import { SAKURA_BOT_FLOW_SEED } from '../../bot-engine/flow-actions/SakuraBotFlow.seed'
 
 const NONCE_VALUE = '1'
 
@@ -87,6 +89,23 @@ function toNonceStore(cache: CacheProvider): NonceStoreInterface {
   }
 }
 
+/**
+ * Cria o grafo do bot do sakura na primeira vez que o estabelecimento é atendido. Nunca sobrescreve
+ * um grafo já gravado — depois de criado, o grafo é editável pelo painel (`WhatsAppSettingsController`).
+ */
+async function seedSakuraBotFlow(flows: NonNullable<MetaWhatsAppModule['flows']>, establishmentId: string): Promise<void> {
+  const existing = await flows.get.execute({ companyId: establishmentId, key: SAKURA_BOT_FLOW_SEED.key })
+  if (existing) return
+
+  await flows.create.execute({
+    companyId: establishmentId,
+    key: SAKURA_BOT_FLOW_SEED.key,
+    label: SAKURA_BOT_FLOW_SEED.label,
+    startNodeId: SAKURA_BOT_FLOW_SEED.startNodeId,
+    nodes: SAKURA_BOT_FLOW_SEED.nodes,
+  })
+}
+
 export function createMetaWhatsAppModuleRegistry(
   params: MetaWhatsAppModuleRegistryParams
 ): MetaWhatsAppModuleRegistry {
@@ -109,6 +128,12 @@ export function createMetaWhatsAppModuleRegistry(
       const cached = instances.get(establishmentId)
       if (cached) return cached
 
+      // Referência preenchida DEPOIS que `instance` existe (abaixo). O hook só é chamado pelo
+      // módulo quando uma mensagem chega — muito depois deste `createMetaWhatsAppModule` retornar
+      // — então o forward-ref é seguro: por construção, `instanceRef` já está setado no primeiro
+      // uso real.
+      let instanceRef: MetaWhatsAppModule | undefined
+
       const instance = createMetaWhatsAppModule({
         db: params.db,
         config,
@@ -122,11 +147,34 @@ export function createMetaWhatsAppModuleRegistry(
           realtime: createConversationRealtimeNotifier(params.webSocketHub, establishmentId),
           ...(params.objectStorage ? { objectStorage: params.objectStorage } : {}),
         },
-        // Hook próprio, e não `onMessageReceived`: aquele não roda em atendimento humano, que é
-        // justamente quando o cliente manda comprovante para o atendente.
-        ...(params.objectStorage
-          ? {
-              hooks: {
+        hooks: {
+          // Ponte do grafo do bot (Fase 2 da migração n8n → SDK) — ver `SakuraBotFlowDriver.ts`
+          // para o porquê de o módulo não rodar o interpretador sozinho.
+          onMessageReceived: async (message, session) => {
+            const flows = instanceRef?.flows
+            if (!flows) return { outcome: 'continue' }
+
+            const driver = new SakuraBotFlowDriver({
+              interpreter: flows.interpreter,
+              sessionRepository: instanceRef!.conversations.repository,
+              loadFlow: (key) => flows.get.execute({ companyId: establishmentId, key }),
+              defaultFlowKey: SAKURA_BOT_FLOW_SEED.key,
+            })
+
+            const result = await driver.handleInbound({
+              companyId: establishmentId,
+              whatsappNumber: message.from,
+              text: message.text?.body ?? '',
+              session,
+              channel: instanceRef!.channel,
+            })
+
+            return { outcome: result.handled ? 'handled' : 'continue' }
+          },
+          // Hook próprio, e não parte de `onMessageReceived`: aquele não roda em atendimento
+          // humano, que é justamente quando o cliente manda comprovante para o atendente.
+          ...(params.objectStorage
+            ? {
                 onMediaReceived: async (media): Promise<void> => {
                   await conversationDocumentsQueue.add(
                     CONVERSATION_DOCUMENTS_JOB.INGEST_INBOUND_MEDIA,
@@ -140,10 +188,11 @@ export function createMetaWhatsAppModuleRegistry(
                     { jobId: inboundMediaJobId(media.companyId, media.sourceMediaId) }
                   )
                 },
-              },
-            }
-          : {}),
+              }
+            : {}),
+        },
       })
+      instanceRef = instance
 
       if (instance.flows) {
         // `params.db` chega tipado como `MetaWhatsAppDatabase` (o SDK não conhece nosso schema) —
@@ -167,6 +216,16 @@ export function createMetaWhatsAppModuleRegistry(
           registerFlowAction: instance.flows.registerFlowAction,
           dataLoader,
           resultPersister,
+        })
+
+        // Disparo assíncrono, não aguardado: `forEstablishment` é síncrono (a instância é
+        // memoizada e devolvida na hora) e mudar isso reabriria todos os ~30 call sites que
+        // chamam `forEstablishment(...)` direto. Sem risco hoje — o webhook real da Meta continua
+        // no n8n até a Fase 3, o único consumidor do grafo é o simulador de conversa, que roda bem
+        // depois do boot. Na Fase 3 (corte), confirmar em staging que o grafo já existe (chamando
+        // `forEstablishment` uma vez por estabelecimento) antes de reapontar o webhook da Meta.
+        void seedSakuraBotFlow(instance.flows, establishmentId).catch((error: unknown) => {
+          console.error('[MetaWhatsAppModule] falha ao semear o grafo do bot do sakura', establishmentId, error)
         })
       }
 
