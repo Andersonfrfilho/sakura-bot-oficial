@@ -10,6 +10,7 @@ import { CreateOrderPage } from '@/pages/orders/CreateOrderPage'
 import { ConversationsPage } from '@/pages/conversations/ConversationsPage'
 import { DocumentsPage } from '@/pages/conversations/DocumentsPage'
 import { MessagesPage } from '@/pages/messages/MessagesPage'
+import { FlowsPage } from '@/pages/flows/FlowsPage'
 import { CustomersPage } from '@/pages/customers/CustomersPage'
 import { TablesPage } from '@/pages/tables/TablesPage'
 import { StaffPage } from '@/pages/staff/StaffPage'
@@ -130,6 +131,14 @@ export default function App() {
             element={
               <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}>
                 <MessagesPage />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/flows"
+            element={
+              <RoleGuard allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                <FlowsPage />
               </RoleGuard>
             }
           />

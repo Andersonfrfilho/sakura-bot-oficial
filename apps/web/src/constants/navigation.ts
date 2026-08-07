@@ -17,6 +17,7 @@ import {
   UsersRound,
   UtensilsCrossed,
   Wallet,
+  Workflow,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -64,6 +65,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { to: '/conversations', label: 'Conversas', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.ATTENDANT], icon: MessageCircle },
       { to: '/documents', label: 'Documentos', roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.ATTENDANT], icon: FolderOpen },
       { to: '/messages', label: 'Mensagens', roles: [ROLES.ADMIN, ROLES.MANAGER], icon: Send },
+      { to: '/flows', label: 'Fluxo do bot', roles: [ROLES.ADMIN, ROLES.MANAGER], icon: Workflow },
       { to: '/customers', label: 'Clientes', roles: [ROLES.ADMIN, ROLES.MANAGER], icon: Users },
     ],
   },

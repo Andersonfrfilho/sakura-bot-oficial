@@ -6,8 +6,9 @@
  * carrega `companyId`. Uma instância única compartilhada entregaria evento de uma conversa para a
  * sala de outro estabelecimento.
  *
- * `flowEngine` fica desligado: neste projeto o bot é o workflow do n8n (`src/*.js` → `make build`),
- * e a API só registra e opera o atendimento humano.
+ * `flowEngine` ligado: início da migração do bot de n8n para o motor de fluxo do SDK (ver plano de
+ * migração). Fase 0 só liga a flag e expõe a tela de fluxos — o grafo real ainda não existe e o n8n
+ * continua sendo quem processa o webhook da Meta até a Fase 3.
  */
 
 import {
@@ -94,7 +95,7 @@ export function createMetaWhatsAppModuleRegistry(
         config,
         nonceStore,
         features: {
-          flowEngine: false,
+          flowEngine: true,
           // Sem storage o flag é ignorado pelo pacote — não há bytes para devolver.
           previewMedia: Boolean(params.previewMediaEnabled && params.objectStorage),
         },
