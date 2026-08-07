@@ -79,8 +79,16 @@ export function registerSakuraBotFlowActions(params: RegisterSakuraBotFlowAction
 
     const result = await runBotEngine({ message, data })
 
-    await sendOutgoingMessages(channel, whatsappNumber, result.respostas)
+    // Persistir primeiro: o estado da conversa é o efeito que importa. Envio ao WhatsApp é
+    // best-effort — falha de rede/token/rate-limit na entrega não pode apagar o turno que a
+    // engine já resolveu, nem derrubar o webhook (a Meta reentrega em 500, duplicando o turno).
     await resultPersister.persist({ establishmentId, whatsappNumber, customerId, result })
+
+    try {
+      await sendOutgoingMessages(channel, whatsappNumber, result.respostas)
+    } catch (error) {
+      console.error('[sakura_bot_handover] falha ao enviar resposta ao WhatsApp', { establishmentId, whatsappNumber, error })
+    }
 
     return { next: node.id, context: { ...context, sakuraBotState: result.state } }
   })
