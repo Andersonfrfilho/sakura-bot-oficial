@@ -8,6 +8,7 @@
  * As rotas e o vocabulário do Order Hub são preservados; o que mudou por baixo é quem executa.
  */
 
+import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import type { MessageRow } from '@adatechnology/meta-whatsapp-module'
 import type { ObjectStorageInterface } from '@adatechnology/meta-whatsapp-contracts'
@@ -72,6 +73,16 @@ const logMessageSchema = z.object({
 
 const requestHumanSchema = z.object({
   establishmentId: z.string().uuid(),
+})
+
+// Base64 infla o binário em ~33%; 20MB cobre folgado qualquer comprovante sem arriscar o processo.
+const MAX_UPLOAD_BASE64_LENGTH = 20_000_000
+
+const uploadDocumentSchema = z.object({
+  filename: z.string().min(1).max(255),
+  mimeType: z.string().min(1),
+  base64: z.string().min(1).max(MAX_UPLOAD_BASE64_LENGTH),
+  whatsappNumber: z.string().min(1),
 })
 
 function boundedInteger(raw: string | undefined, fallback: number, max: number): number {
@@ -305,6 +316,47 @@ export class ConversationController {
       })
 
     response.json(result)
+  }
+
+  /**
+   * Upload manual pra biblioteca, fora do fluxo de webhook. `whatsappNumber` é obrigatório porque
+   * `documentRepository.link` exige um `sessionId` — mesma amarra de mensagem inbound/outbound, só
+   * que aqui é o atendente quem escolhe a que conversa o arquivo pertence.
+   */
+  uploadDocument: RouteHandler = async (request, response) => {
+    const { companyId } = this.tenantOf(request)
+    if (!this.objectStorage) throw new NotFoundError(DOCUMENTS_UNAVAILABLE_MESSAGE)
+
+    const parsed = uploadDocumentSchema.safeParse(request.body)
+    if (!parsed.success) {
+      throw new ValidationError('Validation failed', parsed.error.flatten().fieldErrors)
+    }
+    const { filename, mimeType, base64, whatsappNumber } = parsed.data
+
+    const buffer = Buffer.from(base64, 'base64')
+    const key = `meta-whatsapp/${companyId}/manual/${randomUUID()}`
+    const { uploadId } = await this.objectStorage.upload({ buffer, mimeType, key })
+
+    // `getOrCreate` porque o atendente pode anexar um arquivo antes do cliente mandar a primeira
+    // mensagem — mesma convenção de estado inicial usada no envio manual (`send`/`sendMedia`).
+    const session = await this.modules
+      .forEstablishment(companyId)
+      .conversations.repository.getOrCreate(companyId, whatsappNumber, START_STATE)
+
+    const document = await this.modules
+      .forEstablishment(companyId)
+      .conversations.documentRepository.link({
+        companyId,
+        sessionId: session.id,
+        messageId: null,
+        uploadId,
+        filename,
+        mimeType,
+        sizeBytes: buffer.byteLength,
+        source: 'agent',
+      })
+
+    response.json(document, 201)
   }
 
   /**

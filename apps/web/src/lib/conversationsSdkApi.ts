@@ -8,6 +8,7 @@
 
 import type {
   CompanyDocumentPage,
+  ConversationDocument,
   ConversationDocumentPage,
   ConversationsApi,
   ConversationPage,
@@ -32,6 +33,16 @@ function buildQuery(params: Record<string, string | number | boolean | undefined
   }
   const query = search.toString()
   return query ? `?${query}` : ''
+}
+
+// `readAsDataURL` sempre prefixa com `data:<mime>;base64,` — o backend só quer o conteúdo.
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
 }
 
 interface ApiConversationMessage {
@@ -267,6 +278,22 @@ export const conversationsSdkApi: ConversationsApi = {
       })}`,
       accessToken()
     ),
+
+  // `extra.whatsappNumber` vem do seletor de conversa em `renderFilters`: o backend exige uma
+  // conversa dona do arquivo (é o `sessionId` que `documentRepository.link` pede), então sem o
+  // número escolhido o botão de upload simplesmente não é oferecido pela tela.
+  uploadDocument: async (file, extra) => {
+    const whatsappNumber = extra?.['whatsappNumber']
+    if (typeof whatsappNumber !== 'string' || whatsappNumber.length === 0) {
+      throw new Error('Selecione a conversa de destino antes de enviar o arquivo')
+    }
+    const base64 = await fileToBase64(file)
+    return api.post<ConversationDocument>(
+      '/conversations/documents',
+      { filename: file.name, mimeType: file.type, base64, whatsappNumber },
+      accessToken()
+    )
+  },
 
   // A rota devolve URL assinada e curta; o binário nunca passa pela API — o atendente vai direto
   // ao storage. Por isso o `uploadId` (que é a key do objeto, com barras) precisa ser escapado.
