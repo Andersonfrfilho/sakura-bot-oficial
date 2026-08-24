@@ -9,6 +9,7 @@ export function registerConversationRoutes(router: Router, controller: Conversat
 
   // Antes de `/conversations/:whatsapp/...`: "documents" casaria com o parâmetro de número.
   router.get('/conversations/documents', authenticate, authorize('conversations', 'read'), controller.companyDocuments)
+  router.post('/conversations/documents', authenticate, authorize('conversations', 'write'), controller.uploadDocument)
   router.get('/conversations/documents/:uploadId/url', authenticate, authorize('conversations', 'read'), controller.documentUrl)
   router.get('/conversations/:whatsapp/documents', authenticate, authorize('conversations', 'read'), controller.documents)
 

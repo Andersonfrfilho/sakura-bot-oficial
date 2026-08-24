@@ -12,9 +12,9 @@
       "version": "0.0.1",
       "dependencies": {
         "@adatechnology/fiscal-provider": "file:../../../adatechnology-packages/packages/backend/fiscal-provider",
-        "@adatechnology/meta-whatsapp-contracts": "0.2.0-rc.9",
-        "@adatechnology/meta-whatsapp-module": "0.2.0-rc.18",
-        "@adatechnology/meta-whatsapp-provider": "0.2.0-rc.3",
+        "@adatechnology/meta-whatsapp-contracts": "0.2.0-rc.13",
+        "@adatechnology/meta-whatsapp-module": "0.2.0-rc.31",
+        "@adatechnology/meta-whatsapp-provider": "0.2.0-rc.12",
         "@adatechnology/object-storage-provider": "0.1.1",
         "@bull-board/api": "^8.1.2",
         "@bull-board/express": "^8.1.2",
@@ -47,7 +47,7 @@
       "name": "@order-hub/web",
       "version": "0.0.1",
       "dependencies": {
-        "@adatechnology/conversations-ui": "0.1.0-rc.26",
+        "@adatechnology/conversations-ui": "0.1.0-rc.40",
         "@adatechnology/products-ui": "0.1.0-rc.1",
         "@tanstack/react-query": "^5.62.7",
         "lucide-react": "^0.468.0",
@@ -72,15 +72,15 @@
     },
   },
   "packages": {
-    "@adatechnology/conversations-ui": ["@adatechnology/conversations-ui@0.1.0-rc.26", "", { "dependencies": { "@adatechnology/meta-whatsapp-contracts": "0.2.0-rc.10", "clsx": "^2.1.1", "lucide-react": "^1.21.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "@xyflow/react": "^12", "react": "^18 || ^19", "react-dom": "^18 || ^19" }, "optionalPeers": ["@xyflow/react"] }, "sha512-7Qcuxv7/6x3LHTdIcl4Yu+2NZ33wyKa5B6rEUzufrTyYmrphMp7pasZcSmbx4os9c8dqBBNJzSuGoW//Z4gXGg=="],
+    "@adatechnology/conversations-ui": ["@adatechnology/conversations-ui@0.1.0-rc.40", "", { "dependencies": { "@adatechnology/meta-whatsapp-contracts": "0.2.0-rc.13", "clsx": "^2.1.1", "lucide-react": "^1.21.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "@xyflow/react": "^12", "react": "^18 || ^19", "react-dom": "^18 || ^19" }, "optionalPeers": ["@xyflow/react"] }, "sha512-q+qwxK2LREboTsY1d/14WeIIVsnCny3UGm6CTLIgrVQa14WJHl3PVmnJAe8GBijPVItW0MTQtgJSAP6YZjgeMQ=="],
 
-    "@adatechnology/meta-graph-core": ["@adatechnology/meta-graph-core@0.2.0-rc.2", "", { "dependencies": { "zod": "^3.24.1" } }, "sha512-IW2EeIBAFTflhOCiePp2LlrhLsA/2bW76ZUD8G0HSHbh0VFVLQnCXLrEiSiV3KFmNgyyQSn3PkGbCFnUnYoYpA=="],
+    "@adatechnology/meta-graph-core": ["@adatechnology/meta-graph-core@0.2.0-rc.8", "", { "dependencies": { "zod": "^3.24.1" } }, "sha512-joArl99HXu1LPqgMXMsVhoV6wXyTpoJaGxnqVIqnY1KEp6Wtdg5gFGYGOfEGZKwmMn7/vQYSIHJ5DLFJ9Cuy0g=="],
 
-    "@adatechnology/meta-whatsapp-contracts": ["@adatechnology/meta-whatsapp-contracts@0.2.0-rc.9", "", { "dependencies": { "zod": "^3.24.1" } }, "sha512-saYW64sv4tLuPM24S7apchLRiwcsQaBvNDVqoxrjXZ8NJof3cy1JFEzUwexvwwYc2j/Fpoh250KXP3Gv4b8wMg=="],
+    "@adatechnology/meta-whatsapp-contracts": ["@adatechnology/meta-whatsapp-contracts@0.2.0-rc.13", "", { "dependencies": { "zod": "^3.24.1" } }, "sha512-UqYAcfRxrD+zqUJamcbiKFjn3RHu7CJN3/J/F1LnxHzJLhKH81Qxbdv8zNagVX4xtAjIoqf864BBGRebAqIuJg=="],
 
-    "@adatechnology/meta-whatsapp-module": ["@adatechnology/meta-whatsapp-module@0.2.0-rc.18", "", { "dependencies": { "@adatechnology/meta-graph-core": "0.2.0-rc.2", "@adatechnology/meta-whatsapp-contracts": "0.2.0-rc.9", "@adatechnology/meta-whatsapp-provider": "0.2.0-rc.3" }, "peerDependencies": { "drizzle-orm": ">=0.36.0 <1" } }, "sha512-SN55AMD7q/xfL+lmIm+mFTIzMJklAxQQ3a14JDd/11hPgXDLrIMpkK2mc55l7ZH9mz+CO5HBBPnxLGWT5hqJzA=="],
+    "@adatechnology/meta-whatsapp-module": ["@adatechnology/meta-whatsapp-module@0.2.0-rc.31", "", { "dependencies": { "@adatechnology/meta-graph-core": "0.2.0-rc.8", "@adatechnology/meta-whatsapp-contracts": "0.2.0-rc.13", "@adatechnology/meta-whatsapp-provider": "0.2.0-rc.12" }, "peerDependencies": { "drizzle-orm": ">=0.36.0 <1" } }, "sha512-LtL3Lnt0bz2OJbf2pojdGyHbEKvbBRuI2vVRcGzZDt2g+LGGe6gKBygEE0deBhvT4de44FzpbECco9POm7iF2g=="],
 
-    "@adatechnology/meta-whatsapp-provider": ["@adatechnology/meta-whatsapp-provider@0.2.0-rc.3", "", { "dependencies": { "@adatechnology/meta-graph-core": "0.2.0-rc.2", "zod": "^3.24.1" } }, "sha512-hGhMnVuaU3vTDQLLXKYvlMGFjN+gbOVvwjSCU4n0uwJkeynSP3sjpBi7ao/5KPTAyzkEHpaPLkppcRBdjU7mNw=="],
+    "@adatechnology/meta-whatsapp-provider": ["@adatechnology/meta-whatsapp-provider@0.2.0-rc.12", "", { "dependencies": { "@adatechnology/meta-graph-core": "0.2.0-rc.8", "zod": "^3.24.1" } }, "sha512-iC0zuxZaUufhXG2POw5Ijopg+0orma+fuCb539/AOvhbPgqANU4ocS2YyQ77khv69D5WQwgWNYt8lzNDDSJ+8g=="],
 
     "@adatechnology/object-storage-provider": ["@adatechnology/object-storage-provider@0.1.1", "", { "dependencies": { "@aws-sdk/client-s3": "3.1091.0", "@aws-sdk/s3-request-presigner": "3.1091.0" } }, "sha512-7NDG0Ix3so+c0+ue7WdsMremG2YnnGjbE4BHnQ8pj9pZ5iP3siJeQ9pzhUyOpZT7jJW1M01Zh5nbFAnmlsK4XA=="],
 
@@ -522,7 +522,7 @@
 
     "@types/body-parser": ["@types/body-parser@1.19.6", "", { "dependencies": { "@types/connect": "*", "@types/node": "*" } }, "sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g=="],
 
-    "@types/bun": ["@types/bun@1.3.14", "", { "dependencies": { "bun-types": "1.3.14" } }, "sha512-h1hFqFVcvAvD9j9K7ZW7vd82aSA+rTdznZa+5bwvCwqSB1jmmfLcbIWhOLx1/+boy/xmjgCs/OMUL8hRJSmnPw=="],
+    "@types/bun": ["@types/bun@1.4.0", "", { "dependencies": { "bun-types": "1.4.0" } }, "sha512-K+lZULY23vRgK/CfTjFIV+tyifaNdSMlPh9j+6mQ/cLfpOznLyAuzgV/JQysyECpkBQLVMSyvjlr2fBUSA9wFQ=="],
 
     "@types/connect": ["@types/connect@3.4.38", "", { "dependencies": { "@types/node": "*" } }, "sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug=="],
 
@@ -634,7 +634,7 @@
 
     "bullmq": ["bullmq@5.80.2", "", { "dependencies": { "cron-parser": "4.9.0", "ioredis": "5.10.1", "msgpackr": "2.0.4", "node-abort-controller": "3.1.1", "semver": "7.8.5", "tslib": "2.8.1" }, "peerDependencies": { "redis": ">=5.0.0" }, "optionalPeers": ["redis"] }, "sha512-IobIZd0xFtpnw9W9RdqDX45nfdI2QSmq8rudMj99p3V5mIm9v4I3uPObqKj7i+6Xfd8Lzs3n1p+YNB7s6ykF4Q=="],
 
-    "bun-types": ["bun-types@1.3.14", "", { "dependencies": { "@types/node": "*" } }, "sha512-4N0ig0fEomHt5R0KCFWjovxow98rIoRwKolrYdCcknNwMekCXRnWEUvgu5soYV8QXtVsrUD8B95MBOZGPvr6KQ=="],
+    "bun-types": ["bun-types@1.4.0", "", { "dependencies": { "@types/node": "*" } }, "sha512-iIKw23BspnQQYd3prITOBxeUsxBHnwzX6YJfGMuNOZzeNcMmVqzIIVGRm1l69ogaPQmb4wB6BN8mA5bE9YuC5Q=="],
 
     "bundle-require": ["bundle-require@5.1.0", "", { "dependencies": { "load-tsconfig": "^0.2.3" }, "peerDependencies": { "esbuild": ">=0.18" } }, "sha512-3WrrOuZiyaaZPWiEt4G3+IffISVC9HYlWueJEBWED4ZH4aIAC2PnkdnuRrR94M+w6yGWn4AglWtJtBI8YqvgoA=="],
 
@@ -1476,8 +1476,6 @@
 
     "zustand": ["zustand@5.0.14", "", { "peerDependencies": { "@types/react": ">=18.0.0", "immer": ">=9.0.6", "react": ">=18.0.0", "use-sync-external-store": ">=1.2.0" }, "optionalPeers": ["@types/react", "immer", "react", "use-sync-external-store"] }, "sha512-/8tAspM5LMPr28b3fwLYrtdj77ECpfZviaP75CMTnwO8ISyaE4GDIG/9rDDYq/cH9D2Xw2A2RXglLInmVBQB/g=="],
 
-    "@adatechnology/conversations-ui/@adatechnology/meta-whatsapp-contracts": ["@adatechnology/meta-whatsapp-contracts@0.2.0-rc.10", "", { "dependencies": { "zod": "^3.24.1" } }, "sha512-va/lGqBiSraLYyHBH1YfQrkd3NbqGVFDpYOaP5gQR9fW4iGl99EGw/TDDOlWbGknmQ+jL/4SVu7D24sQtCqfGQ=="],
-
     "@adatechnology/conversations-ui/lucide-react": ["lucide-react@1.28.0", "", { "peerDependencies": { "react": "^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0" } }, "sha512-fARAFJULsGuDDydjp6+6blekG/sBIM29TerzLjc9bQUKAcEfrSc4ZQKb25KRz4OMKd87cZTb5dgq0w/T6KufVg=="],
 
     "@babel/core/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
@@ -1493,6 +1491,8 @@
     "@esbuild-kit/core-utils/esbuild": ["esbuild@0.18.20", "", { "optionalDependencies": { "@esbuild/android-arm": "0.18.20", "@esbuild/android-arm64": "0.18.20", "@esbuild/android-x64": "0.18.20", "@esbuild/darwin-arm64": "0.18.20", "@esbuild/darwin-x64": "0.18.20", "@esbuild/freebsd-arm64": "0.18.20", "@esbuild/freebsd-x64": "0.18.20", "@esbuild/linux-arm": "0.18.20", "@esbuild/linux-arm64": "0.18.20", "@esbuild/linux-ia32": "0.18.20", "@esbuild/linux-loong64": "0.18.20", "@esbuild/linux-mips64el": "0.18.20", "@esbuild/linux-ppc64": "0.18.20", "@esbuild/linux-riscv64": "0.18.20", "@esbuild/linux-s390x": "0.18.20", "@esbuild/linux-x64": "0.18.20", "@esbuild/netbsd-x64": "0.18.20", "@esbuild/openbsd-x64": "0.18.20", "@esbuild/sunos-x64": "0.18.20", "@esbuild/win32-arm64": "0.18.20", "@esbuild/win32-ia32": "0.18.20", "@esbuild/win32-x64": "0.18.20" }, "bin": { "esbuild": "bin/esbuild" } }, "sha512-ceqxoedUrcayh7Y7ZX6NdbbDzGROiyVBgC4PriJThBKSVPWnnFHZAkfI1lJT8QFkOwH4qOS2SJkS4wvpGl8BpA=="],
 
     "@order-hub/api/@adatechnology/fiscal-provider": ["@adatechnology/fiscal-provider@file:../adatechnology-packages/packages/backend/fiscal-provider", { "dependencies": { "fast-xml-parser": "^4.5.3", "node-forge": "^1.3.1", "pdfkit": "^0.19.1", "qrcode": "^1.5.4", "xml-crypto": "^6.0.1" }, "devDependencies": { "@types/node-forge": "^1.3.11", "@types/pdfkit": "^0.17.6", "@types/qrcode": "^1.5.6", "tsup": "^8.5.1", "typescript": "^5.9.3" } }],
+
+    "@order-hub/api/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "@order-hub/web/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
@@ -1591,8 +1591,6 @@
     "@esbuild-kit/core-utils/esbuild/@esbuild/win32-ia32": ["@esbuild/win32-ia32@0.18.20", "", { "os": "win32", "cpu": "ia32" }, "sha512-Wv7QBi3ID/rROT08SABTS7eV4hX26sVduqDOTe1MvGMjNd3EjOz4b7zeexIR62GTIEKrfJXKL9LFxTYgkyeu7g=="],
 
     "@esbuild-kit/core-utils/esbuild/@esbuild/win32-x64": ["@esbuild/win32-x64@0.18.20", "", { "os": "win32", "cpu": "x64" }, "sha512-kTdfRcSiDfQca/y9QIkng02avJ+NCaQvrMejlsB3RRv5sE9rRoeBPISaZpKxHELzRxZyLvNts1P27W3wV+8geQ=="],
-
-    "@order-hub/api/@adatechnology/fiscal-provider/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "bullmq/ioredis/@ioredis/commands": ["@ioredis/commands@1.5.1", "", {}, "sha512-JH8ZL/ywcJyR9MmJ5BNqZllXNZQqQbnVZOqpPQqE1vHiFgAw4NHbvE0FOduNU8IX9babitBT46571OnPTT0Zcw=="],
 

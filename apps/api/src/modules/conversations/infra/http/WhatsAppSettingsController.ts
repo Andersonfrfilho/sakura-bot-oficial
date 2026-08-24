@@ -14,9 +14,20 @@
 
 import { z } from 'zod'
 import { WhatsAppTemplateProvider } from '@adatechnology/meta-whatsapp-provider'
+import { OptimisticLockError, type MetaWhatsAppModule } from '@adatechnology/meta-whatsapp-module'
+import type { FlowGraphData } from '@adatechnology/meta-whatsapp-contracts'
 import type { RouteHandler } from '@/infra/http/router'
-import { ValidationError, UnauthorizedError } from '@/shared/errors/AppError'
+import { ValidationError, UnauthorizedError, NotFoundError, ConflictError } from '@/shared/errors/AppError'
 import type { MetaWhatsAppModuleRegistry } from '../whatsapp/metaWhatsAppModule'
+
+// `flows` fica undefined quando `features.flowEngine` está desligado — 400 explícito em vez de um
+// 500 que esconderia a causa real na tela de fluxos.
+function requireFlows(module: MetaWhatsAppModule) {
+  if (!module.flows) {
+    throw new ValidationError('Motor de fluxo desligado nesta instalação')
+  }
+  return module.flows
+}
 
 const MAX_MESSAGE_LENGTH = 4096
 
@@ -96,5 +107,92 @@ export class WhatsAppSettingsController {
       ...(footerText !== undefined ? { footerText } : {}),
     })
     response.json(result, 201)
+  }
+
+  listFlows: RouteHandler = async (request, response) => {
+    const companyId = this.companyOf(request)
+    const flows = await requireFlows(this.modules.forEstablishment(companyId)).list.execute({
+      companyId,
+    })
+    response.json(flows)
+  }
+
+  getFlow: RouteHandler = async (request, response) => {
+    const companyId = this.companyOf(request)
+    const key = request.params['key']
+    if (!key) throw new ValidationError('Chave do fluxo ausente')
+
+    const flow = await requireFlows(this.modules.forEstablishment(companyId)).get.execute({
+      companyId,
+      key,
+    })
+    if (!flow) throw new NotFoundError('Fluxo')
+
+    response.json(flow)
+  }
+
+  createFlow: RouteHandler = async (request, response) => {
+    const companyId = this.companyOf(request)
+    const body = request.body as { key?: unknown; label?: unknown; startNodeId?: unknown; nodes?: unknown }
+    if (typeof body?.key !== 'string' || typeof body?.label !== 'string') {
+      throw new ValidationError('Campos `key` e `label` são obrigatórios')
+    }
+
+    const startNodeId = typeof body.startNodeId === 'string' ? body.startNodeId : 'start'
+    const flow = await requireFlows(this.modules.forEstablishment(companyId)).create.execute({
+      companyId,
+      key: body.key,
+      label: body.label,
+      startNodeId,
+      nodes: (body.nodes as FlowGraphData['nodes']) ?? {},
+    })
+    response.json(flow, 201)
+  }
+
+  // Save otimista por versão: dois atendentes editando o mesmo fluxo não sobrescrevem um ao outro
+  // em silêncio — o segundo recebe 409 e a UI pede para recarregar.
+  saveFlow: RouteHandler = async (request, response) => {
+    const companyId = this.companyOf(request)
+    const key = request.params['key']
+    if (!key) throw new ValidationError('Chave do fluxo ausente')
+
+    const body = request.body as { graph?: FlowGraphData; expectedVersion?: unknown }
+    if (typeof body?.expectedVersion !== 'number' || !body.graph) {
+      throw new ValidationError('Campos `graph` e `expectedVersion` são obrigatórios')
+    }
+
+    try {
+      const flow = await requireFlows(this.modules.forEstablishment(companyId)).save.execute({
+        companyId,
+        // A chave da rota manda sobre a do corpo: renomear um fluxo por PUT criaria um segundo
+        // grafo em vez de atualizar o da URL.
+        graph: { ...body.graph, key },
+        expectedVersion: body.expectedVersion,
+      })
+      response.json(flow)
+    } catch (error) {
+      if (error instanceof OptimisticLockError) {
+        throw new ConflictError('O fluxo foi alterado por outra pessoa — recarregue antes de gravar')
+      }
+      throw error
+    }
+  }
+
+  deleteFlow: RouteHandler = async (request, response) => {
+    const companyId = this.companyOf(request)
+    const key = request.params['key']
+    if (!key) throw new ValidationError('Chave do fluxo ausente')
+
+    await requireFlows(this.modules.forEstablishment(companyId)).delete.execute({ companyId, key })
+    response.json(null, 204)
+  }
+
+  // Quantas conversas estão paradas em cada nó agora — é o que pinta o contador no editor.
+  liveFlowPositions: RouteHandler = async (request, response) => {
+    const companyId = this.companyOf(request)
+    const positions = await requireFlows(this.modules.forEstablishment(companyId)).livePositions.execute({
+      companyId,
+    })
+    response.json(positions)
   }
 }

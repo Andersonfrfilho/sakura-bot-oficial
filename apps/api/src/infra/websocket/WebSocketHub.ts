@@ -1,5 +1,5 @@
+import type { ServerWebSocket } from 'bun'
 import { jwtVerify, type JWTPayload } from 'jose'
-import type { TemplatedApp, WebSocket } from 'uWebSockets.js'
 import type { CacheProvider } from '@/shared/providers/CacheProvider'
 import { WS_EVENTS, type WsServerMessage } from './WebSocketEvents'
 
@@ -12,7 +12,7 @@ interface AuthPayload extends JWTPayload {
   role: string
 }
 
-interface WsClientData {
+export interface WsClientData {
   userId?: string
   establishmentId?: string
   authenticated: boolean
@@ -32,80 +32,69 @@ function buildMessage(type: string, payload?: unknown): string {
 }
 
 export class WebSocketHub {
-  private readonly app: TemplatedApp
   private readonly cache: CacheProvider
   // Map of establishmentId → Set of authenticated WebSocket clients
-  private readonly rooms = new Map<string, Set<WebSocket<WsClientData>>>()
+  private readonly rooms = new Map<string, Set<ServerWebSocket<WsClientData>>>()
 
-  constructor(app: TemplatedApp, cache: CacheProvider) {
-    this.app = app
+  constructor(cache: CacheProvider) {
     this.cache = cache
-    this.setupRoute()
     this.setupRedisSubscription()
   }
 
-  private setupRoute(): void {
-    this.app.ws<WsClientData>('/ws', {
-      compression: 0,
-      maxPayloadLength: 16 * 1024, // 16 KB — no large payloads needed
-
-      open: (ws) => {
-        const data = ws.getUserData()
-        data.authenticated = false
-
-        // Disconnect if no auth message received within timeout
-        data.authTimer = setTimeout(() => {
-          if (!data.authenticated) {
-            ws.send(buildMessage(WS_EVENTS.AUTH_FAILURE, { reason: 'auth_timeout' }))
-            ws.close()
-          }
-        }, AUTH_TIMEOUT_MS)
-      },
-
-      message: async (ws, rawMessage, _isBinary) => {
-        const data = ws.getUserData()
-        let parsed: Record<string, unknown>
-
-        try {
-          parsed = JSON.parse(Buffer.from(rawMessage).toString('utf-8')) as Record<string, unknown>
-        } catch {
-          ws.send(buildMessage('error', { reason: 'invalid_json' }))
-          return
-        }
-
-        if (parsed['type'] === WS_EVENTS.AUTH) {
-          await this.handleAuth(ws, data, String(parsed['token'] ?? ''))
-          return
-        }
-
-        if (!data.authenticated) {
-          ws.send(buildMessage(WS_EVENTS.AUTH_FAILURE, { reason: 'not_authenticated' }))
-          return
-        }
-
-        if (parsed['type'] === WS_EVENTS.PING) {
-          ws.send(buildMessage(WS_EVENTS.PONG))
-          return
-        }
-      },
-
-      close: (ws) => {
-        const data = ws.getUserData()
-        if (data.authTimer) clearTimeout(data.authTimer)
-        if (data.establishmentId) {
-          const room = this.rooms.get(data.establishmentId)
-          room?.delete(ws)
-          if (room?.size === 0) this.rooms.delete(data.establishmentId)
-        }
-      },
-    })
+  // Initial per-connection data, passed to Bun's server.upgrade(request, { data })
+  createClientData(): WsClientData {
+    return { authenticated: false }
   }
 
-  private async handleAuth(
-    ws: WebSocket<WsClientData>,
-    data: WsClientData,
-    token: string
-  ): Promise<void> {
+  open(ws: ServerWebSocket<WsClientData>): void {
+    ws.data.authenticated = false
+
+    // Disconnect if no auth message received within timeout
+    ws.data.authTimer = setTimeout(() => {
+      if (!ws.data.authenticated) {
+        ws.send(buildMessage(WS_EVENTS.AUTH_FAILURE, { reason: 'auth_timeout' }))
+        ws.close()
+      }
+    }, AUTH_TIMEOUT_MS)
+  }
+
+  async message(ws: ServerWebSocket<WsClientData>, rawMessage: string | Buffer): Promise<void> {
+    let parsed: Record<string, unknown>
+
+    try {
+      const text =
+        typeof rawMessage === 'string' ? rawMessage : Buffer.from(rawMessage).toString('utf-8')
+      parsed = JSON.parse(text) as Record<string, unknown>
+    } catch {
+      ws.send(buildMessage('error', { reason: 'invalid_json' }))
+      return
+    }
+
+    if (parsed['type'] === WS_EVENTS.AUTH) {
+      await this.handleAuth(ws, String(parsed['token'] ?? ''))
+      return
+    }
+
+    if (!ws.data.authenticated) {
+      ws.send(buildMessage(WS_EVENTS.AUTH_FAILURE, { reason: 'not_authenticated' }))
+      return
+    }
+
+    if (parsed['type'] === WS_EVENTS.PING) {
+      ws.send(buildMessage(WS_EVENTS.PONG))
+    }
+  }
+
+  close(ws: ServerWebSocket<WsClientData>): void {
+    if (ws.data.authTimer) clearTimeout(ws.data.authTimer)
+    if (ws.data.establishmentId) {
+      const room = this.rooms.get(ws.data.establishmentId)
+      room?.delete(ws)
+      if (room?.size === 0) this.rooms.delete(ws.data.establishmentId)
+    }
+  }
+
+  private async handleAuth(ws: ServerWebSocket<WsClientData>, token: string): Promise<void> {
     if (!token) {
       ws.send(buildMessage(WS_EVENTS.AUTH_FAILURE, { reason: 'missing_token' }))
       ws.close()
@@ -116,11 +105,11 @@ export class WebSocketHub {
       const { payload } = await jwtVerify(token, JWT_SECRET, { algorithms: ['HS256'] })
       if (!isAuthPayload(payload)) throw new Error('invalid_payload')
 
-      if (data.authTimer) clearTimeout(data.authTimer)
+      if (ws.data.authTimer) clearTimeout(ws.data.authTimer)
 
-      data.userId = payload.sub
-      data.establishmentId = payload.establishmentId
-      data.authenticated = true
+      ws.data.userId = payload.sub
+      ws.data.establishmentId = payload.establishmentId
+      ws.data.authenticated = true
 
       // Join room for this establishment
       if (!this.rooms.has(payload.establishmentId)) {
